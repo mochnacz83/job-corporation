@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, ClipboardCheck, LogOut, User, ExternalLink, Plus } from "lucide-react";
+import { BarChart3, ClipboardCheck, LogOut, User, Shield } from "lucide-react";
 
 interface PowerBILink {
   id: string;
@@ -15,7 +15,7 @@ interface PowerBILink {
 }
 
 const Dashboard = () => {
-  const { profile, signOut, loading } = useAuth();
+  const { profile, isAdmin, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const [links, setLinks] = useState<PowerBILink[]>([]);
 
@@ -104,6 +104,23 @@ const Dashboard = () => {
               </p>
             </CardContent>
           </Card>
+
+          {/* Admin Section */}
+          {isAdmin && (
+            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer border-primary/20" onClick={() => navigate("/admin/usuarios")}>
+              <CardHeader className="pb-3">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
+                  <Shield className="w-6 h-6 text-primary" />
+                </div>
+                <CardTitle className="text-lg">Gerenciar Usuários</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-sm">
+                  Ative, bloqueie ou gerencie o acesso dos usuários ao sistema.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
     </div>

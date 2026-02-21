@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import ChangePassword from "./pages/ChangePassword";
 import PowerBI from "./pages/PowerBI";
 import Visitas from "./pages/Visitas";
+import AdminUsers from "./pages/AdminUsers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
             <Route path="/powerbi" element={<ProtectedRoute><PowerBI /></ProtectedRoute>} />
             <Route path="/visitas" element={<ProtectedRoute><Visitas /></ProtectedRoute>} />
+            <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

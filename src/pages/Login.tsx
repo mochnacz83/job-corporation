@@ -25,6 +25,24 @@ const Login = () => {
     setLoading(true);
     try {
       await signIn(matricula.trim(), password);
+      // Check user status
+      const email = `${matricula.trim()}@empresa.local`;
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("matricula", matricula.trim())
+        .single();
+      
+      if (profileData?.status === "bloqueado") {
+        await supabase.auth.signOut();
+        toast({ title: "Acesso bloqueado", description: "Sua conta está bloqueada. Contacte o administrador.", variant: "destructive" });
+        return;
+      }
+      if (profileData?.status === "pendente") {
+        await supabase.auth.signOut();
+        toast({ title: "Aguardando aprovação", description: "Sua conta ainda não foi ativada pelo administrador.", variant: "destructive" });
+        return;
+      }
       navigate("/dashboard");
     } catch {
       toast({ title: "Erro no login", description: "Matrícula ou senha incorretos.", variant: "destructive" });
