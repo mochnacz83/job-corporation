@@ -63,7 +63,13 @@ const Login = () => {
         options: { data: { matricula: matricula.trim(), nome: nome.trim() } },
       });
       if (error) throw error;
-      toast({ title: "Conta criada!", description: "Faça login com sua matrícula e senha." });
+
+      // Notify admin via email
+      supabase.functions.invoke("notify-new-user", {
+        body: { nome: nome.trim(), matricula: matricula.trim() },
+      }).catch((err) => console.error("Notification error:", err));
+
+      toast({ title: "Conta criada!", description: "Aguarde a aprovação do administrador para acessar o sistema." });
       setIsSignUp(false);
     } catch (err: any) {
       toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
