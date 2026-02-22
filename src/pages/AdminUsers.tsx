@@ -13,7 +13,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -26,6 +45,17 @@ interface UserProfile {
   created_at: string;
 }
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{6,}$/;
+
+const validatePassword = (password: string): string | null => {
+  if (password.length < 6) return "A senha deve ter no mínimo 6 caracteres.";
+  if (!/[a-z]/.test(password)) return "A senha deve conter pelo menos uma letra minúscula.";
+  if (!/[A-Z]/.test(password)) return "A senha deve conter pelo menos uma letra maiúscula.";
+  if (!/\d/.test(password)) return "A senha deve conter pelo menos um número.";
+  if (!/[^a-zA-Z0-9]/.test(password)) return "A senha deve conter pelo menos um caractere especial.";
+  return null;
+};
+
 const AdminUsers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -34,6 +64,18 @@ const AdminUsers = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Reset password state
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetUser, setResetUser] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  // Delete user state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteUserTarget, setDeleteUserTarget] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     checkAdminAndLoad();
   }, [user]);
@@ -41,7 +83,6 @@ const AdminUsers = () => {
   const checkAdminAndLoad = async () => {
     if (!user) return;
 
-    // Check if current user is admin
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
@@ -88,6 +129,83 @@ const AdminUsers = () => {
       description: `Usuário ${newStatus === "ativo" ? "ativado" : "bloqueado"} com sucesso.`,
     });
     await loadUsers();
+  };
+
+  const openResetDialog = (u: UserProfile) => {
+    setResetUser(u);
+    setNewPassword("");
+    setPasswordError(null);
+    setResetDialogOpen(true);
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetUser) return;
+
+    const error = validatePassword(newPassword);
+    if (error) {
+      setPasswordError(error);
+      return;
+    }
+
+    setResetting(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "reset-password", userId: resetUser.user_id, newPassword },
+      });
+
+      if (fnError || (data && data.error)) {
+        throw new Error(data?.error || fnError?.message || "Erro desconhecido");
+      }
+
+      toast({
+        title: "Senha redefinida",
+        description: `A senha de ${resetUser.nome} foi redefinida. No próximo login será solicitada a troca.`,
+      });
+      setResetDialogOpen(false);
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível redefinir a senha.",
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const openDeleteDialog = (u: UserProfile) => {
+    setDeleteUserTarget(u);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserTarget) return;
+
+    setDeleting(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "delete-user", userId: deleteUserTarget.user_id },
+      });
+
+      if (fnError || (data && data.error)) {
+        throw new Error(data?.error || fnError?.message || "Erro desconhecido");
+      }
+
+      toast({
+        title: "Usuário excluído",
+        description: `A conta de ${deleteUserTarget.nome} foi excluída permanentemente.`,
+      });
+      setDeleteDialogOpen(false);
+      await loadUsers();
+    } catch (err: any) {
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível excluir o usuário.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -157,27 +275,44 @@ const AdminUsers = () => {
                     <TableCell className="text-sm text-muted-foreground">
                       {new Date(u.created_at).toLocaleDateString("pt-BR")}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {u.status !== "ativo" && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {u.status !== "ativo" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600 border-green-600 hover:bg-green-50"
+                            onClick={() => updateUserStatus(u.user_id, "ativo")}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" /> Ativar
+                          </Button>
+                        )}
+                        {u.status !== "bloqueado" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive border-destructive hover:bg-destructive/10"
+                            onClick={() => updateUserStatus(u.user_id, "bloqueado")}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" /> Bloquear
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-green-600 border-green-600 hover:bg-green-50"
-                          onClick={() => updateUserStatus(u.user_id, "ativo")}
+                          onClick={() => openResetDialog(u)}
                         >
-                          <CheckCircle className="w-4 h-4 mr-1" /> Ativar
+                          <KeyRound className="w-4 h-4 mr-1" /> Resetar Senha
                         </Button>
-                      )}
-                      {u.status !== "bloqueado" && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="text-destructive border-destructive hover:bg-destructive/10"
-                          onClick={() => updateUserStatus(u.user_id, "bloqueado")}
+                          onClick={() => openDeleteDialog(u)}
                         >
-                          <XCircle className="w-4 h-4 mr-1" /> Bloquear
+                          <Trash2 className="w-4 h-4 mr-1" /> Excluir
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -193,6 +328,75 @@ const AdminUsers = () => {
           </CardContent>
         </Card>
       </main>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Redefinir Senha</DialogTitle>
+            <DialogDescription>
+              Informe a nova senha para <strong>{resetUser?.nome}</strong> (Matrícula: {resetUser?.matricula}).
+              O usuário será obrigado a trocar a senha no próximo login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Input
+              type="password"
+              placeholder="Nova senha"
+              value={newPassword}
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setPasswordError(null);
+              }}
+            />
+            {passwordError && (
+              <p className="text-sm text-destructive">{passwordError}</p>
+            )}
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>A senha deve conter:</p>
+              <ul className="list-disc list-inside">
+                <li>No mínimo 6 caracteres</li>
+                <li>Pelo menos uma letra maiúscula</li>
+                <li>Pelo menos uma letra minúscula</li>
+                <li>Pelo menos um número</li>
+                <li>Pelo menos um caractere especial (!@#$%...)</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleResetPassword} disabled={resetting || !newPassword}>
+              {resetting ? "Redefinindo..." : "Redefinir Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir permanentemente a conta de{" "}
+              <strong>{deleteUserTarget?.nome}</strong> (Matrícula: {deleteUserTarget?.matricula})?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Excluir Permanentemente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
