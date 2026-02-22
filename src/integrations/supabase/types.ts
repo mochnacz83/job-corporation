@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          page: string | null
+          user_id: string
+        }
+        Insert: {
+          action?: string
+          created_at?: string
+          id?: string
+          page?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          page?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       powerbi_links: {
         Row: {
           ativo: boolean | null
@@ -79,6 +103,24 @@ export type Database = {
           nome?: string
           status?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_presence: {
+        Row: {
+          current_page: string | null
+          last_seen_at: string
+          user_id: string
+        }
+        Insert: {
+          current_page?: string | null
+          last_seen_at?: string
+          user_id: string
+        }
+        Update: {
+          current_page?: string | null
+          last_seen_at?: string
           user_id?: string
         }
         Relationships: []

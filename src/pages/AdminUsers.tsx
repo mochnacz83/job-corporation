@@ -5,34 +5,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -45,7 +29,10 @@ interface UserProfile {
   created_at: string;
 }
 
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{6,}$/;
+interface UserRole {
+  user_id: string;
+  role: string;
+}
 
 const validatePassword = (password: string): string | null => {
   if (password.length < 6) return "A senha deve ter no mínimo 6 caracteres.";
@@ -61,17 +48,16 @@ const AdminUsers = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [adminUserIds, setAdminUserIds] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Reset password state
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetUser, setResetUser] = useState<UserProfile | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
 
-  // Delete user state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteUserTarget, setDeleteUserTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -101,12 +87,15 @@ const AdminUsers = () => {
   };
 
   const loadUsers = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const [{ data: profilesData }, { data: rolesData }] = await Promise.all([
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
+    ]);
 
-    if (data) setUsers(data as UserProfile[]);
+    if (profilesData) setUsers(profilesData as UserProfile[]);
+    if (rolesData) {
+      setAdminUserIds(new Set(rolesData.map((r: any) => r.user_id)));
+    }
   };
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
@@ -116,11 +105,7 @@ const AdminUsers = () => {
       .eq("user_id", userId);
 
     if (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível atualizar o status.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
       return;
     }
 
@@ -128,6 +113,35 @@ const AdminUsers = () => {
       title: "Sucesso",
       description: `Usuário ${newStatus === "ativo" ? "ativado" : "bloqueado"} com sucesso.`,
     });
+    await loadUsers();
+  };
+
+  const toggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {
+    if (isCurrentlyAdmin) {
+      // Remove admin role
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role", "admin");
+
+      if (error) {
+        toast({ title: "Erro", description: "Não foi possível remover o admin.", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Sucesso", description: "Permissão de administrador removida." });
+    } else {
+      // Add admin role
+      const { error } = await supabase
+        .from("user_roles")
+        .insert({ user_id: userId, role: "admin" });
+
+      if (error) {
+        toast({ title: "Erro", description: "Não foi possível promover a admin.", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Sucesso", description: "Usuário promovido a administrador." });
+    }
     await loadUsers();
   };
 
@@ -140,34 +154,19 @@ const AdminUsers = () => {
 
   const handleResetPassword = async () => {
     if (!resetUser) return;
-
     const error = validatePassword(newPassword);
-    if (error) {
-      setPasswordError(error);
-      return;
-    }
+    if (error) { setPasswordError(error); return; }
 
     setResetting(true);
     try {
       const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
         body: { action: "reset-password", userId: resetUser.user_id, newPassword },
       });
-
-      if (fnError || (data && data.error)) {
-        throw new Error(data?.error || fnError?.message || "Erro desconhecido");
-      }
-
-      toast({
-        title: "Senha redefinida",
-        description: `A senha de ${resetUser.nome} foi redefinida. No próximo login será solicitada a troca.`,
-      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      toast({ title: "Senha redefinida", description: `A senha de ${resetUser.nome} foi redefinida.` });
       setResetDialogOpen(false);
     } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err.message || "Não foi possível redefinir a senha.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setResetting(false);
     }
@@ -180,29 +179,17 @@ const AdminUsers = () => {
 
   const handleDeleteUser = async () => {
     if (!deleteUserTarget) return;
-
     setDeleting(true);
     try {
       const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
         body: { action: "delete-user", userId: deleteUserTarget.user_id },
       });
-
-      if (fnError || (data && data.error)) {
-        throw new Error(data?.error || fnError?.message || "Erro desconhecido");
-      }
-
-      toast({
-        title: "Usuário excluído",
-        description: `A conta de ${deleteUserTarget.nome} foi excluída permanentemente.`,
-      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      toast({ title: "Usuário excluído", description: `A conta de ${deleteUserTarget.nome} foi excluída.` });
       setDeleteDialogOpen(false);
       await loadUsers();
     } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err.message || "Não foi possível excluir o usuário.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setDeleting(false);
     }
@@ -261,64 +248,72 @@ const AdminUsers = () => {
                   <TableHead>Nome</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Perfil</TableHead>
                   <TableHead>Cadastro</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-mono">{u.matricula}</TableCell>
-                    <TableCell>{u.nome}</TableCell>
-                    <TableCell>{u.cargo || "—"}</TableCell>
-                    <TableCell>{getStatusBadge(u.status)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(u.created_at).toLocaleDateString("pt-BR")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 flex-wrap">
-                        {u.status !== "ativo" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-600 hover:bg-green-50"
-                            onClick={() => updateUserStatus(u.user_id, "ativo")}
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" /> Ativar
-                          </Button>
+                {users.map((u) => {
+                  const isUserAdmin = adminUserIds.has(u.user_id);
+                  const isSelf = u.user_id === user?.id;
+                  return (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-mono">{u.matricula}</TableCell>
+                      <TableCell>{u.nome}</TableCell>
+                      <TableCell>{u.cargo || "—"}</TableCell>
+                      <TableCell>{getStatusBadge(u.status)}</TableCell>
+                      <TableCell>
+                        {isUserAdmin ? (
+                          <Badge className="bg-amber-600 hover:bg-amber-700">
+                            <Crown className="w-3 h-3 mr-1" /> Admin
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Usuário</Badge>
                         )}
-                        {u.status !== "bloqueado" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-destructive border-destructive hover:bg-destructive/10"
-                            onClick={() => updateUserStatus(u.user_id, "bloqueado")}
-                          >
-                            <XCircle className="w-4 h-4 mr-1" /> Bloquear
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(u.created_at).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1 flex-wrap">
+                          {u.status !== "ativo" && (
+                            <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50"
+                              onClick={() => updateUserStatus(u.user_id, "ativo")}>
+                              <CheckCircle className="w-4 h-4 mr-1" /> Ativar
+                            </Button>
+                          )}
+                          {u.status !== "bloqueado" && (
+                            <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
+                              onClick={() => updateUserStatus(u.user_id, "bloqueado")}>
+                              <XCircle className="w-4 h-4 mr-1" /> Bloquear
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => openResetDialog(u)}>
+                            <KeyRound className="w-4 h-4 mr-1" /> Resetar Senha
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openResetDialog(u)}
-                        >
-                          <KeyRound className="w-4 h-4 mr-1" /> Resetar Senha
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive border-destructive hover:bg-destructive/10"
-                          onClick={() => openDeleteDialog(u)}
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" /> Excluir
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                          {!isSelf && (
+                            <>
+                              <Button size="sm" variant="outline"
+                                className={isUserAdmin ? "text-amber-600 border-amber-600" : "text-primary border-primary"}
+                                onClick={() => toggleAdmin(u.user_id, isUserAdmin)}>
+                                <Crown className="w-4 h-4 mr-1" />
+                                {isUserAdmin ? "Remover Admin" : "Promover Admin"}
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
+                                onClick={() => openDeleteDialog(u)}>
+                                <Trash2 className="w-4 h-4 mr-1" /> Excluir
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {users.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       Nenhum usuário cadastrado.
                     </TableCell>
                   </TableRow>
@@ -340,18 +335,9 @@ const AdminUsers = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <Input
-              type="password"
-              placeholder="Nova senha"
-              value={newPassword}
-              onChange={(e) => {
-                setNewPassword(e.target.value);
-                setPasswordError(null);
-              }}
-            />
-            {passwordError && (
-              <p className="text-sm text-destructive">{passwordError}</p>
-            )}
+            <Input type="password" placeholder="Nova senha" value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }} />
+            {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
             <div className="text-xs text-muted-foreground space-y-1">
               <p>A senha deve conter:</p>
               <ul className="list-disc list-inside">
@@ -364,9 +350,7 @@ const AdminUsers = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setResetDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleResetPassword} disabled={resetting || !newPassword}>
               {resetting ? "Redefinindo..." : "Redefinir Senha"}
             </Button>
@@ -387,11 +371,8 @@ const AdminUsers = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteUser}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDeleteUser} disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? "Excluindo..." : "Excluir Permanentemente"}
             </AlertDialogAction>
           </AlertDialogFooter>
