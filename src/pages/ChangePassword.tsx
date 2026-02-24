@@ -17,10 +17,16 @@ const ChangePassword = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const passwordValid = newPassword.length >= 6 &&
+    /[A-Z]/.test(newPassword) &&
+    /[a-z]/.test(newPassword) &&
+    /\d/.test(newPassword) &&
+    /[^A-Za-z0-9]/.test(newPassword);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword.length < 6) {
-      toast({ title: "Senha muito curta", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+    if (!passwordValid) {
+      toast({ title: "Senha inválida", description: "Mínimo 6 caracteres com maiúscula, minúscula, número e caractere especial.", variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {

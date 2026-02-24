@@ -9,6 +9,9 @@ interface Profile {
   matricula: string;
   nome: string;
   cargo: string | null;
+  email: string | null;
+  empresa: string | null;
+  telefone: string | null;
   must_change_password: boolean;
   status: string;
 }
