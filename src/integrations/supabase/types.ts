@@ -75,33 +75,42 @@ export type Database = {
         Row: {
           cargo: string | null
           created_at: string
+          email: string | null
+          empresa: string | null
           id: string
           matricula: string
           must_change_password: boolean
           nome: string
           status: string
+          telefone: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           cargo?: string | null
           created_at?: string
+          email?: string | null
+          empresa?: string | null
           id?: string
           matricula: string
           must_change_password?: boolean
           nome: string
           status?: string
+          telefone?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           cargo?: string | null
           created_at?: string
+          email?: string | null
+          empresa?: string | null
           id?: string
           matricula?: string
           must_change_password?: boolean
           nome?: string
           status?: string
+          telefone?: string | null
           updated_at?: string
           user_id?: string
         }
