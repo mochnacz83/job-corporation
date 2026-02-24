@@ -12,6 +12,11 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+
     // Verify the caller is an admin
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -20,33 +25,21 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-
-    // Verify caller with anon client
     const anonClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(
-      authHeader.replace('Bearer ', '')
-    );
-    if (claimsError || !claimsData?.claims) {
+    const { data: { user: caller }, error: userError } = await anonClient.auth.getUser();
+    if (userError || !caller) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const callerId = claimsData.claims.sub;
-
-    // Check admin role using service client
-    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-
     const { data: roleData } = await serviceClient
       .from('user_roles')
       .select('role')
-      .eq('user_id', callerId)
+      .eq('user_id', caller.id)
       .eq('role', 'admin')
       .maybeSingle();
 
@@ -56,7 +49,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, userId, newPassword } = await req.json();
+    const { action, userId, newPassword, profileData } = await req.json();
 
     if (action === 'reset-password') {
       if (!userId || !newPassword) {
@@ -65,7 +58,6 @@ serve(async (req) => {
         });
       }
 
-      // Update password via admin API
       const { error: updateError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: newPassword,
       });
@@ -74,7 +66,6 @@ serve(async (req) => {
         throw new Error(`Failed to reset password: ${updateError.message}`);
       }
 
-      // Set must_change_password flag
       await serviceClient
         .from('profiles')
         .update({ must_change_password: true })
@@ -92,15 +83,39 @@ serve(async (req) => {
         });
       }
 
-      // Delete profile first (cascade should handle, but be explicit)
       await serviceClient.from('profiles').delete().eq('user_id', userId);
       await serviceClient.from('user_roles').delete().eq('user_id', userId);
 
-      // Delete auth user
       const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
       if (deleteError) {
         throw new Error(`Failed to delete user: ${deleteError.message}`);
       }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'update-profile') {
+      if (!userId || !profileData) {
+        return new Response(JSON.stringify({ error: 'userId and profileData required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Only allow safe fields
+      const allowed = ['nome', 'cargo', 'email', 'empresa', 'telefone'];
+      const safeData: Record<string, string> = {};
+      for (const key of allowed) {
+        if (profileData[key] !== undefined) safeData[key] = profileData[key];
+      }
+
+      const { error: updateError } = await serviceClient
+        .from('profiles')
+        .update(safeData)
+        .eq('user_id', userId);
+
+      if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

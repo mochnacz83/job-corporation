@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -16,7 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -25,6 +26,9 @@ interface UserProfile {
   matricula: string;
   nome: string;
   cargo: string | null;
+  email: string | null;
+  empresa: string | null;
+  telefone: string | null;
   status: string;
   created_at: string;
 }
@@ -61,6 +65,11 @@ const AdminUsers = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteUserTarget, setDeleteUserTarget] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserProfile | null>(null);
+  const [editForm, setEditForm] = useState({ nome: "", cargo: "", email: "", empresa: "", telefone: "" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     checkAdminAndLoad();
@@ -118,7 +127,6 @@ const AdminUsers = () => {
 
   const toggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {
     if (isCurrentlyAdmin) {
-      // Remove admin role
       const { error } = await supabase
         .from("user_roles")
         .delete()
@@ -131,7 +139,6 @@ const AdminUsers = () => {
       }
       toast({ title: "Sucesso", description: "Permissão de administrador removida." });
     } else {
-      // Add admin role
       const { error } = await supabase
         .from("user_roles")
         .insert({ user_id: userId, role: "admin" });
@@ -195,6 +202,50 @@ const AdminUsers = () => {
     }
   };
 
+  const openEditDialog = (u: UserProfile) => {
+    setEditUser(u);
+    setEditForm({
+      nome: u.nome || "",
+      cargo: u.cargo || "",
+      email: u.email || "",
+      empresa: u.empresa || "",
+      telefone: u.telefone || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditUser = async () => {
+    if (!editUser) return;
+    if (!editForm.nome.trim()) {
+      toast({ title: "Erro", description: "O nome é obrigatório.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: {
+          action: "update-profile",
+          userId: editUser.user_id,
+          profileData: {
+            nome: editForm.nome.trim(),
+            cargo: editForm.cargo.trim() || null,
+            email: editForm.email.trim() || null,
+            empresa: editForm.empresa.trim() || null,
+            telefone: editForm.telefone.replace(/\D/g, "") || null,
+          },
+        },
+      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      toast({ title: "Sucesso", description: `Dados de ${editForm.nome} atualizados.` });
+      setEditDialogOpen(false);
+      await loadUsers();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo":
@@ -246,6 +297,8 @@ const AdminUsers = () => {
                 <TableRow>
                   <TableHead>Matrícula</TableHead>
                   <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Empresa</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Perfil</TableHead>
@@ -261,6 +314,8 @@ const AdminUsers = () => {
                     <TableRow key={u.id}>
                       <TableCell className="font-mono">{u.matricula}</TableCell>
                       <TableCell>{u.nome}</TableCell>
+                      <TableCell className="text-sm">{u.email || "—"}</TableCell>
+                      <TableCell className="text-sm">{u.empresa || "—"}</TableCell>
                       <TableCell>{u.cargo || "—"}</TableCell>
                       <TableCell>{getStatusBadge(u.status)}</TableCell>
                       <TableCell>
@@ -277,6 +332,9 @@ const AdminUsers = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1 flex-wrap">
+                          <Button size="sm" variant="outline" onClick={() => openEditDialog(u)}>
+                            <Pencil className="w-4 h-4 mr-1" /> Editar
+                          </Button>
                           {u.status !== "ativo" && (
                             <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50"
                               onClick={() => updateUserStatus(u.user_id, "ativo")}>
@@ -313,7 +371,7 @@ const AdminUsers = () => {
                 })}
                 {users.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       Nenhum usuário cadastrado.
                     </TableCell>
                   </TableRow>
@@ -353,6 +411,51 @@ const AdminUsers = () => {
             <Button variant="outline" onClick={() => setResetDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleResetPassword} disabled={resetting || !newPassword}>
               {resetting ? "Redefinindo..." : "Redefinir Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Dados do Usuário</DialogTitle>
+            <DialogDescription>
+              Editando dados de <strong>{editUser?.nome}</strong> (Matrícula: {editUser?.matricula}).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="edit-nome">Nome</Label>
+              <Input id="edit-nome" value={editForm.nome}
+                onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-cargo">Cargo</Label>
+              <Input id="edit-cargo" value={editForm.cargo}
+                onChange={(e) => setEditForm({ ...editForm, cargo: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-email">E-mail</Label>
+              <Input id="edit-email" type="email" value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-empresa">Empresa</Label>
+              <Input id="edit-empresa" value={editForm.empresa}
+                onChange={(e) => setEditForm({ ...editForm, empresa: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-telefone">Telefone</Label>
+              <Input id="edit-telefone" value={editForm.telefone}
+                onChange={(e) => setEditForm({ ...editForm, telefone: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleEditUser} disabled={saving || !editForm.nome.trim()}>
+              {saving ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>
