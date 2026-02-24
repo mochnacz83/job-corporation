@@ -5,34 +5,56 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Shield, Loader2 } from "lucide-react";
+import { Shield, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+const MATRICULA_REGEX = /^TT\d{6}$/;
+const PHONE_REGEX = /^\d{11}$/;
+
+const formatPhone = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+type View = "login" | "signup" | "forgot";
+
 const Login = () => {
+  const [view, setView] = useState<View>("login");
   const [matricula, setMatricula] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [nome, setNome] = useState("");
+  const [emailContato, setEmailContato] = useState("");
+  const [empresa, setEmpresa] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const handleMatriculaChange = (value: string) => {
+    // Always start with TT, only allow digits after
+    let cleaned = value.toUpperCase();
+    if (!cleaned.startsWith("TT")) cleaned = "TT";
+    const afterTT = cleaned.slice(2).replace(/\D/g, "").slice(0, 6);
+    setMatricula("TT" + afterTT);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matricula.trim() || !password.trim()) return;
+    if (!MATRICULA_REGEX.test(matricula) || !password.trim()) return;
     setLoading(true);
     try {
       await signIn(matricula.trim(), password);
-      // Check user status
-      const email = `${matricula.trim()}@empresa.local`;
       const { data: profileData } = await supabase
         .from("profiles")
         .select("status")
         .eq("matricula", matricula.trim())
         .single();
-      
+
       if (profileData?.status === "bloqueado") {
         await supabase.auth.signOut();
         toast({ title: "Acesso bloqueado", description: "Sua conta está bloqueada. Contacte o administrador.", variant: "destructive" });
@@ -53,26 +75,69 @@ const Login = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!matricula.trim() || !password.trim() || !nome.trim()) return;
+    if (!MATRICULA_REGEX.test(matricula)) {
+      toast({ title: "Matrícula inválida", description: "A matrícula deve começar com TT seguido de 6 números.", variant: "destructive" });
+      return;
+    }
+    const phoneDigits = telefone.replace(/\D/g, "");
+    if (!PHONE_REGEX.test(phoneDigits)) {
+      toast({ title: "Telefone inválido", description: "Informe DDD + 9 dígitos (11 números).", variant: "destructive" });
+      return;
+    }
+    if (!nome.trim() || !password.trim() || !emailContato.trim() || !empresa.trim()) return;
     setLoading(true);
     try {
       const email = `${matricula.trim()}@empresa.local`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { matricula: matricula.trim(), nome: nome.trim() } },
+        options: {
+          data: {
+            matricula: matricula.trim(),
+            nome: nome.trim(),
+            email_contato: emailContato.trim(),
+            empresa: empresa.trim(),
+            telefone: phoneDigits,
+          },
+        },
       });
       if (error) throw error;
 
-      // Notify admin via email
       supabase.functions.invoke("notify-new-user", {
         body: { nome: nome.trim(), matricula: matricula.trim() },
       }).catch((err) => console.error("Notification error:", err));
 
       toast({ title: "Conta criada!", description: "Aguarde a aprovação do administrador para acessar o sistema." });
-      setIsSignUp(false);
+      setView("login");
+      setNome("");
+      setEmailContato("");
+      setEmpresa("");
+      setTelefone("");
+      setPassword("");
+      setMatricula("");
     } catch (err: any) {
       toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("forgot-password", {
+        body: { email: forgotEmail.trim() },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "E-mail enviado!", description: "Verifique sua caixa de entrada para a nova senha temporária." });
+      setView("login");
+      setForgotEmail("");
+    } catch (err: any) {
+      const msg = err?.message || "Erro ao recuperar senha.";
+      toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -89,40 +154,145 @@ const Login = () => {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Portal Corporativo</h1>
             <p className="text-muted-foreground text-sm mt-1">
-              {isSignUp ? "Cadastre sua conta" : "Acesse com sua matrícula"}
+              {view === "signup" ? "Cadastre sua conta" : view === "forgot" ? "Recuperar senha" : "Acesse com sua matrícula"}
             </p>
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="nome">Nome Completo</Label>
-                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="matricula">Matrícula</Label>
-              <Input id="matricula" value={matricula} onChange={(e) => setMatricula(e.target.value)} placeholder="Digite sua matrícula" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? "Cadastrar" : "Entrar"}
-            </Button>
-          </form>
-          <div className="mt-4 text-center">
+          {/* Forgot password link at the top */}
+          {view === "login" && (
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => setView("forgot")}
+              className="text-sm text-primary hover:underline mb-4 block w-full text-center"
             >
-              {isSignUp ? "Já tem conta? Faça login" : "Primeiro acesso? Cadastre-se"}
+              Esqueci a senha
             </button>
-          </div>
+          )}
+
+          {view === "forgot" && (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <button
+                type="button"
+                onClick={() => setView("login")}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors mb-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Voltar ao login
+              </button>
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">E-mail cadastrado</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  required
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Uma nova senha temporária será enviada para o e-mail informado.
+              </p>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Enviar nova senha
+              </Button>
+            </form>
+          )}
+
+          {view === "login" && (
+            <>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="matricula">Matrícula</Label>
+                  <Input
+                    id="matricula"
+                    value={matricula}
+                    onChange={(e) => handleMatriculaChange(e.target.value)}
+                    placeholder="TT000000"
+                    maxLength={8}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading || !MATRICULA_REGEX.test(matricula)}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Entrar
+                </Button>
+              </form>
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => setView("signup")}
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Primeiro acesso? Cadastre-se
+                </button>
+              </div>
+            </>
+          )}
+
+          {view === "signup" && (
+            <>
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setView("login")}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary transition-colors mb-2"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Voltar ao login
+                </button>
+                <div className="space-y-2">
+                  <Label htmlFor="nome">Nome Completo</Label>
+                  <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome completo" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="matricula-signup">Matrícula</Label>
+                  <Input
+                    id="matricula-signup"
+                    value={matricula}
+                    onChange={(e) => handleMatriculaChange(e.target.value)}
+                    placeholder="TT000000"
+                    maxLength={8}
+                    required
+                  />
+                  {matricula.length > 0 && !MATRICULA_REGEX.test(matricula) && (
+                    <p className="text-xs text-destructive">Formato: TT seguido de 6 números</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email-contato">E-mail</Label>
+                  <Input id="email-contato" type="email" value={emailContato} onChange={(e) => setEmailContato(e.target.value)} placeholder="seu@email.com" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="empresa">Empresa</Label>
+                  <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nome da empresa" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefone">Telefone (DDD + 9 dígitos)</Label>
+                  <Input
+                    id="telefone"
+                    value={telefone}
+                    onChange={(e) => setTelefone(formatPhone(e.target.value))}
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password-signup">Senha</Label>
+                  <Input id="password-signup" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading || !MATRICULA_REGEX.test(matricula)}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Cadastrar
+                </Button>
+              </form>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
