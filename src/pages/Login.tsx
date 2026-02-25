@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Shield, Loader2, ArrowLeft } from "lucide-react";
+import abilityLogo from "@/assets/ability-logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -295,6 +296,9 @@ const Login = () => {
           )}
         </CardContent>
       </Card>
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 opacity-30">
+        <img src={abilityLogo} alt="Ability Tecnologia" className="h-8 object-contain" />
+      </div>
     </div>
   );
 };
