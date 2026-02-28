@@ -63,6 +63,15 @@ VALUES (
   true
 );
 
+INSERT INTO public.powerbi_links (titulo, descricao, url, ordem, ativo)
+VALUES (
+  'Dashboard Operacional de Comunicação de Dados',
+  'Monitoramento de comunicação de dados e métricas operacionais',
+  'https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9',
+  2,
+  true
+);
+
 -- Admin can manage roles (already has insert/delete policies)
 -- Admin can manage powerbi_links
 CREATE POLICY "Admins can insert powerbi_links"
