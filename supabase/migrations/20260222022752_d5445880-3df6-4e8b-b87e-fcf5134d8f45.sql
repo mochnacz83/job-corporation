@@ -56,8 +56,8 @@ USING (auth.uid() = user_id);
 -- Add a fictitious PowerBI link for testing
 INSERT INTO public.powerbi_links (titulo, descricao, url, ordem, ativo)
 VALUES (
-  'Dashboard de Vendas',
-  'Relatório geral de vendas e metas por região',
+  'Dash Operacional Home Connect',
+  'Visualização operacional detalhada Home Connect',
   'https://app.powerbi.com/view?r=demo-embed-placeholder',
   1,
   true
