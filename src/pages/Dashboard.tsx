@@ -104,11 +104,11 @@ const Dashboard = () => {
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                 <BarChart3 className="w-6 h-6 text-primary" />
               </div>
-              <CardTitle className="text-lg">Dash Operacional Home Connect</CardTitle>
+              <CardTitle className="text-lg">Relatórios Power BI</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground text-sm">
-                Acesse o dashboard operacional e análise de dados Home Connect.
+                Acesse os dashboards e relatórios de análise de dados.
               </p>
               {links.length > 0 && (
                 <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
