@@ -45,7 +45,7 @@ const PowerBI = () => {
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
             <h1 className="text-lg font-bold text-foreground">
-              {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
+              {selectedLink ? selectedLink.titulo : "Dash Operacional Home Connect"}
             </h1>
           </div>
         </div>

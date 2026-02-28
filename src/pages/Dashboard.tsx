@@ -40,14 +40,14 @@ const Dashboard = () => {
       user_id: user.id,
       action: "page_view",
       page: "/dashboard",
-    }).then(() => {});
+    }).then(() => { });
 
     // Update presence
     supabase.from("user_presence").upsert({
       user_id: user.id,
       last_seen_at: new Date().toISOString(),
       current_page: "/dashboard",
-    }).then(() => {});
+    }).then(() => { });
 
     // Heartbeat every 30s
     const interval = setInterval(() => {
@@ -55,7 +55,7 @@ const Dashboard = () => {
         user_id: user.id,
         last_seen_at: new Date().toISOString(),
         current_page: window.location.pathname,
-      }).then(() => {});
+      }).then(() => { });
     }, 30000);
 
     return () => clearInterval(interval);
@@ -104,11 +104,11 @@ const Dashboard = () => {
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                 <BarChart3 className="w-6 h-6 text-primary" />
               </div>
-              <CardTitle className="text-lg">Relatórios Power BI</CardTitle>
+              <CardTitle className="text-lg">Dash Operacional Home Connect</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground text-sm">
-                Acesse os dashboards e relatórios de análise de dados.
+                Acesse o dashboard operacional e análise de dados Home Connect.
               </p>
               {links.length > 0 && (
                 <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
