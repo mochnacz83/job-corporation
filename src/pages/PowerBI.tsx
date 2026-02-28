@@ -12,6 +12,21 @@ interface PowerBILink {
   url: string;
 }
 
+const DEFAULT_REPORTS: PowerBILink[] = [
+  {
+    id: "report-1",
+    titulo: "Dashboard Operacional Home Connect",
+    descricao: "Visualização operacional detalhada Home Connect",
+    url: "https://app.powerbi.com/view?r=demo-embed-placeholder",
+  },
+  {
+    id: "report-2",
+    titulo: "Dashboard Operacional de Comunicação de Dados",
+    descricao: "Monitoramento de comunicação de dados e métricas operacionais",
+    url: "https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9",
+  }
+];
+
 const PowerBI = () => {
   const [links, setLinks] = useState<PowerBILink[]>([]);
   const [selectedLink, setSelectedLink] = useState<PowerBILink | null>(null);
@@ -19,8 +34,10 @@ const PowerBI = () => {
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      if (data) {
+      if (data && data.length > 0) {
         setLinks(data);
+      } else {
+        setLinks(DEFAULT_REPORTS);
       }
     });
   }, []);

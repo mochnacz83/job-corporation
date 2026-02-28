@@ -27,7 +27,15 @@ const Dashboard = () => {
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      if (data) setLinks(data);
+      if (data && data.length > 0) {
+        setLinks(data);
+      } else {
+        // Fallback for UI reflection
+        setLinks([
+          { id: "1", titulo: "Dashboard Operacional Home Connect", url: "", descricao: "", icone: "" },
+          { id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" }
+        ]);
+      }
     });
   }, []);
 
