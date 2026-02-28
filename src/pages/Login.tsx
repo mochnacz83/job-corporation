@@ -84,13 +84,15 @@ const Login = () => {
       toast({ title: "Telefone inválido", description: "Informe DDD + 9 dígitos (11 números).", variant: "destructive" });
       return;
     }
-    if (!nome.trim() || !password.trim() || !emailContato.trim() || !empresa.trim()) return;
+    if (!nome.trim() || !emailContato.trim() || !empresa.trim()) return;
     setLoading(true);
     try {
       const email = `${matricula.trim()}@empresa.local`;
+      // Generate a temporary random password
+      const tempPassword = Math.random().toString(36).slice(-10) + "A1!";
       const { error } = await supabase.auth.signUp({
         email,
-        password,
+        password: tempPassword,
         options: {
           data: {
             matricula: matricula.trim(),
@@ -113,7 +115,7 @@ const Login = () => {
       setEmailContato("");
       setEmpresa("");
       setTelefone("");
-      setPassword("");
+      // password state reset removed
       setMatricula("");
     } catch (err: any) {
       toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
@@ -282,10 +284,7 @@ const Login = () => {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password-signup">Senha</Label>
-                  <Input id="password-signup" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" required />
-                </div>
+                {/* Senha input removed for signup */}
                 <Button type="submit" className="w-full" disabled={loading || !MATRICULA_REGEX.test(matricula)}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Cadastrar

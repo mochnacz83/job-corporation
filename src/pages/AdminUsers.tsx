@@ -17,7 +17,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -284,6 +291,16 @@ const AdminUsers = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {users.filter(u => u.status === "pendente").length > 0 && (
+          <Alert variant="default" className="bg-amber-50 border-amber-200">
+            <Info className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">Atenção Adminstrador</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Existem {users.filter(u => u.status === "pendente").length} novos usuários aguardando sua validação para acessar o sistema. Revise-os abaixo.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -300,8 +317,7 @@ const AdminUsers = () => {
                   <TableHead>E-mail</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Cargo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Perfil</TableHead>
+                  <TableHead>Controlar Acesso</TableHead>
                   <TableHead>Cadastro</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -317,54 +333,71 @@ const AdminUsers = () => {
                       <TableCell className="text-sm">{u.email || "—"}</TableCell>
                       <TableCell className="text-sm">{u.empresa || "—"}</TableCell>
                       <TableCell>{u.cargo || "—"}</TableCell>
-                      <TableCell>{getStatusBadge(u.status)}</TableCell>
                       <TableCell>
-                        {isUserAdmin ? (
-                          <Badge className="bg-amber-600 hover:bg-amber-700">
-                            <Crown className="w-3 h-3 mr-1" /> Admin
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Usuário</Badge>
-                        )}
+                        <Select
+                          value={isUserAdmin ? "admin" : u.status}
+                          onValueChange={(val) => {
+                            if (val === "admin" && !isUserAdmin) {
+                              toggleAdmin(u.user_id, false);
+                              if (u.status !== "ativo") updateUserStatus(u.user_id, "ativo");
+                            } else if (val !== "admin") {
+                              if (isUserAdmin) toggleAdmin(u.user_id, true);
+                              updateUserStatus(u.user_id, val);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-[130px] h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ativo">
+                              <div className="flex items-center text-green-600"><CheckCircle className="w-3 h-3 mr-2" /> Ativo</div>
+                            </SelectItem>
+                            <SelectItem value="bloqueado">
+                              <div className="flex items-center text-red-600"><XCircle className="w-3 h-3 mr-2" /> Bloqueado</div>
+                            </SelectItem>
+                            <SelectItem value="admin">
+                              <div className="flex items-center text-amber-600"><Crown className="w-3 h-3 mr-2" /> Admin</div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(u.created_at).toLocaleDateString("pt-BR")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 flex-wrap">
-                          <Button size="sm" variant="outline" onClick={() => openEditDialog(u)}>
-                            <Pencil className="w-4 h-4 mr-1" /> Editar
-                          </Button>
-                          {u.status !== "ativo" && (
-                            <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50"
-                              onClick={() => updateUserStatus(u.user_id, "ativo")}>
-                              <CheckCircle className="w-4 h-4 mr-1" /> Ativar
-                            </Button>
-                          )}
-                          {u.status !== "bloqueado" && (
-                            <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
-                              onClick={() => updateUserStatus(u.user_id, "bloqueado")}>
-                              <XCircle className="w-4 h-4 mr-1" /> Bloquear
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" onClick={() => openResetDialog(u)}>
-                            <KeyRound className="w-4 h-4 mr-1" /> Resetar Senha
-                          </Button>
-                          {!isSelf && (
-                            <>
-                              <Button size="sm" variant="outline"
-                                className={isUserAdmin ? "text-amber-600 border-amber-600" : "text-primary border-primary"}
-                                onClick={() => toggleAdmin(u.user_id, isUserAdmin)}>
-                                <Crown className="w-4 h-4 mr-1" />
-                                {isUserAdmin ? "Remover Admin" : "Promover Admin"}
-                              </Button>
-                              <Button size="sm" variant="outline" className="text-destructive border-destructive hover:bg-destructive/10"
-                                onClick={() => openDeleteDialog(u)}>
-                                <Trash2 className="w-4 h-4 mr-1" /> Excluir
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                        <TooltipProvider delayDuration={200}>
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" onClick={() => openEditDialog(u)} className="h-8 w-8 hover:bg-slate-100">
+                                  <Pencil className="w-4 h-4 text-slate-700" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar Usuário</TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" onClick={() => openResetDialog(u)} className="h-8 w-8 hover:bg-slate-100">
+                                  <KeyRound className="w-4 h-4 text-slate-700" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Resetar Senha</TooltipContent>
+                            </Tooltip>
+
+                            {!isSelf && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="icon" variant="ghost" onClick={() => openDeleteDialog(u)} className="h-8 w-8 hover:bg-red-50 hover:text-red-600">
+                                    <Trash2 className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Excluir Usuário</TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   );
