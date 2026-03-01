@@ -73,6 +73,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          area: string | null
           cargo: string | null
           created_at: string
           email: string | null
@@ -87,6 +88,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          area?: string | null
           cargo?: string | null
           created_at?: string
           email?: string | null
@@ -101,6 +103,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          area?: string | null
           cargo?: string | null
           created_at?: string
           email?: string | null

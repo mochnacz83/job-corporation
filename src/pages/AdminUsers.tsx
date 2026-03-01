@@ -109,7 +109,7 @@ const AdminUsers = () => {
       supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
     ]);
 
-    if (profilesData) setUsers(profilesData as UserProfile[]);
+    if (profilesData) setUsers(profilesData as unknown as UserProfile[]);
     if (rolesData) {
       setAdminUserIds(new Set(rolesData.map((r: any) => r.user_id)));
     }
