@@ -227,9 +227,13 @@ serve(async (req) => {
               `,
             }),
           });
-          const result = await emailResponse.json();
-          console.log('Resend response:', result);
-          if (emailResponse.ok) emailSent = true;
+          if (emailResponse.ok) {
+            emailSent = true;
+            console.log('Email sent successfully');
+          } else {
+            const errBody = await emailResponse.text();
+            console.error('Resend error:', emailResponse.status, errBody);
+          }
         } catch (e) {
           console.error('Email send failure (resend-password):', e);
         }
