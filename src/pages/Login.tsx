@@ -151,7 +151,7 @@ const Login = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       <Card className="w-full max-w-md glass-card relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="mx-auto w-24 h-24 flex items-center justify-center p-2 mb-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="mx-auto w-24 h-24 flex items-center justify-center p-2 mb-2 bg-slate-900 rounded-2xl shadow-sm overflow-hidden">
             <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
           </div>
           <div>
