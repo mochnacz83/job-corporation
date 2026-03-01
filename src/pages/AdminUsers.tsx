@@ -32,10 +32,7 @@ interface UserProfile {
   user_id: string;
   matricula: string;
   nome: string;
-  cargo: string | null;
-  email: string | null;
-  empresa: string | null;
-  telefone: string | null;
+  area: string | null;
   status: string;
   created_at: string;
 }
@@ -239,6 +236,7 @@ const AdminUsers = () => {
     setEditForm({
       nome: u.nome || "",
       cargo: u.cargo || "",
+      area: u.area || "",
       email: u.email || "",
       empresa: u.empresa || "",
       telefone: u.telefone || "",
@@ -343,6 +341,7 @@ const AdminUsers = () => {
                   <TableHead>Nome</TableHead>
                   <TableHead>E-mail</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead>Área</TableHead>
                   <TableHead>Cargo</TableHead>
                   <TableHead>Controlar Acesso</TableHead>
                   <TableHead>Cadastro</TableHead>
@@ -359,7 +358,8 @@ const AdminUsers = () => {
                       <TableCell>{u.nome}</TableCell>
                       <TableCell className="text-sm">{u.email || "—"}</TableCell>
                       <TableCell className="text-sm">{u.empresa || "—"}</TableCell>
-                      <TableCell>{u.cargo || "—"}</TableCell>
+                      <TableCell className="text-sm">{u.area || "—"}</TableCell>
+                      <TableCell className="text-sm">{u.cargo || "—"}</TableCell>
                       <TableCell>
                         <Select
                           value={isUserAdmin ? "admin" : u.status}
@@ -503,9 +503,34 @@ const AdminUsers = () => {
                 onChange={(e) => setEditForm({ ...editForm, nome: e.target.value })} />
             </div>
             <div className="space-y-1">
+              <Label htmlFor="edit-area">Área</Label>
+              <Select onValueChange={(val) => setEditForm({ ...editForm, area: val })} value={editForm.area}>
+                <SelectTrigger id="edit-area">
+                  <SelectValue placeholder="Selecione a área" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Comunicação de Dados">Comunicação de Dados</SelectItem>
+                  <SelectItem value="Home Connect">Home Connect</SelectItem>
+                  <SelectItem value="Suporte CL">Suporte CL</SelectItem>
+                  <SelectItem value="Gerencia">Gerencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="edit-cargo">Cargo</Label>
-              <Input id="edit-cargo" value={editForm.cargo}
-                onChange={(e) => setEditForm({ ...editForm, cargo: e.target.value })} />
+              <Select onValueChange={(val) => setEditForm({ ...editForm, cargo: val })} value={editForm.cargo}>
+                <SelectTrigger id="edit-cargo">
+                  <SelectValue placeholder="Selecione o cargo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Gerente">Gerente</SelectItem>
+                  <SelectItem value="Coordenador">Coordenador</SelectItem>
+                  <SelectItem value="Supervisor">Supervisor</SelectItem>
+                  <SelectItem value="Apoio CL">Apoio CL</SelectItem>
+                  <SelectItem value="Técnico Dados">Técnico Dados</SelectItem>
+                  <SelectItem value="Técnico Home">Técnico Home</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="edit-email">E-mail</Label>

@@ -266,7 +266,7 @@ serve(async (req) => {
       }
 
       // Only allow safe fields
-      const allowed = ['nome', 'cargo', 'email', 'empresa', 'telefone'];
+      const allowed = ['nome', 'cargo', 'email', 'empresa', 'telefone', 'area'];
       const safeData: Record<string, string> = {};
       for (const key of allowed) {
         if (profileData[key] !== undefined) safeData[key] = profileData[key];

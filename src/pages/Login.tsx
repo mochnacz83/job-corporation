@@ -8,6 +8,13 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const MATRICULA_REGEX = /^TT\d{6}$/;
 const PHONE_REGEX = /^\d{11}$/;
@@ -31,6 +38,7 @@ const Login = () => {
   const [empresa, setEmpresa] = useState("");
   const [telefone, setTelefone] = useState("");
   const [cargo, setCargo] = useState("");
+  const [area, setArea] = useState("");
   const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
@@ -103,6 +111,7 @@ const Login = () => {
             empresa: empresa.trim(),
             telefone: phoneDigits,
             cargo: cargo.trim(),
+            area: area.trim(),
           },
         },
       });
@@ -119,6 +128,7 @@ const Login = () => {
       setEmpresa("");
       setTelefone("");
       setCargo("");
+      setArea("");
       // password state reset removed
       setMatricula("");
     } catch (err: any) {
@@ -291,12 +301,34 @@ const Login = () => {
                   <Input id="email-contato" type="email" value={emailContato} onChange={(e) => setEmailContato(e.target.value)} placeholder="seu@email.com" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="empresa">Empresa</Label>
-                  <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nome da empresa" required />
+                  <Label htmlFor="area">Área</Label>
+                  <Select onValueChange={setArea} value={area} required>
+                    <SelectTrigger id="area">
+                      <SelectValue placeholder="Selecione a área" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Comunicação de Dados">Comunicação de Dados</SelectItem>
+                      <SelectItem value="Home Connect">Home Connect</SelectItem>
+                      <SelectItem value="Suporte CL">Suporte CL</SelectItem>
+                      <SelectItem value="Gerencia">Gerencia</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cargo">Cargo</Label>
-                  <Input id="cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Seu cargo na empresa" required />
+                  <Select onValueChange={setCargo} value={cargo} required>
+                    <SelectTrigger id="cargo">
+                      <SelectValue placeholder="Selecione o cargo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Gerente">Gerente</SelectItem>
+                      <SelectItem value="Coordenador">Coordenador</SelectItem>
+                      <SelectItem value="Supervisor">Supervisor</SelectItem>
+                      <SelectItem value="Apoio CL">Apoio CL</SelectItem>
+                      <SelectItem value="Técnico Dados">Técnico Dados</SelectItem>
+                      <SelectItem value="Técnico Home">Técnico Home</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone (DDD + 9 dígitos)</Label>
