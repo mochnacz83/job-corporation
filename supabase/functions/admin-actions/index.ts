@@ -157,15 +157,28 @@ serve(async (req) => {
         .eq('user_id', userId)
         .maybeSingle();
 
-      if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
-      if (!profile?.email) throw new Error('User has no registered email');
+      if (profileError) {
+        return new Response(JSON.stringify({ error: `Profile fetch failed: ${profileError.message}` }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!profile?.email) {
+        return new Response(JSON.stringify({ error: 'User has no registered email' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const defaultPassword = '12345@Ab';
       const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: defaultPassword,
       });
 
-      if (authError) throw new Error(`Auth update failed: ${authError.message}`);
+      if (authError) {
+        return new Response(JSON.stringify({ error: `Auth update failed: ${authError.message}` }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       await serviceClient
         .from('profiles')
@@ -175,41 +188,45 @@ serve(async (req) => {
       let emailSent = false;
       const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
       if (RESEND_API_KEY) {
-        const emailResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${RESEND_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'Portal Corporativo <onboarding@resend.dev>',
-            to: [profile.email],
-            subject: '🔐 Sua senha de acesso - Portal Corporativo',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-                <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">
-                  Acesso ao Portal Corporativo
-                </h2>
-                <p>Olá, <strong>${profile.nome}</strong>,</p>
-                <p>Conforme solicitado, estamos encaminhando sua senha inicial de acesso.</p>
-                <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
-                  <p style="margin: 0; font-size: 16px;">Sua senha é:</p>
-                  <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">
-                    12345@Ab
+        try {
+          const emailResponse = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${RESEND_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: 'Portal Corporativo <onboarding@resend.dev>',
+              to: [profile.email],
+              subject: '🔐 Sua senha de acesso - Portal Corporativo',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                  <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">
+                    Acesso ao Portal Corporativo
+                  </h2>
+                  <p>Olá, <strong>${profile.nome}</strong>,</p>
+                  <p>Conforme solicitado, estamos encaminhando sua senha inicial de acesso.</p>
+                  <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
+                    <p style="margin: 0; font-size: 16px;">Sua senha é:</p>
+                    <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">
+                      12345@Ab
+                    </p>
+                  </div>
+                  <p style="color: #666; font-size: 14px;">
+                    <strong>DICA:</strong> Por segurança, você deverá alterar essa senha ao realizar o primeiro acesso.
+                  </p>
+                  <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                  <p style="font-size: 12px; color: #999;">
+                    Este é um e-mail automático da Ability Tecnologia.
                   </p>
                 </div>
-                <p style="color: #666; font-size: 14px;">
-                  <strong>DICA:</strong> Por segurança, você deverá alterar essa senha ao realizar o primeiro acesso.
-                </p>
-                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #999;">
-                  Este é um e-mail automático da Ability Tecnologia.
-                </p>
-              </div>
-            `,
-          }),
-        });
-        if (emailResponse.ok) emailSent = true;
+              `,
+            }),
+          });
+          if (emailResponse.ok) emailSent = true;
+        } catch (e) {
+          console.error('Email send failure (resend-password):', e);
+        }
       }
 
       return new Response(JSON.stringify({ success: true, emailSent }), {

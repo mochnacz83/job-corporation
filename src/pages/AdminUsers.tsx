@@ -31,8 +31,11 @@ interface UserProfile {
   id: string;
   user_id: string;
   matricula: string;
-  nome: string;
   area: string | null;
+  cargo: string | null;
+  email: string | null;
+  empresa: string | null;
+  telefone: string | null;
   status: string;
   created_at: string;
 }
