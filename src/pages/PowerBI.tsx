@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3, PieChart, Presentation, MoveLeft } from "lucide-react";
+import { ArrowLeft, BarChart3, PieChart, Presentation, MoveLeft, Loader2 } from "lucide-react";
 
 interface PowerBILink {
   id: string;
@@ -17,55 +17,44 @@ interface PowerBILink {
   created_at?: string;
 }
 
-const DEFAULT_REPORTS: PowerBILink[] = [
-  {
-    id: "report-comunicacao",
-    titulo: "Dashboard Operacional de Comunicação de Dados",
-    descricao: "Monitoramento de comunicação de dados e métricas operacionais",
-    url: "https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9",
-    ordem: 2,
-    ativo: true,
-  }
-];
 
 const PowerBI = () => {
   const { areaPermissions, isAdmin } = useAuth();
-  const [links, setLinks] = useState<PowerBILink[]>(DEFAULT_REPORTS);
+  const [links, setLinks] = useState<PowerBILink[]>([]);
   const [selectedLink, setSelectedLink] = useState<PowerBILink | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      // Get DB links and automatically rename the "legacy" one
-      const dbLinks = (data || []).map((link: any) => {
-        const legacyTitles = ["Relatório Power BI", "Dashboard de Vendas", "Dash Operacional Home Connect"];
-        if (legacyTitles.includes(link.titulo)) {
-          return { ...link, titulo: "Dashboard Operacional Home Connect" };
-        }
-        return link;
-      }) as PowerBILink[];
+    const fetchLinks = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("powerbi_links")
+          .select("*")
+          .eq("ativo", true)
+          .order("ordem");
 
-      setLinks(() => {
-        // Start with DB links
-        let combined = [...dbLinks];
-        // Ensure "Comunicação de Dados" is present
-        DEFAULT_REPORTS.forEach(def => {
-          if (!combined.some(link => link.titulo === def.titulo)) {
-            combined.push(def);
-          }
-        });
+        if (error) throw error;
 
-        // Apply filtering if not admin
+        let filteredLinks = (data || []) as PowerBILink[];
+
+        // Aplicar filtragem se não for admin
         if (!isAdmin && areaPermissions && !areaPermissions.all_access) {
-          combined = combined.filter(link =>
-            areaPermissions.powerbi_report_ids.includes(link.id) ||
-            link.id.startsWith('report-') // keep default reports if they don't have UUIDs
+          filteredLinks = filteredLinks.filter(link =>
+            areaPermissions.powerbi_report_ids?.includes(link.id)
           );
         }
 
-        return combined;
-      });
-    });
+        setLinks(filteredLinks);
+      } catch (err) {
+        console.error("Erro ao carregar relatórios Power BI:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLinks();
   }, [areaPermissions, isAdmin]);
 
   return (
@@ -97,11 +86,17 @@ const PowerBI = () => {
       </header>
 
       <main className="flex-1 flex flex-col">
-        {links.length === 0 ? (
-          <div className="text-center py-20">
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : links.length === 0 ? (
+          <div className="text-center py-20 px-4">
             <BarChart3 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-1">Nenhum relatório cadastrado</h3>
-            <p className="text-muted-foreground text-sm">Os relatórios serão exibidos aqui quando forem adicionados pelo administrador.</p>
+            <h3 className="text-lg font-medium text-foreground mb-1">Nenhum relatório disponível</h3>
+            <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+              Você não tem permissão para visualizar relatórios ou não há relatórios ativos para sua área.
+            </p>
           </div>
         ) : !selectedLink ? (
           <div className="container mx-auto px-4 py-8">
