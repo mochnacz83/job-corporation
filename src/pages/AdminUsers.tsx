@@ -31,7 +31,8 @@ interface UserProfile {
   id: string;
   user_id: string;
   matricula: string;
-  area: string | null;
+  nome: string;
+  area?: string | null;
   cargo: string | null;
   email: string | null;
   empresa: string | null;
@@ -75,7 +76,7 @@ const AdminUsers = () => {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
-  const [editForm, setEditForm] = useState({ nome: "", cargo: "", email: "", empresa: "", telefone: "" });
+  const [editForm, setEditForm] = useState({ nome: "", cargo: "", area: "", email: "", empresa: "", telefone: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
