@@ -11,18 +11,18 @@ function generatePassword(): string {
   const lower = 'abcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';
   const special = '!@#$%&*';
-  
+
   let pw = '';
   pw += upper[Math.floor(Math.random() * upper.length)];
   pw += lower[Math.floor(Math.random() * lower.length)];
   pw += digits[Math.floor(Math.random() * digits.length)];
   pw += special[Math.floor(Math.random() * special.length)];
-  
+
   const all = upper + lower + digits + special;
   for (let i = 0; i < 4; i++) {
     pw += all[Math.floor(Math.random() * all.length)];
   }
-  
+
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
@@ -71,14 +71,14 @@ serve(async (req) => {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
 
-    await fetch('https://api.resend.com/emails', {
+    const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Portal Corporativo <onboarding@resend.dev>',
+        from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
         to: [email],
         subject: '🔑 Nova senha - Portal Corporativo',
         html: `
@@ -97,6 +97,12 @@ serve(async (req) => {
         `,
       }),
     });
+
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      console.error('Resend API error:', emailResponse.status, errorText);
+      throw new Error(`Falha ao enviar e-mail: ${emailResponse.status}`);
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

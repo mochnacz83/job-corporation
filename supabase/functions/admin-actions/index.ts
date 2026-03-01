@@ -100,7 +100,7 @@ serve(async (req) => {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                from: 'Portal Corporativo <onboarding@resend.dev>',
+                from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
                 to: [profile.email],
                 subject: '🔐 Sua senha foi redefinida - Portal Corporativo',
                 html: `
@@ -127,7 +127,12 @@ serve(async (req) => {
                 `,
               }),
             });
-            if (emailResponse.ok) emailSent = true;
+            if (emailResponse.ok) {
+              emailSent = true;
+            } else {
+              const errorText = await emailResponse.text();
+              console.error('Resend API error:', emailResponse.status, errorText);
+            }
           } catch (e) {
             console.error('Failed to send reset email:', e);
           }
@@ -200,7 +205,7 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              from: 'Portal Corporativo <onboarding@resend.dev>',
+              from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
               to: [profile.email],
               subject: '🔐 Sua senha de acesso - Portal Corporativo',
               html: `
@@ -309,7 +314,7 @@ serve(async (req) => {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                  from: 'Portal Corporativo <onboarding@resend.dev>',
+                  from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
                   to: [profile.email],
                   subject: '🎉 Sua conta foi ativada! - Portal Corporativo',
                   html: `
@@ -336,7 +341,12 @@ serve(async (req) => {
                   `,
                 }),
               });
-              if (emailResponse.ok) emailSent = true;
+              if (emailResponse.ok) {
+                emailSent = true;
+              } else {
+                const errorText = await emailResponse.text();
+                console.error('Resend API error:', emailResponse.status, errorText);
+              }
             } catch (e) {
               console.error('Email send failure:', e);
             }

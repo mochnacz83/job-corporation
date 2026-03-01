@@ -25,7 +25,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Portal Corporativo <onboarding@resend.dev>',
+        from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
         to: ['juniomar.alex@gmail.com'],
         subject: '🔔 Novo usuário solicitou acesso - Portal Corporativo',
         html: `
@@ -47,7 +47,7 @@ serve(async (req) => {
     });
 
     const emailData = await emailResponse.json();
-    
+
     if (!emailResponse.ok) {
       console.error('Resend error:', emailData);
       throw new Error(`Resend API failed [${emailResponse.status}]: ${JSON.stringify(emailData)}`);
