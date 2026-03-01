@@ -49,7 +49,7 @@ serve(async (req) => {
       });
     }
 
-    const { action, userId, newPassword, profileData } = await req.json();
+    const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
     if (action === 'reset-password') {
       if (!userId) {
@@ -160,6 +160,100 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'update-status') {
+      if (!userId || !newStatus) {
+        return new Response(JSON.stringify({ error: 'userId and newStatus required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: profile, error: profileError } = await serviceClient
+        .from('profiles')
+        .select('nome, email')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
+
+      // Basic update
+      const updateData: any = { status: newStatus };
+      let emailSent = false;
+      let passwordPrompt = '';
+
+      // If activating, set default password and send email
+      if (newStatus === 'ativo') {
+        const defaultPassword = '12345@Ab';
+        const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
+          password: defaultPassword,
+        });
+
+        if (authError) throw new Error(`Auth update failed: ${authError.message}`);
+
+        updateData.must_change_password = true;
+        passwordPrompt = defaultPassword;
+
+        if (profile?.email) {
+          const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+          if (RESEND_API_KEY) {
+            try {
+              const emailResponse = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${RESEND_API_KEY}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  from: 'Portal Corporativo <onboarding@resend.dev>',
+                  to: [profile.email],
+                  subject: '🎉 Sua conta foi ativada! - Portal Corporativo',
+                  html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                      <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">
+                        Bem-vindo ao Portal Corporativo
+                      </h2>
+                      <p>Olá, <strong>${profile.nome}</strong>,</p>
+                      <p>Sua conta foi aprovada e já está ativa!</p>
+                      <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
+                        <p style="margin: 0; font-size: 16px;">Sua senha inicial de acesso é:</p>
+                        <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">
+                          12345@Ab
+                        </p>
+                      </div>
+                      <p style="color: #666; font-size: 14px;">
+                        <strong>IMPORTANTE:</strong> Por segurança, você será solicitado a alterar esta senha no seu primeiro login.
+                      </p>
+                      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                      <p style="font-size: 12px; color: #999;">
+                        Este é um e-mail automático da Ability Tecnologia.
+                      </p>
+                    </div>
+                  `,
+                }),
+              });
+              if (emailResponse.ok) emailSent = true;
+            } catch (e) {
+              console.error('Email send failure:', e);
+            }
+          }
+        }
+      }
+
+      const { error: dbError } = await serviceClient
+        .from('profiles')
+        .update(updateData)
+        .eq('user_id', userId);
+
+      if (dbError) throw new Error(`Database update failed: ${dbError.message}`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        emailSent,
+        passwordUsed: passwordPrompt
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

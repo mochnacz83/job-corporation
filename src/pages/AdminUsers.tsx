@@ -115,21 +115,32 @@ const AdminUsers = () => {
   };
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ status: newStatus })
-      .eq("user_id", userId);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "update-status", userId, newStatus },
+      });
 
-    if (error) {
-      toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
-      return;
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+
+      const { emailSent, passwordUsed } = data;
+      let successMsg = `Usuário ${newStatus === "ativo" ? "ativado" : "bloqueado"} com sucesso.`;
+
+      if (newStatus === "ativo") {
+        if (emailSent) {
+          successMsg = "Usuário ativado e senha inicial (12345@Ab) enviada por e-mail.";
+        } else {
+          successMsg = "Usuário ativado. Senha definida como: 12345@Ab (E-mail não pôde ser enviado).";
+        }
+      }
+
+      toast({
+        title: "Sucesso",
+        description: successMsg,
+      });
+      await loadUsers();
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
     }
-
-    toast({
-      title: "Sucesso",
-      description: `Usuário ${newStatus === "ativo" ? "ativado" : "bloqueado"} com sucesso.`,
-    });
-    await loadUsers();
   };
 
   const toggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {

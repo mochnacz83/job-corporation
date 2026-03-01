@@ -110,7 +110,7 @@ const Login = () => {
         body: { nome: nome.trim(), matricula: matricula.trim() },
       }).catch((err) => console.error("Notification error:", err));
 
-      toast({ title: "Conta criada!", description: "Aguarde a aprovação do administrador para acessar o sistema." });
+      toast({ title: "Conta criada!", description: "Aguarde a aprovação do administrador. Você receberá uma senha inicial em seu e-mail após a ativação." });
       setView("login");
       setNome("");
       setEmailContato("");
