@@ -18,15 +18,7 @@ interface PowerBILink {
 
 const DEFAULT_REPORTS: PowerBILink[] = [
   {
-    id: "report-1",
-    titulo: "Dashboard Operacional Home Connect",
-    descricao: "Visualização operacional detalhada Home Connect",
-    url: "https://app.powerbi.com/view?r=demo-embed-placeholder",
-    ordem: 1,
-    ativo: true,
-  },
-  {
-    id: "report-2",
+    id: "report-comunicacao",
     titulo: "Dashboard Operacional de Comunicação de Dados",
     descricao: "Monitoramento de comunicação de dados e métricas operacionais",
     url: "https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9",
@@ -42,10 +34,19 @@ const PowerBI = () => {
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      // Merge DB results with defaults, avoiding duplicates by title
-      const dbLinks = (data || []) as PowerBILink[];
+      // Get DB links and automatically rename the "legacy" one
+      const dbLinks = (data || []).map((link: any) => {
+        const legacyTitles = ["Relatório Power BI", "Dashboard de Vendas", "Dash Operacional Home Connect"];
+        if (legacyTitles.includes(link.titulo)) {
+          return { ...link, titulo: "Dashboard Operacional Home Connect" };
+        }
+        return link;
+      }) as PowerBILink[];
+
       setLinks(prev => {
+        // Start with DB links
         const combined = [...dbLinks];
+        // Ensure "Comunicação de Dados" is present
         DEFAULT_REPORTS.forEach(def => {
           if (!combined.some(link => link.titulo === def.titulo)) {
             combined.push(def);
