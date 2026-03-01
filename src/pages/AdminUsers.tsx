@@ -24,7 +24,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -165,6 +165,28 @@ const AdminUsers = () => {
       toast({ title: "Sucesso", description: "Usuário promovido a administrador." });
     }
     await loadUsers();
+  };
+
+  const handleResendPassword = async (u: UserProfile) => {
+    if (!u.email) {
+      toast({ title: "Erro", description: "Usuário não possui e-mail cadastrado.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "resend-password", userId: u.user_id },
+      });
+
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+
+      toast({
+        title: "Sucesso",
+        description: `Senha inicial encaminhada para ${u.email}.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    }
   };
 
   const openResetDialog = (u: UserProfile) => {
@@ -412,6 +434,17 @@ const AdminUsers = () => {
                               </TooltipTrigger>
                               <TooltipContent>Resetar Senha</TooltipContent>
                             </Tooltip>
+
+                            {u.email && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="icon" variant="ghost" onClick={() => handleResendPassword(u)} className="h-8 w-8 hover:bg-slate-100">
+                                    <Mail className="w-4 h-4 text-slate-700" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Encaminhar Senha ao Usuario</TooltipContent>
+                              </Tooltip>
+                            )}
 
                             {!isSelf && (
                               <Tooltip>
