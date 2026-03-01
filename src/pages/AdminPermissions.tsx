@@ -52,12 +52,12 @@ const AdminPermissions = () => {
         setLoading(true);
         try {
             const [permRes, reportRes] = await Promise.all([
-                supabase.from("area_permissions").select("*"),
-                supabase.from("powerbi_links").select("id, titulo").eq("ativo", true)
+                supabase.from("area_permissions" as any).select("*"),
+                supabase.from("powerbi_links" as any).select("id, titulo").eq("ativo", true)
             ]);
 
-            if (permRes.data) setPermissions(permRes.data as AreaPermission[]);
-            if (reportRes.data) setReports(reportRes.data as PowerBILink[]);
+            if (permRes.data) setPermissions(permRes.data as unknown as AreaPermission[]);
+            if (reportRes.data) setReports(reportRes.data as unknown as PowerBILink[]);
         } catch (error) {
             console.error("Error loading permissions:", error);
         } finally {
@@ -95,7 +95,7 @@ const AdminPermissions = () => {
     const savePermissions = async () => {
         setSaving(true);
         try {
-            const { error } = await supabase.from("area_permissions").upsert(
+            const { error } = await supabase.from("area_permissions" as any).upsert(
                 permissions.map(p => ({
                     area: p.area,
                     modules: p.modules,
