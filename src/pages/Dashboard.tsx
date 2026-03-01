@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, LogOut, User, Shield, Activity } from "lucide-react";
+import { BarChart3, LogOut, User, Shield, Activity, KeyRound } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface PowerBILink {
   id: string;
@@ -96,7 +102,18 @@ const Dashboard = () => {
               <span>{profile?.nome}</span>
               <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">{profile?.matricula}</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => navigate("/alterar-senha")}>
+                    <KeyRound className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Alterar Senha</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-foreground">
               <LogOut className="w-4 h-4 mr-1" /> Sair
             </Button>
           </div>
