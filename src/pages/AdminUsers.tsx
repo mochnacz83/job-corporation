@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info } from "lucide-react";
-import logoAbility from "@/assets/ability-logo.png";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -286,7 +285,7 @@ const AdminUsers = () => {
           </Button>
           <div className="flex items-center gap-2">
             <div className="p-1 bg-white rounded-md shadow-sm w-10 h-10 flex items-center justify-center overflow-hidden">
-              <img src={logoAbility} alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
+              <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-lg font-bold text-foreground">Gerenciar Usuários</h1>
           </div>
