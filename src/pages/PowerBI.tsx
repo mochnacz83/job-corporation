@@ -10,6 +10,10 @@ interface PowerBILink {
   titulo: string;
   descricao: string | null;
   url: string;
+  icone?: string | null;
+  ordem?: number;
+  ativo?: boolean;
+  created_at?: string;
 }
 
 const DEFAULT_REPORTS: PowerBILink[] = [
@@ -18,27 +22,37 @@ const DEFAULT_REPORTS: PowerBILink[] = [
     titulo: "Dashboard Operacional Home Connect",
     descricao: "Visualização operacional detalhada Home Connect",
     url: "https://app.powerbi.com/view?r=demo-embed-placeholder",
+    ordem: 1,
+    ativo: true,
   },
   {
     id: "report-2",
     titulo: "Dashboard Operacional de Comunicação de Dados",
     descricao: "Monitoramento de comunicação de dados e métricas operacionais",
     url: "https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9",
+    ordem: 2,
+    ativo: true,
   }
 ];
 
 const PowerBI = () => {
-  const [links, setLinks] = useState<PowerBILink[]>([]);
+  const [links, setLinks] = useState<PowerBILink[]>(DEFAULT_REPORTS);
   const [selectedLink, setSelectedLink] = useState<PowerBILink | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      if (data && data.length > 0) {
-        setLinks(data);
-      } else {
-        setLinks(DEFAULT_REPORTS);
-      }
+      // Merge DB results with defaults, avoiding duplicates by title
+      const dbLinks = (data || []) as PowerBILink[];
+      setLinks(prev => {
+        const combined = [...dbLinks];
+        DEFAULT_REPORTS.forEach(def => {
+          if (!combined.some(link => link.titulo === def.titulo)) {
+            combined.push(def);
+          }
+        });
+        return combined;
+      });
     });
   }, []);
 

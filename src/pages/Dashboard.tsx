@@ -17,7 +17,10 @@ interface PowerBILink {
 const Dashboard = () => {
   const { user, profile, isAdmin, signOut, loading } = useAuth();
   const navigate = useNavigate();
-  const [links, setLinks] = useState<PowerBILink[]>([]);
+  const [links, setLinks] = useState<PowerBILink[]>([
+    { id: "1", titulo: "Dashboard Operacional Home Connect", url: "", descricao: "", icone: "" },
+    { id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" }
+  ]);
 
   useEffect(() => {
     if (!loading && profile?.must_change_password) {
@@ -29,12 +32,6 @@ const Dashboard = () => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
       if (data && data.length > 0) {
         setLinks(data);
-      } else {
-        // Fallback for UI reflection
-        setLinks([
-          { id: "1", titulo: "Dashboard Operacional Home Connect", url: "", descricao: "", icone: "" },
-          { id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" }
-        ]);
       }
     });
   }, []);
