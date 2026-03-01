@@ -30,6 +30,7 @@ const Login = () => {
   const [emailContato, setEmailContato] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [cargo, setCargo] = useState("");
   const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
@@ -101,6 +102,7 @@ const Login = () => {
             email_contato: emailContato.trim(),
             empresa: empresa.trim(),
             telefone: phoneDigits,
+            cargo: cargo.trim(),
           },
         },
       });
@@ -116,6 +118,7 @@ const Login = () => {
       setEmailContato("");
       setEmpresa("");
       setTelefone("");
+      setCargo("");
       // password state reset removed
       setMatricula("");
     } catch (err: any) {
@@ -290,6 +293,10 @@ const Login = () => {
                 <div className="space-y-2">
                   <Label htmlFor="empresa">Empresa</Label>
                   <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nome da empresa" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cargo">Cargo</Label>
+                  <Input id="cargo" value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Seu cargo na empresa" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="telefone">Telefone (DDD + 9 dígitos)</Label>
