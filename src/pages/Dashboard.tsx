@@ -17,10 +17,7 @@ interface PowerBILink {
 const Dashboard = () => {
   const { user, profile, isAdmin, signOut, loading } = useAuth();
   const navigate = useNavigate();
-  const [links, setLinks] = useState<PowerBILink[]>([
-    { id: "1", titulo: "Dashboard Operacional Home Connect", url: "", descricao: "", icone: "" },
-    { id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" }
-  ]);
+  const [links, setLinks] = useState<PowerBILink[]>([]);
 
   useEffect(() => {
     if (!loading && profile?.must_change_password) {
@@ -30,9 +27,21 @@ const Dashboard = () => {
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      if (data && data.length > 0) {
-        setLinks(data);
-      }
+      const dbLinks = (data || []).map((link: any) => {
+        const legacyTitles = ["Relatório Power BI", "Dashboard de Vendas", "Dash Operacional Home Connect"];
+        if (legacyTitles.includes(link.titulo)) {
+          return { ...link, titulo: "Dashboard Operacional Home Connect" };
+        }
+        return link;
+      }) as PowerBILink[];
+
+      setLinks(() => {
+        const combined = [...dbLinks];
+        if (!combined.some(link => link.titulo === "Dashboard Operacional de Comunicação de Dados")) {
+          combined.push({ id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" });
+        }
+        return combined;
+      });
     });
   }, []);
 
