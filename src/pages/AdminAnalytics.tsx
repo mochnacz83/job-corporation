@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Activity, Users, Circle } from "lucide-react";
+import logoAbility from "@/assets/ability-logo.png";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface AccessLog {
@@ -114,7 +115,9 @@ const AdminAnalytics = () => {
             <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
           <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-primary" />
+            <div className="p-1 bg-white rounded-md shadow-sm w-10 h-10 flex items-center justify-center overflow-hidden">
+              <img src={logoAbility} alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
+            </div>
             <h1 className="text-lg font-bold text-foreground">Monitoramento de Acessos</h1>
           </div>
         </div>

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Shield, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import logoAbility from "@/assets/ability-logo.png";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -151,8 +152,8 @@ const Login = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       <Card className="w-full max-w-md glass-card relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
-            <Shield className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto w-24 h-24 flex items-center justify-center p-2 mb-2 bg-white rounded-2xl shadow-sm overflow-hidden">
+            <img src={logoAbility} alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Portal Corporativo</h1>

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BarChart3, PieChart, Presentation, MoveLeft } from "lucide-react";
+import logoAbility from "@/assets/ability-logo.png";
 
 interface PowerBILink {
   id: string;
@@ -75,7 +76,9 @@ const PowerBI = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-primary" />
+            <div className="p-1 bg-white rounded-md shadow-sm w-10 h-10 flex items-center justify-center overflow-hidden">
+              <img src={logoAbility} alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
+            </div>
             <h1 className="text-lg font-bold text-foreground">
               {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
             </h1>
