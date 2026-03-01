@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("area", p.area)
         .maybeSingle();
-      setAreaPermissions(permData as AreaPermissions | null);
+      setAreaPermissions(permData as unknown as AreaPermissions | null);
     } else {
       setAreaPermissions(null);
     }
