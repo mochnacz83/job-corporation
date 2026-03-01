@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select("*")
       .eq("user_id", userId)
       .single();
-    setProfile(data as Profile | null);
+    setProfile(data as unknown as Profile | null);
 
     // Check admin role
     const { data: roleData } = await supabase
