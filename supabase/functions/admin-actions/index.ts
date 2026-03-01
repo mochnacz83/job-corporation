@@ -379,10 +379,12 @@ serve(async (req) => {
 
       // Only allow safe fields
       const allowed = ['nome', 'cargo', 'email', 'empresa', 'telefone', 'area'];
-      const safeData: Record<string, string> = {};
+      const safeData: Record<string, any> = {};
       for (const key of allowed) {
         if (profileData[key] !== undefined) safeData[key] = profileData[key];
       }
+
+      console.log(`Updating profile for user ${userId}:`, JSON.stringify(safeData));
 
       const { error: updateError } = await serviceClient
         .from('profiles')
