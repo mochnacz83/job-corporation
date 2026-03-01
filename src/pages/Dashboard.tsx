@@ -85,7 +85,7 @@ const Dashboard = () => {
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-1 bg-slate-900 rounded-lg shadow-sm w-12 h-12 flex items-center justify-center overflow-hidden">
+            <div className="p-1 bg-transparent w-12 h-12 flex items-center justify-center overflow-hidden">
               <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-lg font-bold text-foreground">Portal Corporativo</h1>

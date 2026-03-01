@@ -75,7 +75,7 @@ const PowerBI = () => {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="p-1 bg-slate-900 rounded-md shadow-sm w-10 h-10 flex items-center justify-center overflow-hidden">
+            <div className="p-1 bg-transparent w-10 h-10 flex items-center justify-center overflow-hidden">
               <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-lg font-bold text-foreground">
