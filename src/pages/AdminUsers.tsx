@@ -355,9 +355,14 @@ const AdminUsers = () => {
 
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              <CardTitle>Usuários Cadastrados</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                <CardTitle>Usuários Cadastrados</CardTitle>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate("/admin/perfis")}>
+                <Shield className="w-4 h-4 mr-2" /> Gerenciar Perfis
+              </Button>
             </div>
           </CardHeader>
           <CardContent>

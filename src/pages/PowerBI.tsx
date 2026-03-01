@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BarChart3, PieChart, Presentation, MoveLeft } from "lucide-react";
@@ -28,6 +29,7 @@ const DEFAULT_REPORTS: PowerBILink[] = [
 ];
 
 const PowerBI = () => {
+  const { areaPermissions, isAdmin } = useAuth();
   const [links, setLinks] = useState<PowerBILink[]>(DEFAULT_REPORTS);
   const [selectedLink, setSelectedLink] = useState<PowerBILink | null>(null);
   const navigate = useNavigate();
@@ -43,19 +45,28 @@ const PowerBI = () => {
         return link;
       }) as PowerBILink[];
 
-      setLinks(prev => {
+      setLinks(() => {
         // Start with DB links
-        const combined = [...dbLinks];
+        let combined = [...dbLinks];
         // Ensure "Comunicação de Dados" is present
         DEFAULT_REPORTS.forEach(def => {
           if (!combined.some(link => link.titulo === def.titulo)) {
             combined.push(def);
           }
         });
+
+        // Apply filtering if not admin
+        if (!isAdmin && areaPermissions && !areaPermissions.all_access) {
+          combined = combined.filter(link =>
+            areaPermissions.powerbi_report_ids.includes(link.id) ||
+            link.id.startsWith('report-') // keep default reports if they don't have UUIDs
+          );
+        }
+
         return combined;
       });
     });
-  }, []);
+  }, [areaPermissions, isAdmin]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

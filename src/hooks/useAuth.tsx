@@ -17,10 +17,18 @@ interface Profile {
   status: string;
 }
 
+interface AreaPermissions {
+  area: string;
+  modules: string[];
+  powerbi_report_ids: string[];
+  all_access: boolean;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
+  areaPermissions: AreaPermissions | null;
   isAdmin: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -34,16 +42,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [areaPermissions, setAreaPermissions] = useState<AreaPermissions | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
       .eq("user_id", userId)
       .single();
-    setProfile(data as unknown as Profile | null);
+    const p = profileData as Profile | null;
+    setProfile(p);
+
+    if (p?.area) {
+      const { data: permData } = await supabase
+        .from("area_permissions" as any)
+        .select("*")
+        .eq("area", p.area)
+        .maybeSingle();
+      setAreaPermissions(permData as AreaPermissions | null);
+    } else {
+      setAreaPermissions(null);
+    }
 
     // Check admin role
     const { data: roleData } = await supabase
@@ -95,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, isAdmin, loading, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, user, profile, areaPermissions, isAdmin, loading, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
