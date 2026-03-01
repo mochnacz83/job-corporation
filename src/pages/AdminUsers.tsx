@@ -177,7 +177,21 @@ const AdminUsers = () => {
         body: { action: "reset-password", userId: resetUser.user_id, newPassword },
       });
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
-      toast({ title: "Senha redefinida", description: `A senha de ${resetUser.nome} foi redefinida.` });
+
+      const { emailSent, passwordUsed, targetEmail } = data;
+
+      let successMsg = `A senha de ${resetUser.nome} foi redefinida.`;
+      if (emailSent) {
+        successMsg = `Senha redefinida e enviada para ${targetEmail}.`;
+      } else if (!targetEmail) {
+        successMsg = `Usuário sem e-mail. Senha definida como: ${passwordUsed}`;
+      }
+
+      toast({
+        title: "Sucesso",
+        description: successMsg,
+        variant: "default"
+      });
       setResetDialogOpen(false);
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
@@ -427,20 +441,31 @@ const AdminUsers = () => {
               O usuário será obrigado a trocar a senha no próximo login.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Input type="password" placeholder="Nova senha" value={newPassword}
+          <div className="space-y-1">
+            <Label>Nova Senha</Label>
+            <Input type="password" placeholder={resetUser?.email ? "Nova senha" : "12345@Ab"} value={newPassword}
+              disabled={!resetUser?.email}
               onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }} />
-            {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p>A senha deve conter:</p>
-              <ul className="list-disc list-inside">
-                <li>No mínimo 6 caracteres</li>
-                <li>Pelo menos uma letra maiúscula</li>
-                <li>Pelo menos uma letra minúscula</li>
-                <li>Pelo menos um número</li>
-                <li>Pelo menos um caractere especial (!@#$%...)</li>
-              </ul>
-            </div>
+            {!resetUser?.email ? (
+              <p className="text-[10px] text-amber-600 font-medium">
+                Usuário sem e-mail cadastrado. A senha será resetada para o padrão: 12345@Ab
+              </p>
+            ) : (
+              <p className="text-[10px] text-blue-600 font-medium">
+                A senha será enviada para: {resetUser.email}
+              </p>
+            )}
+          </div>
+          {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>A senha deve conter:</p>
+            <ul className="list-disc list-inside">
+              <li>No mínimo 6 caracteres</li>
+              <li>Pelo menos uma letra maiúscula</li>
+              <li>Pelo menos uma letra minúscula</li>
+              <li>Pelo menos um número</li>
+              <li>Pelo menos um caractere especial (!@#$%...)</li>
+            </ul>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetDialogOpen(false)}>Cancelar</Button>

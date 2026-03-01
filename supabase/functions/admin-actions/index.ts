@@ -52,14 +52,31 @@ serve(async (req) => {
     const { action, userId, newPassword, profileData } = await req.json();
 
     if (action === 'reset-password') {
-      if (!userId || !newPassword) {
-        return new Response(JSON.stringify({ error: 'userId and newPassword required' }), {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'userId required' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
+      // Fetch user profile to get email and name
+      const { data: profile, error: profileError } = await serviceClient
+        .from('profiles')
+        .select('nome, email')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
+
+      let passwordToUse = newPassword;
+      let emailSent = false;
+
+      // Rule: if no email, use 12345@Ab
+      if (!profile?.email) {
+        passwordToUse = '12345@Ab';
+      }
+
       const { error: updateError } = await serviceClient.auth.admin.updateUserById(userId, {
-        password: newPassword,
+        password: passwordToUse,
       });
 
       if (updateError) {
@@ -71,7 +88,58 @@ serve(async (req) => {
         .update({ must_change_password: true })
         .eq('user_id', userId);
 
-      return new Response(JSON.stringify({ success: true }), {
+      // Send email if registered
+      if (profile?.email) {
+        const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+        if (RESEND_API_KEY) {
+          try {
+            const emailResponse = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${RESEND_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'Portal Corporativo <onboarding@resend.dev>',
+                to: [profile.email],
+                subject: '🔐 Sua senha foi redefinida - Portal Corporativo',
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+                    <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">
+                      Redefinição de Senha
+                    </h2>
+                    <p>Olá, <strong>${profile.nome}</strong>,</p>
+                    <p>Um administrador redefiniu sua senha no Portal Corporativo.</p>
+                    <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
+                      <p style="margin: 0; font-size: 16px;">Sua nova senha temporária é:</p>
+                      <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">
+                        ${passwordToUse}
+                      </p>
+                    </div>
+                    <p style="color: #666; font-size: 14px;">
+                      <strong>IMPORTANTE:</strong> Por segurança, você será solicitado a alterar esta senha no seu próximo login.
+                    </p>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                    <p style="font-size: 12px; color: #999;">
+                      Este é um e-mail automático do Portal Corporativo da Ability Tecnologia.
+                    </p>
+                  </div>
+                `,
+              }),
+            });
+            if (emailResponse.ok) emailSent = true;
+          } catch (e) {
+            console.error('Failed to send reset email:', e);
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        passwordUsed: passwordToUse,
+        emailSent,
+        targetEmail: profile?.email
+      }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
