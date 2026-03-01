@@ -169,12 +169,15 @@ serve(async (req) => {
         });
       }
 
+      console.log(`Resending password for user ${userId}, email: ${profile.email}`);
+
       const defaultPassword = '12345@Ab';
       const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: defaultPassword,
       });
 
       if (authError) {
+        console.error('Auth update error:', authError);
         return new Response(JSON.stringify({ error: `Auth update failed: ${authError.message}` }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -189,6 +192,7 @@ serve(async (req) => {
       const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
       if (RESEND_API_KEY) {
         try {
+          console.log('Sending email via Resend...');
           const emailResponse = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -223,10 +227,14 @@ serve(async (req) => {
               `,
             }),
           });
+          const result = await emailResponse.json();
+          console.log('Resend response:', result);
           if (emailResponse.ok) emailSent = true;
         } catch (e) {
           console.error('Email send failure (resend-password):', e);
         }
+      } else {
+        console.warn('RESEND_API_KEY not found');
       }
 
       return new Response(JSON.stringify({ success: true, emailSent }), {

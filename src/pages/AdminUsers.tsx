@@ -284,6 +284,7 @@ const AdminUsers = () => {
           profileData: {
             nome: editForm.nome.trim(),
             cargo: editForm.cargo.trim() || null,
+            area: editForm.area?.trim() || null,
             email: editForm.email.trim() || null,
             empresa: editForm.empresa.trim() || null,
             telefone: editForm.telefone.replace(/\D/g, "") || null,
