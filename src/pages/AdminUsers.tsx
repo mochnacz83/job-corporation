@@ -32,7 +32,7 @@ interface UserProfile {
   user_id: string;
   matricula: string;
   nome: string;
-  area?: string | null;
+  area: string | null;
   cargo: string | null;
   email: string | null;
   empresa: string | null;
