@@ -402,6 +402,17 @@ const Login = () => {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="empresa">Empresa</Label>
+                  <Input
+                    id="empresa"
+                    value={empresa}
+                    onChange={(e) => setEmpresa(e.target.value)}
+                    placeholder="Nome da empresa"
+                    required
+                  />
+                </div>
+
                 {/* Senha Temporária */}
                 <div className="space-y-1 pt-2 border-t border-border">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
