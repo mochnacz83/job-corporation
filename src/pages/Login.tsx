@@ -141,6 +141,37 @@ const Login = () => {
 
     setLoading(true);
     try {
+      // 🕵️ Verificação de Duplicidade (Nome, E-mail ou Telefone)
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("profiles")
+        .select("nome, email, telefone")
+        .or(`nome.eq."${nome.trim()}",email.eq."${emailContato.trim()}",telefone.eq."${phoneDigits}"`)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error("[Signup] Erro ao verificar duplicidade:", checkError);
+      }
+
+      if (existingProfile) {
+        let duplicatedField = "dados";
+        if (existingProfile.nome === nome.trim()) duplicatedField = "Nome";
+        else if (existingProfile.email === emailContato.trim()) duplicatedField = "E-mail";
+        else if (existingProfile.telefone === phoneDigits) duplicatedField = "Telefone";
+
+        setLoading(false);
+        toast({
+          title: "Cadastro já identificado",
+          description: `Já existe um usuário com este ${duplicatedField}. Você já possui uma conta? Use a recuperação de senha.`,
+          variant: "destructive",
+          duration: 8000,
+        });
+
+        // Redireciona para recuperação
+        setView("forgot");
+        setForgotEmail(emailContato.trim());
+        return;
+      }
+
       const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
       console.log("[Signup] Iniciando cadastro para:", authEmail);
 
