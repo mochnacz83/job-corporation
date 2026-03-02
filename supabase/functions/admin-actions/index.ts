@@ -133,7 +133,10 @@ serve(async (req) => {
 
       await serviceClient
         .from('profiles')
-        .update({ must_change_password: true })
+        .update({
+          must_change_password: true,
+          reset_password_pending: false
+        })
         .eq('user_id', userId);
 
       // Send email if registered

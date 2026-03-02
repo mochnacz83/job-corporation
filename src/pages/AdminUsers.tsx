@@ -38,6 +38,7 @@ interface UserProfile {
   empresa: string | null;
   telefone: string | null;
   status: string;
+  reset_password_pending: boolean;
   created_at: string;
 }
 
@@ -346,9 +347,19 @@ const AdminUsers = () => {
         {users.filter(u => u.status === "pendente").length > 0 && (
           <Alert variant="default" className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-800">Atenção Adminstrador</AlertTitle>
+            <AlertTitle className="text-amber-800">Novos Cadastros</AlertTitle>
             <AlertDescription className="text-amber-700">
-              Existem {users.filter(u => u.status === "pendente").length} novos usuários aguardando sua validação para acessar o sistema. Revise-os abaixo.
+              Existem {users.filter(u => u.status === "pendente").length} novos usuários aguardando sua validação para acessar o sistema. Revise-os abaixo na coluna "Controlar Acesso".
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {users.filter(u => u.reset_password_pending).length > 0 && (
+          <Alert variant="default" className="bg-orange-50 border-orange-200">
+            <KeyRound className="h-4 w-4 text-orange-600" />
+            <AlertTitle className="text-orange-800">Recuperação de Senha Solicidada</AlertTitle>
+            <AlertDescription className="text-orange-700">
+              {users.filter(u => u.reset_password_pending).length} usuário(s) solicitaram nova senha. Clique no ícone de chave <KeyRound className="inline w-3 h-3" /> na linha do usuário para definir e enviar.
             </AlertDescription>
           </Alert>
         )}
@@ -387,7 +398,14 @@ const AdminUsers = () => {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-mono">{u.matricula}</TableCell>
-                      <TableCell>{u.nome}</TableCell>
+                      <TableCell className="relative">
+                        {u.nome}
+                        {u.reset_password_pending && (
+                          <Badge variant="outline" className="ml-2 border-orange-500 text-orange-600 bg-orange-50 animate-pulse py-0 h-5">
+                            Reset Solicidado
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm">{u.email || "—"}</TableCell>
                       <TableCell className="text-sm">{u.empresa || "—"}</TableCell>
                       <TableCell className="text-sm">{u.area || "—"}</TableCell>
@@ -438,11 +456,12 @@ const AdminUsers = () => {
 
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" onClick={() => openResetDialog(u)} className="h-8 w-8 hover:bg-slate-100">
-                                  <KeyRound className="w-4 h-4 text-slate-700" />
+                                <Button size="icon" variant="ghost" onClick={() => openResetDialog(u)}
+                                  className={`h-8 w-8 ${u.reset_password_pending ? 'bg-orange-100 ring-2 ring-orange-400 hover:bg-orange-200' : 'hover:bg-slate-100'}`}>
+                                  <KeyRound className={`w-4 h-4 ${u.reset_password_pending ? 'text-orange-600' : 'text-slate-700'}`} />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Resetar Senha</TooltipContent>
+                              <TooltipContent>{u.reset_password_pending ? "Aprovar & Enviar Nova Senha" : "Resetar Senha"}</TooltipContent>
                             </Tooltip>
 
                             {u.email && (

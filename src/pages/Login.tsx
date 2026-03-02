@@ -141,11 +141,11 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // 🕵️ Verificação de Duplicidade (Nome, E-mail ou Telefone)
+      // 🕵️ Verificação de Duplicidade (Matrícula, Nome, E-mail ou Telefone)
       const { data: existingProfile, error: checkError } = await supabase
         .from("profiles")
-        .select("nome, email, telefone")
-        .or(`nome.eq."${nome.trim()}",email.eq."${emailContato.trim()}",telefone.eq."${phoneDigits}"`)
+        .select("matricula, nome, email, telefone")
+        .or(`matricula.eq."${matricula.trim()}",nome.eq."${nome.trim()}",email.eq."${emailContato.trim()}",telefone.eq."${phoneDigits}"`)
         .maybeSingle();
 
       if (checkError) {
@@ -154,14 +154,15 @@ const Login = () => {
 
       if (existingProfile) {
         let duplicatedField = "dados";
-        if (existingProfile.nome === nome.trim()) duplicatedField = "Nome";
+        if (existingProfile.matricula === matricula.trim()) duplicatedField = "Matrícula";
+        else if (existingProfile.nome === nome.trim()) duplicatedField = "Nome";
         else if (existingProfile.email === emailContato.trim()) duplicatedField = "E-mail";
         else if (existingProfile.telefone === phoneDigits) duplicatedField = "Telefone";
 
         setLoading(false);
         toast({
           title: "Cadastro já identificado",
-          description: `Já existe um usuário com este ${duplicatedField}. Você já possui uma conta? Use a recuperação de senha.`,
+          description: `Já existe um usuário com este(a) ${duplicatedField}. Você já possui uma conta? Use a recuperação de senha.`,
           variant: "destructive",
           duration: 8000,
         });

@@ -43,73 +43,75 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
-    // Find user by email in profiles
+    // 1. Find user by email in profiles
     const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
-      .select('user_id, nome, email')
+      .select('user_id, nome, email, matricula')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'E-mail não encontrado no sistema' }), {
+      return new Response(JSON.stringify({ error: 'Este e-mail não está vinculado a nenhuma conta ativa.' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const newPassword = generatePassword();
+    // 2. Mark as pending reset in the database
+    const { error: dbError } = await serviceClient
+      .from('profiles')
+      .update({ reset_password_pending: true })
+      .eq('user_id', profile.user_id);
 
-    // Update password
-    const { error: updateError } = await serviceClient.auth.admin.updateUserById(profile.user_id, {
-      password: newPassword,
-    });
-    if (updateError) throw updateError;
+    if (dbError) throw new Error(`Erro ao registrar solicitação: ${dbError.message}`);
 
-    // Set must_change_password
-    await serviceClient.from('profiles').update({ must_change_password: true }).eq('user_id', profile.user_id);
-
-    // Send email with new password
+    // 3. Notify Admin (Juniomar Alex)
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
+    const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>';
+    const ADMIN_EMAIL = 'juniomar.mochnacz@abilitytecnologia.com.br'; // O admin principal
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>',
-        to: [email],
-        subject: '🔑 Nova senha - Portal Corporativo',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">
-              Recuperação de Senha
-            </h2>
-            <p>Olá, <strong>${profile.nome}</strong>!</p>
-            <p>Sua nova senha temporária é:</p>
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
-              <code style="font-size: 24px; font-weight: bold; color: #4361ee; letter-spacing: 2px;">${newPassword}</code>
-            </div>
-            <p style="color: #666;">Ao fazer login com esta senha, você será solicitado a criar uma nova senha.</p>
-            <p style="color: #999; font-size: 12px;">Se você não solicitou esta alteração, entre em contato com o administrador.</p>
-          </div>
-        `,
-      }),
-    });
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Resend API error:', emailResponse.status, errorText);
-      throw new Error(`Falha ao enviar e-mail: ${emailResponse.status}`);
+    if (RESEND_API_KEY) {
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [ADMIN_EMAIL],
+            subject: '⚠️ Solicitação de Reset de Senha - Portal Corporativo',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
+                <h2 style="color: #d9480f;">Solicitação de Nova Senha</h2>
+                <p>O seguinte usuário solicitou a recuperação de acesso:</p>
+                <div style="background: #fff4e6; padding: 15px; border-radius: 8px;">
+                  <p><strong>Nome:</strong> ${profile.nome}</p>
+                  <p><strong>Matrícula:</strong> ${profile.matricula}</p>
+                  <p><strong>E-mail:</strong> ${profile.email}</p>
+                </div>
+                <p>Acesse o painel administrativo para validar e enviar a nova senha temporária.</p>
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                <p style="font-size: 12px; color: #999;">Este é um alerta automático do sistema.</p>
+              </div>
+            `,
+          }),
+        });
+      } catch (e) {
+        console.error('Falha ao notificar admin:', e);
+      }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Sua solicitação foi enviada ao administrador. Você receberá um e-mail com a nova senha assim que for aprovada.'
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
   } catch (error) {
     console.error('Forgot password error:', error);
-    const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+    const msg = error instanceof Error ? error.message : 'Erro interno';
     return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
