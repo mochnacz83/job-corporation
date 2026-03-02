@@ -113,12 +113,17 @@ const Login = () => {
       toast({ title: "Senhas não conferem", description: "A confirmação de senha deve ser igual à senha informada.", variant: "destructive" });
       return;
     }
-    if (!nome.trim() || !emailContato.trim() || !empresa.trim() || !area || !cargo) return;
+    if (!nome.trim() || !emailContato.trim() || !empresa.trim() || !area || !cargo) {
+      toast({ title: "Campos obrigatórios", description: "Preencha todos os campos antes de continuar.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
-      const email = `${matricula.trim()}@empresa.local`;
-      const { error } = await supabase.auth.signUp({
-        email,
+      const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
+      console.log("[Signup] Iniciando cadastro para:", authEmail);
+
+      const { data: signUpData, error } = await supabase.auth.signUp({
+        email: authEmail,
         password: signupPassword,
         options: {
           data: {
@@ -132,18 +137,40 @@ const Login = () => {
           },
         },
       });
-      if (error) throw error;
+
+      if (error) {
+        console.error("[Signup] Erro do Supabase Auth:", error);
+        // Translate common Supabase error messages
+        let friendlyMsg = error.message;
+        if (error.message.includes("already registered") || error.message.includes("already exists")) {
+          friendlyMsg = "Esta matrícula já foi cadastrada. Tente fazer login ou use outra matrícula.";
+        } else if (error.message.includes("password")) {
+          friendlyMsg = "A senha não atende aos requisitos mínimos de segurança.";
+        } else if (error.message.includes("email")) {
+          friendlyMsg = "Erro no formato do e-mail interno. Tente novamente.";
+        }
+        throw new Error(friendlyMsg);
+      }
+
+      if (!signUpData?.user) {
+        console.warn("[Signup] Nenhum usuário retornado — possível duplicata silenciosa");
+        toast({ title: "Matrícula já cadastrada", description: "Esta matrícula já existe no sistema. Tente fazer login.", variant: "destructive" });
+        return;
+      }
+
+      console.log("[Signup] Usuário criado com sucesso:", signUpData.user.id);
 
       supabase.functions.invoke("notify-new-user", {
         body: { nome: nome.trim(), matricula: matricula.trim() },
       }).catch((err) => console.error("Notification error:", err));
 
-      toast({ title: "Cadastro realizado!", description: "Aguarde a aprovação do administrador. Você será notificado por e-mail quando sua conta for ativada." });
+      toast({ title: "✅ Cadastro realizado!", description: "Aguarde a aprovação do administrador. Você será notificado por e-mail quando sua conta for ativada." });
       setView("login");
       setNome(""); setEmailContato(""); setEmpresa(""); setTelefone("");
       setCargo(""); setArea(""); setMatricula(""); setSignupPassword(""); setSignupPasswordConfirm("");
     } catch (err: any) {
-      toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
+      console.error("[Signup] Erro final:", err);
+      toast({ title: "Erro ao cadastrar", description: err.message || "Erro desconhecido. Tente novamente.", variant: "destructive" });
     } finally {
       setLoading(false);
     }

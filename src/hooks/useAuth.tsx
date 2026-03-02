@@ -105,9 +105,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (matricula: string, password: string) => {
-    const email = `${matricula}@empresa.local`;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    // Try new domain first, fallback to old domain for existing users
+    const newEmail = `${matricula.toLowerCase()}@corporativo.local`;
+    const oldEmail = `${matricula}@empresa.local`;
+
+    const { error: newError } = await supabase.auth.signInWithPassword({ email: newEmail, password });
+    if (!newError) return; // Success with new domain
+
+    // Try old domain for users registered before the migration
+    const { error: oldError } = await supabase.auth.signInWithPassword({ email: oldEmail, password });
+    if (oldError) throw oldError; // Both failed — throw the final error
   };
 
   const signOut = async () => {
