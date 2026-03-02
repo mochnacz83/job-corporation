@@ -268,7 +268,6 @@ const Login = () => {
     } catch (err: any) {
       setForgotPassword("");
       setForgotPasswordConfirm("");
-    } catch (err: any) {
       const msg = err?.message || "Erro ao recuperar senha.";
       toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
