@@ -105,18 +105,40 @@ const Login = () => {
       toast({ title: "Telefone inválido", description: "Informe DDD + 9 dígitos (11 números).", variant: "destructive" });
       return;
     }
+    if (!nome.trim()) {
+      toast({ title: "Campo obrigatório", description: "Por favor, informe seu nome completo.", variant: "destructive" });
+      return;
+    }
+    if (!emailContato.trim()) {
+      toast({ title: "Campo obrigatório", description: "Por favor, informe seu e-mail de contato.", variant: "destructive" });
+      return;
+    }
+    if (!area) {
+      toast({ title: "Campo obrigatório", description: "Por favor, selecione sua área.", variant: "destructive" });
+      return;
+    }
+    if (!cargo) {
+      toast({ title: "Campo obrigatório", description: "Por favor, selecione seu cargo.", variant: "destructive" });
+      return;
+    }
+    if (!empresa.trim()) {
+      toast({ title: "Campo obrigatório", description: "Por favor, informe sua empresa.", variant: "destructive" });
+      return;
+    }
+
     if (!PASSWORD_REGEX.test(signupPassword)) {
-      toast({ title: "Senha fraca", description: "A senha deve ter pelo menos 6 caracteres, incluindo maiúsculas, minúsculas, números e um caractere especial (!@#$%...).", variant: "destructive" });
+      toast({
+        title: "Senha inválida",
+        description: "A senha deve conter pelo menos 6 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um símbolo.",
+        variant: "destructive"
+      });
       return;
     }
     if (signupPassword !== signupPasswordConfirm) {
-      toast({ title: "Senhas não conferem", description: "A confirmação de senha deve ser igual à senha informada.", variant: "destructive" });
+      toast({ title: "Senhas divergentes", description: "A confirmação deve ser idêntica à senha.", variant: "destructive" });
       return;
     }
-    if (!nome.trim() || !emailContato.trim() || !empresa.trim() || !area || !cargo) {
-      toast({ title: "Campos obrigatórios", description: "Preencha todos os campos antes de continuar.", variant: "destructive" });
-      return;
-    }
+
     setLoading(true);
     try {
       const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
@@ -444,12 +466,7 @@ const Login = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={
-                    loading ||
-                    !MATRICULA_REGEX.test(matricula) ||
-                    !PASSWORD_REGEX.test(signupPassword) ||
-                    signupPassword !== signupPasswordConfirm
-                  }
+                  disabled={loading}
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Cadastrar
