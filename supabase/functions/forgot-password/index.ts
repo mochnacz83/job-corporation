@@ -32,9 +32,9 @@ serve(async (req) => {
   }
 
   try {
-    const { email, newPassword } = await req.json();
-    if (!email || !newPassword) {
-      return new Response(JSON.stringify({ error: 'E-mail e nova senha são obrigatórios' }), {
+    const { matricula, newPassword } = await req.json();
+    if (!matricula || !newPassword) {
+      return new Response(JSON.stringify({ error: 'Matrícula e nova senha são obrigatórios' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -43,15 +43,15 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
-    // 1. Find user by email in profiles
+    // 1. Find user by matricula in profiles
     const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
       .select('user_id, nome, email, matricula')
-      .eq('email', email)
+      .eq('matricula', matricula)
       .maybeSingle();
 
     if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Este e-mail não está vinculado a nenhuma conta ativa.' }), {
+      return new Response(JSON.stringify({ error: 'Esta matrícula não está vinculada a nenhuma conta ativa.' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

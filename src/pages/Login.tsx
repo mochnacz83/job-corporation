@@ -45,7 +45,7 @@ const Login = () => {
   const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
   const [showSignupPwd, setShowSignupPwd] = useState(false);
   const [showSignupPwdConfirm, setShowSignupPwdConfirm] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMatricula, setForgotMatricula] = useState("");
   const [forgotPassword, setForgotPassword] = useState("");
   const [forgotPasswordConfirm, setForgotPasswordConfirm] = useState("");
   const [showForgotPwd, setShowForgotPwd] = useState(false);
@@ -173,7 +173,7 @@ const Login = () => {
 
         // Redireciona para recuperação
         setView("forgot");
-        setForgotEmail(emailContato.trim());
+        setForgotMatricula(matricula.trim());
         return;
       }
 
@@ -236,7 +236,7 @@ const Login = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim()) return;
+    if (!forgotMatricula.trim()) return;
     setLoading(true);
     try {
       if (forgotPassword !== forgotPasswordConfirm) {
@@ -254,7 +254,7 @@ const Login = () => {
 
       const { data, error } = await supabase.functions.invoke("forgot-password", {
         body: {
-          email: forgotEmail.trim(),
+          matricula: forgotMatricula.trim(),
           newPassword: forgotPassword
         },
       });
@@ -262,7 +262,10 @@ const Login = () => {
       if (data?.error) throw new Error(data.error);
       toast({ title: "Solicitação enviada!", description: "Sua solicitação foi enviada ao administrador. Você receberá um e-mail assim que for aprovada." });
       setView("login");
-      setForgotEmail("");
+      setForgotMatricula("");
+      setForgotPassword("");
+      setForgotPasswordConfirm("");
+    } catch (err: any) {
       setForgotPassword("");
       setForgotPasswordConfirm("");
     } catch (err: any) {
@@ -293,7 +296,10 @@ const Login = () => {
           {view === "login" && (
             <button
               type="button"
-              onClick={() => setView("forgot")}
+              onClick={() => {
+                setView("forgot");
+                setForgotMatricula(matricula);
+              }}
               className="text-sm text-primary hover:underline mb-4 block w-full text-center"
             >
               Esqueci a senha
@@ -310,13 +316,18 @@ const Login = () => {
                 <ArrowLeft className="w-4 h-4" /> Voltar ao login
               </button>
               <div className="space-y-2">
-                <Label htmlFor="forgot-email">E-mail cadastrado</Label>
+                <Label htmlFor="forgot-matricula">Matrícula</Label>
                 <Input
-                  id="forgot-email"
-                  type="email"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  id="forgot-matricula"
+                  value={forgotMatricula}
+                  onChange={(e) => {
+                    let cleaned = e.target.value.toUpperCase();
+                    if (!cleaned.startsWith("TT")) cleaned = "TT";
+                    const afterTT = cleaned.slice(2).replace(/\D/g, "").slice(0, 6);
+                    setForgotMatricula("TT" + afterTT);
+                  }}
+                  placeholder="TT000000"
+                  maxLength={8}
                   required
                 />
               </div>
@@ -369,7 +380,7 @@ const Login = () => {
               </p>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Enviar nova senha
+                Solicitar nova senha
               </Button>
             </form>
           )}
