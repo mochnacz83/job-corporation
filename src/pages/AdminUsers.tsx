@@ -39,6 +39,7 @@ interface UserProfile {
   telefone: string | null;
   status: string;
   reset_password_pending: boolean;
+  requested_password: string | null;
   created_at: string;
 }
 
@@ -196,7 +197,7 @@ const AdminUsers = () => {
 
   const openResetDialog = (u: UserProfile) => {
     setResetUser(u);
-    setNewPassword("");
+    setNewPassword(u.requested_password || "");
     setPasswordError(null);
     setResetDialogOpen(true);
   };
@@ -228,6 +229,7 @@ const AdminUsers = () => {
         variant: "default"
       });
       setResetDialogOpen(false);
+      await loadUsers(); // Refresh to clear badges
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
@@ -401,8 +403,8 @@ const AdminUsers = () => {
                       <TableCell className="relative">
                         {u.nome}
                         {u.reset_password_pending && (
-                          <Badge variant="outline" className="ml-2 border-orange-500 text-orange-600 bg-orange-50 animate-pulse py-0 h-5">
-                            Reset Solicidado
+                          <Badge variant="outline" className={`ml-2 animate-pulse py-0 h-5 ${u.requested_password ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-orange-500 text-orange-600 bg-orange-50'}`}>
+                            {u.requested_password ? 'Nova Senha Definida' : 'Reset Solicitado'}
                           </Badge>
                         )}
                       </TableCell>
@@ -516,10 +518,14 @@ const AdminUsers = () => {
           </DialogHeader>
           <div className="space-y-1">
             <Label>Nova Senha</Label>
-            <Input type="password" placeholder={resetUser?.email ? "Nova senha" : "12345@Ab"} value={newPassword}
-              disabled={!resetUser?.email}
+            <Input type="text" placeholder={resetUser?.requested_password ? "Senha solicitada" : (resetUser?.email ? "Nova senha" : "12345@Ab")} value={newPassword}
+              disabled={!resetUser?.email && !resetUser?.requested_password}
               onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }} />
-            {!resetUser?.email ? (
+            {resetUser?.requested_password ? (
+              <p className="text-[10px] text-blue-600 font-medium pt-1">
+                ⭐ O usuário escolheu esta senha. Clique em redefinir para aprovar.
+              </p>
+            ) : !resetUser?.email ? (
               <p className="text-[10px] text-amber-600 font-medium">
                 Usuário sem e-mail cadastrado. A senha será resetada para o padrão: 12345@Ab
               </p>

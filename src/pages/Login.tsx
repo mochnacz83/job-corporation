@@ -46,6 +46,10 @@ const Login = () => {
   const [showSignupPwd, setShowSignupPwd] = useState(false);
   const [showSignupPwdConfirm, setShowSignupPwdConfirm] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotPasswordConfirm, setForgotPasswordConfirm] = useState("");
+  const [showForgotPwd, setShowForgotPwd] = useState(false);
+  const [showForgotPwdConfirm, setShowForgotPwdConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -235,14 +239,32 @@ const Login = () => {
     if (!forgotEmail.trim()) return;
     setLoading(true);
     try {
+      if (forgotPassword !== forgotPasswordConfirm) {
+        toast({ title: "Senhas divergentes", description: "A confirmação deve ser idêntica à senha.", variant: "destructive" });
+        return;
+      }
+      if (!PASSWORD_REGEX.test(forgotPassword)) {
+        toast({
+          title: "Senha inválida",
+          description: "A senha deve conter pelo menos 6 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um símbolo.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("forgot-password", {
-        body: { email: forgotEmail.trim() },
+        body: {
+          email: forgotEmail.trim(),
+          newPassword: forgotPassword
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast({ title: "E-mail enviado!", description: "Verifique sua caixa de entrada para a nova senha temporária." });
+      toast({ title: "Solicitação enviada!", description: "Sua solicitação foi enviada ao administrador. Você receberá um e-mail assim que for aprovada." });
       setView("login");
       setForgotEmail("");
+      setForgotPassword("");
+      setForgotPasswordConfirm("");
     } catch (err: any) {
       const msg = err?.message || "Erro ao recuperar senha.";
       toast({ title: "Erro", description: msg, variant: "destructive" });
@@ -298,8 +320,52 @@ const Login = () => {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="forgot-password">Nova Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="forgot-password"
+                    type={showForgotPwd ? "text" : "password"}
+                    value={forgotPassword}
+                    onChange={(e) => setForgotPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPwd(!showForgotPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showForgotPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="forgot-password-confirm">Confirme a Nova Senha</Label>
+                <div className="relative">
+                  <Input
+                    id="forgot-password-confirm"
+                    type={showForgotPwdConfirm ? "text" : "password"}
+                    value={forgotPasswordConfirm}
+                    onChange={(e) => setForgotPasswordConfirm(e.target.value)}
+                    placeholder="Repita a nova senha"
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPwdConfirm(!showForgotPwdConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showForgotPwdConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
               <p className="text-xs text-muted-foreground">
-                Uma nova senha temporária será enviada para o e-mail informado.
+                Sua nova senha será validada por um administrador antes de ser ativada.
               </p>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

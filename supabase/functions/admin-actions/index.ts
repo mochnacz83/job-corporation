@@ -106,10 +106,10 @@ serve(async (req) => {
         });
       }
 
-      // Fetch user profile to get email and name
+      // Fetch user profile to get email, name and requested password
       const { data: profile, error: profileError } = await serviceClient
         .from('profiles')
-        .select('nome, email')
+        .select('nome, email, requested_password')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -118,8 +118,11 @@ serve(async (req) => {
       let passwordToUse = newPassword;
       let emailSent = false;
 
-      // Rule: if no email, use 12345@Ab
-      if (!profile?.email) {
+      // Rule: if user requested a password, prioritize it
+      if (profile?.requested_password) {
+        passwordToUse = profile.requested_password;
+      } else if (!profile?.email && !newPassword) {
+        // if no email and no new password provided, use default
         passwordToUse = '12345@Ab';
       }
 
@@ -135,7 +138,8 @@ serve(async (req) => {
         .from('profiles')
         .update({
           must_change_password: true,
-          reset_password_pending: false
+          reset_password_pending: false,
+          requested_password: null
         })
         .eq('user_id', userId);
 

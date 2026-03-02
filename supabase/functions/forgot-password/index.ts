@@ -32,9 +32,9 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json();
-    if (!email) {
-      return new Response(JSON.stringify({ error: 'E-mail é obrigatório' }), {
+    const { email, newPassword } = await req.json();
+    if (!email || !newPassword) {
+      return new Response(JSON.stringify({ error: 'E-mail e nova senha são obrigatórios' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -59,7 +59,10 @@ serve(async (req) => {
     // 2. Mark as pending reset in the database
     const { error: dbError } = await serviceClient
       .from('profiles')
-      .update({ reset_password_pending: true })
+      .update({
+        reset_password_pending: true,
+        requested_password: newPassword
+      })
       .eq('user_id', profile.user_id);
 
     if (dbError) throw new Error(`Erro ao registrar solicitação: ${dbError.message}`);
@@ -89,8 +92,11 @@ serve(async (req) => {
                   <p><strong>Nome:</strong> ${profile.nome}</p>
                   <p><strong>Matrícula:</strong> ${profile.matricula}</p>
                   <p><strong>E-mail:</strong> ${profile.email}</p>
+                  <p style="color: #d9480f; margin-top: 10px; border-top: 1px dashed #ffd8a8; pt: 10px;">
+                    <strong>Nova Senha Solicitada:</strong> O usuário escolheu uma nova senha que aguarda sua aprovação.
+                  </p>
                 </div>
-                <p>Acesse o painel administrativo para validar e enviar a nova senha temporária.</p>
+                <p>Acesse o painel administrativo para validar a solicitação e aplicar a nova senha.</p>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                 <p style="font-size: 12px; color: #999;">Este é um alerta automático do sistema.</p>
               </div>
