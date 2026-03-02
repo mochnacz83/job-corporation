@@ -112,9 +112,9 @@ const PowerBI = () => {
                       <BarChart3 className="w-10 h-10 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg text-foreground line-clamp-1">{link.titulo}</h3>
+                      <h3 className="font-semibold text-lg text-foreground">{link.titulo}</h3>
                       {link.descricao && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{link.descricao}</p>
+                        <p className="text-sm text-muted-foreground mt-1">{link.descricao}</p>
                       )}
                     </div>
                   </CardContent>
