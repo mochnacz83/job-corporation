@@ -283,37 +283,31 @@ serve(async (req) => {
 
       if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
 
-      // Basic update
       const updateData: any = { status: newStatus };
       let emailSent = false;
-      let passwordPrompt = '';
 
-      // If activating, set default password and send email
+      // If activating: mark must_change_password and notify via email
       if (newStatus === 'ativo') {
-        const defaultPassword = '12345@Ab';
-        const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
-          password: defaultPassword,
-        });
-
-        if (authError) throw new Error(`Auth update failed: ${authError.message}`);
-
         updateData.must_change_password = true;
-        passwordPrompt = defaultPassword;
 
         if (profile?.email) {
           const activationEmail = await sendEmail(
             profile.email,
-            '🎉 Sua conta foi ativada! - Portal Corporativo',
+            '🎉 Sua conta foi aprovada! - Portal Corporativo',
             `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-              <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">Bem-vindo ao Portal Corporativo</h2>
-              <p>Olá, <strong>${profile.nome}</strong>,</p>
-              <p>Sua conta foi aprovada e já está ativa!</p>
-              <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
-                <p style="margin: 0; font-size: 16px;">Sua senha inicial de acesso é:</p>
-                <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">12345@Ab</p>
+              <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">✅ Acesso Liberado!</h2>
+              <p>Olá, <strong>${profile.nome}</strong>!</p>
+              <p>Boa notícia! Sua conta no <strong>Portal Corporativo da Ability Tecnologia</strong> foi aprovada e já está ativa.</p>
+              <div style="background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bfdbfe;">
+                <p style="margin: 0; font-size: 15px; font-weight: bold; color: #1a1a2e;">Como acessar:</p>
+                <p style="margin: 8px 0 0 0; color: #374151;">Use a senha que você cadastrou no momento do seu registro.</p>
+                <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">⚠️ No primeiro acesso, você será solicitado a criar uma nova senha permanente.</p>
               </div>
-              <p style="color: #666; font-size: 14px;"><strong>IMPORTANTE:</strong> Por segurança, você será solicitado a alterar esta senha no seu primeiro login.</p>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #999;">Em caso de dúvidas, entre em contato:<br/>
+                📱 Juniomar Alex Mochnacz — (48) 99143-1983<br/>
+                📧 juniomar.mochnacz@abilitytecnologia.com.br
+              </p>
               <p style="font-size: 12px; color: #999;">Este é um e-mail automático da Ability Tecnologia.</p>
             </div>`
           );
@@ -334,7 +328,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         emailSent,
-        passwordUsed: passwordPrompt
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

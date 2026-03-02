@@ -18,6 +18,7 @@ import {
 
 const MATRICULA_REGEX = /^TT\d{6}$/;
 const PHONE_REGEX = /^\d{11}$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{6,}$/;
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -39,6 +40,11 @@ const Login = () => {
   const [telefone, setTelefone] = useState("");
   const [cargo, setCargo] = useState("");
   const [area, setArea] = useState("");
+  // Signup-specific
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
+  const [showSignupPwd, setShowSignupPwd] = useState(false);
+  const [showSignupPwdConfirm, setShowSignupPwdConfirm] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
@@ -67,12 +73,17 @@ const Login = () => {
 
       if (profileData?.status === "bloqueado") {
         await supabase.auth.signOut();
-        toast({ title: "Acesso bloqueado", description: "Sua conta está bloqueada. Contacte o administrador.", variant: "destructive" });
+        toast({ title: "Acesso bloqueado", description: "Sua conta está bloqueada. Entre em contato com o administrador.", variant: "destructive", duration: 8000 });
         return;
       }
       if (profileData?.status === "pendente") {
         await supabase.auth.signOut();
-        toast({ title: "Aguardando aprovação", description: "Sua conta ainda não foi ativada pelo administrador.", variant: "destructive" });
+        toast({
+          title: "⏳ Aguardando validação do Administrador",
+          description: "Sua conta ainda não foi ativada. Entre em contato:\n📱 Juniomar Alex Mochnacz — (48) 99143-1983\n📧 juniomar.mochnacz@abilitytecnologia.com.br",
+          variant: "destructive",
+          duration: 12000,
+        });
         return;
       }
       navigate("/dashboard");
@@ -94,15 +105,21 @@ const Login = () => {
       toast({ title: "Telefone inválido", description: "Informe DDD + 9 dígitos (11 números).", variant: "destructive" });
       return;
     }
-    if (!nome.trim() || !emailContato.trim() || !empresa.trim()) return;
+    if (!PASSWORD_REGEX.test(signupPassword)) {
+      toast({ title: "Senha fraca", description: "A senha deve ter pelo menos 6 caracteres, incluindo maiúsculas, minúsculas, números e um caractere especial (!@#$%...).", variant: "destructive" });
+      return;
+    }
+    if (signupPassword !== signupPasswordConfirm) {
+      toast({ title: "Senhas não conferem", description: "A confirmação de senha deve ser igual à senha informada.", variant: "destructive" });
+      return;
+    }
+    if (!nome.trim() || !emailContato.trim() || !empresa.trim() || !area || !cargo) return;
     setLoading(true);
     try {
       const email = `${matricula.trim()}@empresa.local`;
-      // Generate a temporary random password
-      const tempPassword = Math.random().toString(36).slice(-10) + "A1!";
       const { error } = await supabase.auth.signUp({
         email,
-        password: tempPassword,
+        password: signupPassword,
         options: {
           data: {
             matricula: matricula.trim(),
@@ -121,16 +138,10 @@ const Login = () => {
         body: { nome: nome.trim(), matricula: matricula.trim() },
       }).catch((err) => console.error("Notification error:", err));
 
-      toast({ title: "Conta criada!", description: "Aguarde a aprovação do administrador. Você receberá uma senha inicial em seu e-mail após a ativação." });
+      toast({ title: "Cadastro realizado!", description: "Aguarde a aprovação do administrador. Você será notificado por e-mail quando sua conta for ativada." });
       setView("login");
-      setNome("");
-      setEmailContato("");
-      setEmpresa("");
-      setTelefone("");
-      setCargo("");
-      setArea("");
-      // password state reset removed
-      setMatricula("");
+      setNome(""); setEmailContato(""); setEmpresa(""); setTelefone("");
+      setCargo(""); setArea(""); setMatricula(""); setSignupPassword(""); setSignupPasswordConfirm("");
     } catch (err: any) {
       toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
     } finally {
@@ -341,8 +352,78 @@ const Login = () => {
                     required
                   />
                 </div>
-                {/* Senha input removed for signup */}
-                <Button type="submit" className="w-full" disabled={loading || !MATRICULA_REGEX.test(matricula)}>
+
+                {/* Senha Temporária */}
+                <div className="space-y-1 pt-2 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Senha Temporária de Acesso
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Crie sua senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        type={showSignupPwd ? "text" : "password"}
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPwd(!showSignupPwd)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSignupPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Deve conter: maiúscula, minúscula, número e caractere especial (!@#$%)
+                    </p>
+                    {signupPassword.length > 0 && !PASSWORD_REGEX.test(signupPassword) && (
+                      <p className="text-xs text-destructive">Senha não atende aos requisitos</p>
+                    )}
+                  </div>
+                  <div className="space-y-2 mt-2">
+                    <Label htmlFor="signup-password-confirm">Confirme a senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password-confirm"
+                        type={showSignupPwdConfirm ? "text" : "password"}
+                        value={signupPasswordConfirm}
+                        onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                        placeholder="Repita a senha"
+                        required
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPwdConfirm(!showSignupPwdConfirm)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showSignupPwdConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {signupPasswordConfirm.length > 0 && signupPassword !== signupPasswordConfirm && (
+                      <p className="text-xs text-destructive">As senhas não conferem</p>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-amber-600 font-medium pt-1">
+                    ⚠️ Esta senha é temporária. Você será solicitado a alterá-la no primeiro login após a aprovação do administrador.
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={
+                    loading ||
+                    !MATRICULA_REGEX.test(matricula) ||
+                    !PASSWORD_REGEX.test(signupPassword) ||
+                    signupPassword !== signupPasswordConfirm
+                  }
+                >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Cadastrar
                 </Button>
