@@ -38,6 +38,36 @@ export type Database = {
         }
         Relationships: []
       }
+      area_permissions: {
+        Row: {
+          all_access: boolean
+          area: string
+          created_at: string
+          id: string
+          modules: string[]
+          powerbi_report_ids: string[]
+          updated_at: string
+        }
+        Insert: {
+          all_access?: boolean
+          area: string
+          created_at?: string
+          id?: string
+          modules?: string[]
+          powerbi_report_ids?: string[]
+          updated_at?: string
+        }
+        Update: {
+          all_access?: boolean
+          area?: string
+          created_at?: string
+          id?: string
+          modules?: string[]
+          powerbi_report_ids?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       powerbi_links: {
         Row: {
           ativo: boolean | null
@@ -82,6 +112,7 @@ export type Database = {
           matricula: string
           must_change_password: boolean
           nome: string
+          requested_password: string | null
           status: string
           telefone: string | null
           updated_at: string
@@ -97,6 +128,7 @@ export type Database = {
           matricula: string
           must_change_password?: boolean
           nome: string
+          requested_password?: string | null
           status?: string
           telefone?: string | null
           updated_at?: string
@@ -112,6 +144,7 @@ export type Database = {
           matricula?: string
           must_change_password?: boolean
           nome?: string
+          requested_password?: string | null
           status?: string
           telefone?: string | null
           updated_at?: string
