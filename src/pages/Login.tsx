@@ -167,19 +167,23 @@ const Login = () => {
       const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
       console.log("[Signup] Iniciando cadastro para:", authEmail);
 
+      const signupMetadata = {
+        matricula: matricula.trim(),
+        nome: nome.trim(),
+        email_contato: emailContato.trim(),
+        empresa: empresa.trim(),
+        telefone: phoneDigits,
+        cargo: cargo.trim(),
+        area: area.trim(),
+      };
+
+      console.log("[Signup] Enviando metadados:", signupMetadata);
+
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: authEmail,
         password: signupPassword,
         options: {
-          data: {
-            matricula: matricula.trim(),
-            nome: nome.trim(),
-            email_contato: emailContato.trim(),
-            empresa: empresa.trim(),
-            telefone: phoneDigits,
-            cargo: cargo.trim(),
-            area: area.trim(),
-          },
+          data: signupMetadata,
         },
       });
 
