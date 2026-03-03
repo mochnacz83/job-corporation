@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, LogOut, User, Shield, Activity, KeyRound } from "lucide-react";
+import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -148,6 +148,21 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Reagenda Section */}
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/reagenda")}>
+            <CardHeader className="pb-3">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
+                <CalendarDays className="w-6 h-6 text-primary" />
+              </div>
+              <CardTitle className="text-lg">Sistema de Reagenda</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-sm">
+                Carregue planilhas para antecipar atendimentos e contatar clientes.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Admin Section */}
           {isAdmin && (

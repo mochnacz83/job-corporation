@@ -12,6 +12,7 @@ import PowerBI from "./pages/PowerBI";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
+import Reagenda from "./pages/Reagenda";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/admin/perfis" element={<ProtectedRoute><AdminPermissions /></ProtectedRoute>} />
+            <Route path="/reagenda" element={<ProtectedRoute><Reagenda /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
