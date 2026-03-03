@@ -24,6 +24,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface ReagendaData {
     id: string;
+    sa: string;
+    setor: string;
     nome: string;
     contato: string;
     operadora: string;
@@ -43,7 +45,7 @@ const Reagenda = () => {
     const { toast } = useToast();
 
     useEffect(() => {
-        const savedData = localStorage.getItem("reagenda_history_v2");
+        const savedData = localStorage.getItem("reagenda_history_v3");
         if (savedData) {
             try {
                 setData(JSON.parse(savedData));
@@ -54,7 +56,7 @@ const Reagenda = () => {
     }, []);
 
     useEffect(() => {
-        localStorage.setItem("reagenda_history_v2", JSON.stringify(data));
+        localStorage.setItem("reagenda_history_v3", JSON.stringify(data));
     }, [data]);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,6 +75,8 @@ const Reagenda = () => {
 
                 const newEntries: ReagendaData[] = jsonData.map((row) => ({
                     id: crypto.randomUUID(),
+                    sa: String(row["SA"] || row["sa"] || row["S.A"] || "").trim(),
+                    setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
                     nome: row["NOME"] || row["Nome"] || "",
                     contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
                     operadora: row["OPERADORA"] || row["Operadora"] || "",
@@ -172,6 +176,8 @@ Fico no aguardo!`;
     const downloadSample = () => {
         const sampleData = [
             {
+                "SA": "123456",
+                "SETOR": "Setor A",
                 "NOME": "Nome do Cliente",
                 "CONTATO": "11999999999",
                 "OPERADORA": "Vivo",
@@ -181,8 +187,9 @@ Fico no aguardo!`;
         ];
         const ws = XLSX.utils.json_to_sheet(sampleData);
 
-        // Set column widths
         ws['!cols'] = [
+            { wch: 10 }, // SA
+            { wch: 15 }, // Setor
             { wch: 30 }, // Nome
             { wch: 15 }, // Contato
             { wch: 15 }, // Operadora
@@ -192,11 +199,13 @@ Fico no aguardo!`;
 
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Modelo");
-        XLSX.writeFile(wb, "modelo_reagendamento_formatado.xlsx");
+        XLSX.writeFile(wb, "modelo_reagendamento_completo.xlsx");
     };
 
     const exportResults = () => {
         const exportData = data.filter(item => item.selecionado).map(item => ({
+            "SA": item.sa,
+            "Setor": item.setor,
             "Nome": item.nome,
             "Contato": item.contato,
             "Operadora": item.operadora,
@@ -215,8 +224,8 @@ Fico no aguardo!`;
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         ws['!cols'] = [
-            { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 },
-            { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }
+            { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
+            { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Resultados");
@@ -243,7 +252,7 @@ Fico no aguardo!`;
                         {data.length > 0 && (
                             <>
                                 <Button variant="default" size="sm" onClick={exportResults} className="bg-primary hover:bg-primary/90">
-                                    <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados
+                                    <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados (Dinamicas)
                                 </Button>
                                 <Button variant="destructive" size="sm" onClick={clearHistory}>
                                     <Trash2 className="w-4 h-4" />
@@ -256,7 +265,7 @@ Fico no aguardo!`;
                 <main className="container mx-auto max-w-7xl space-y-6">
                     <Card className="glass-card">
                         <CardHeader>
-                            <CardTitle className="text-lg">Importar Contatos</CardTitle>
+                            <CardTitle className="text-lg">Painel de Importação</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-primary/50 transition-colors bg-card/50">
@@ -272,10 +281,10 @@ Fico no aguardo!`;
                     {data.length > 0 && (
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-lg font-semibold">Contatos Disponíveis ({data.length})</CardTitle>
+                                <CardTitle className="text-lg font-semibold">Base de Contatos ({data.length})</CardTitle>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Checkbox checked={data.every(i => i.selecionado)} onCheckedChange={toggleAll} />
-                                    <span>Selecionar Todos</span>
+                                    <span>Selecionar p/ Painel</span>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -285,6 +294,7 @@ Fico no aguardo!`;
                                             <TableRow>
                                                 <TableHead className="w-10"></TableHead>
                                                 <TableHead className="w-[140px]">Status</TableHead>
+                                                <TableHead>SA / Setor</TableHead>
                                                 <TableHead>Nome / Contato</TableHead>
                                                 <TableHead className="w-[180px]">Decisão</TableHead>
                                                 <TableHead className="w-[120px]">Período</TableHead>
@@ -310,6 +320,12 @@ Fico no aguardo!`;
                                                                 <SelectItem value="Sem Contato">Sem Contato</SelectItem>
                                                             </SelectContent>
                                                         </Select>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-medium">{item.sa || "-"}</span>
+                                                            <span className="text-[11px] text-muted-foreground uppercase">{item.setor || "-"}</span>
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-col">
@@ -358,15 +374,15 @@ Fico no aguardo!`;
                                                         <div className="flex justify-center gap-1">
                                                             <Tooltip><TooltipTrigger asChild>
                                                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)}><MessageSquare className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Iniciar contato Whats</TooltipContent></Tooltip>
+                                                            </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
 
                                                             <Tooltip><TooltipTrigger asChild>
                                                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)}><Send className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Iniciar contato Telegram</TooltipContent></Tooltip>
+                                                            </TooltipTrigger><TooltipContent>Telegram</TooltipContent></Tooltip>
 
                                                             <Tooltip><TooltipTrigger asChild>
                                                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Copiar mensagem</TooltipContent></Tooltip>
+                                                            </TooltipTrigger><TooltipContent>Copiar</TooltipContent></Tooltip>
 
                                                             <Tooltip><TooltipTrigger asChild>
                                                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
