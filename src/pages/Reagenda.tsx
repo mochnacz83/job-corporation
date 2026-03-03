@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -44,10 +44,12 @@ const Reagenda = () => {
                     dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "",
                 }));
 
-                setData(formattedData.filter(item => item.nome && item.contato));
+                const validData = formattedData.filter(item => item.nome && item.contato);
+                setData(validData);
+
                 toast({
                     title: "Planilha carregada",
-                    description: `${formattedData.length} registros encontrados.`,
+                    description: `${validData.length} registros encontrados.`,
                 });
             } catch (error) {
                 console.error("Erro ao ler planilha:", error);
@@ -83,6 +85,30 @@ Fico no aguardo!`;
         window.open(whatsappUrl, "_blank");
     };
 
+    const downloadSample = () => {
+        const sampleData = [
+            {
+                "NOME": "João Silva",
+                "CONTATO": "11999999999",
+                "OPERADORA": "Vivo",
+                "TIPO DE ATIVIDADE": "Instalação",
+                "DATA DE AGENDAMENTO": "10/03/2026"
+            },
+            {
+                "NOME": "Maria Oliveira",
+                "CONTATO": "11888888888",
+                "OPERADORA": "Claro",
+                "TIPO DE ATIVIDADE": "Reparo",
+                "DATA DE AGENDAMENTO": "12/03/2026"
+            }
+        ];
+
+        const worksheet = XLSX.utils.json_to_sheet(sampleData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Reagendamentos");
+        XLSX.writeFile(workbook, "modelo_reagendamento.xlsx");
+    };
+
     return (
         <div className="min-h-screen bg-background p-4">
             <header className="container mx-auto max-w-6xl mb-6 flex items-center justify-between">
@@ -92,9 +118,12 @@ Fico no aguardo!`;
                     </Button>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <FileSpreadsheet className="w-6 h-6 text-primary" />
-                        Sistema de Reagenda
+                        Sistema de Reagendamento
                     </h1>
                 </div>
+                <Button variant="outline" size="sm" onClick={downloadSample} className="flex items-center gap-2">
+                    <Download className="w-4 h-4" /> Baixar Planilha Modelo
+                </Button>
             </header>
 
             <main className="container mx-auto max-w-6xl space-y-6">
@@ -129,7 +158,7 @@ Fico no aguardo!`;
                             <CardTitle>Registros Encontrados</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-md border">
+                            <div className="rounded-md border overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -144,12 +173,12 @@ Fico no aguardo!`;
                                     <TableBody>
                                         {data.map((item, index) => (
                                             <TableRow key={index}>
-                                                <TableCell className="font-medium">{item.nome}</TableCell>
-                                                <TableCell>{item.contato}</TableCell>
-                                                <TableCell>{item.operadora}</TableCell>
-                                                <TableCell>{item.tipoAtividade}</TableCell>
-                                                <TableCell>{item.dataAgendamento}</TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="font-medium whitespace-nowrap">{item.nome}</TableCell>
+                                                <TableCell className="whitespace-nowrap">{item.contato}</TableCell>
+                                                <TableCell className="whitespace-nowrap">{item.operadora}</TableCell>
+                                                <TableCell className="whitespace-nowrap">{item.tipoAtividade}</TableCell>
+                                                <TableCell className="whitespace-nowrap text-center">{item.dataAgendamento}</TableCell>
+                                                <TableCell className="text-right whitespace-nowrap">
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
