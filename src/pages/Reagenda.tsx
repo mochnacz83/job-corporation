@@ -3,10 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { Badge } from "@/components/ui/badge";
 
 interface ReagendaData {
     nome: string;
@@ -14,6 +15,7 @@ interface ReagendaData {
     operadora: string;
     tipoAtividade: string;
     dataAgendamento: string;
+    status: "Pendente" | "Contatado";
 }
 
 const Reagenda = () => {
@@ -42,6 +44,7 @@ const Reagenda = () => {
                     operadora: row["OPERADORA"] || row["Operadora"] || "",
                     tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
                     dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "",
+                    status: "Pendente",
                 }));
 
                 const validData = formattedData.filter(item => item.nome && item.contato);
@@ -65,7 +68,7 @@ const Reagenda = () => {
         reader.readAsBinaryString(file);
     };
 
-    const sendWhatsAppMessage = (item: ReagendaData) => {
+    const getWhatsAppUrl = (item: ReagendaData) => {
         const message = `Olá, ${item.nome}! Tudo bem?
 
 Aqui é da equipe de agendamento da ${item.operadora}.
@@ -81,8 +84,13 @@ Se sim, por favor, me confirme qual período (manhã ou tarde) e horário você 
 Fico no aguardo!`;
 
         const encodedMessage = encodeURIComponent(message);
-        const whatsappUrl = `https://wa.me/55${item.contato}?text=${encodedMessage}`;
-        window.open(whatsappUrl, "_blank");
+        return `https://wa.me/55${item.contato}?text=${encodedMessage}`;
+    };
+
+    const markAsContacted = (index: number) => {
+        const newData = [...data];
+        newData[index].status = "Contatado";
+        setData(newData);
     };
 
     const downloadSample = () => {
@@ -111,12 +119,12 @@ Fico no aguardo!`;
 
     return (
         <div className="min-h-screen bg-background p-4">
-            <header className="container mx-auto max-w-6xl mb-6 flex items-center justify-between">
+            <header className="container mx-auto max-w-6xl mb-6 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
                         <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
                     </Button>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
                         <FileSpreadsheet className="w-6 h-6 text-primary" />
                         Sistema de Reagendamento
                     </h1>
@@ -162,6 +170,7 @@ Fico no aguardo!`;
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead>Status</TableHead>
                                             <TableHead>Nome</TableHead>
                                             <TableHead>Contato</TableHead>
                                             <TableHead>Operadora</TableHead>
@@ -172,7 +181,18 @@ Fico no aguardo!`;
                                     </TableHeader>
                                     <TableBody>
                                         {data.map((item, index) => (
-                                            <TableRow key={index}>
+                                            <TableRow key={index} className={item.status === "Contatado" ? "bg-muted/30" : ""}>
+                                                <TableCell>
+                                                    {item.status === "Contatado" ? (
+                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 gap-1">
+                                                            <CheckCircle2 className="w-3 h-3" /> Contatado
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
+                                                            <Clock className="w-3 h-3" /> Pendente
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell className="font-medium whitespace-nowrap">{item.nome}</TableCell>
                                                 <TableCell className="whitespace-nowrap">{item.contato}</TableCell>
                                                 <TableCell className="whitespace-nowrap">{item.operadora}</TableCell>
@@ -180,13 +200,21 @@ Fico no aguardo!`;
                                                 <TableCell className="whitespace-nowrap text-center">{item.dataAgendamento}</TableCell>
                                                 <TableCell className="text-right whitespace-nowrap">
                                                     <Button
+                                                        asChild
                                                         size="sm"
                                                         variant="outline"
                                                         className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                                                        onClick={() => sendWhatsAppMessage(item)}
+                                                        onClick={() => markAsContacted(index)}
                                                     >
-                                                        <MessageSquare className="w-4 h-4 mr-2" />
-                                                        WhatsApp
+                                                        <a
+                                                            href={getWhatsAppUrl(item)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center"
+                                                        >
+                                                            <MessageSquare className="w-4 h-4 mr-2" />
+                                                            WhatsApp
+                                                        </a>
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
