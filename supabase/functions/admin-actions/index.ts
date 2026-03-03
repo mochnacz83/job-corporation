@@ -262,9 +262,7 @@ serve(async (req) => {
         });
       }
 
-      await serviceClient.from('profiles').delete().eq('user_id', userId);
-      await serviceClient.from('user_roles').delete().eq('user_id', userId);
-
+      // Reliance on ON DELETE CASCADE in the database to clean up profiles, user_roles, logs, etc.
       const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
       if (deleteError) {
         throw new Error(`Failed to delete user: ${deleteError.message}`);
