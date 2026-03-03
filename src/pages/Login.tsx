@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Loader2, ArrowLeft, Eye, EyeOff, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const MATRICULA_REGEX = /^TT\d{6}$/;
 const PHONE_REGEX = /^\d{11}$/;
@@ -41,10 +42,6 @@ const Login = () => {
   const [cargo, setCargo] = useState("");
   const [area, setArea] = useState("");
   // Signup-specific
-  const [signupPassword, setSignupPassword] = useState("");
-  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
-  const [showSignupPwd, setShowSignupPwd] = useState(false);
-  const [showSignupPwdConfirm, setShowSignupPwdConfirm] = useState(false);
   const [forgotMatricula, setForgotMatricula] = useState("");
   const [forgotPassword, setForgotPassword] = useState("");
   const [forgotPasswordConfirm, setForgotPasswordConfirm] = useState("");
@@ -130,18 +127,8 @@ const Login = () => {
       return;
     }
 
-    if (!PASSWORD_REGEX.test(signupPassword)) {
-      toast({
-        title: "Senha inválida",
-        description: "A senha deve conter pelo menos 6 caracteres, incluindo uma letra maiúscula, uma minúscula, um número e um símbolo.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (signupPassword !== signupPasswordConfirm) {
-      toast({ title: "Senhas divergentes", description: "A confirmação deve ser idêntica à senha.", variant: "destructive" });
-      return;
-    }
+    const signupPassword = "12346@Ab";
+
 
     setLoading(true);
     try {
@@ -222,10 +209,14 @@ const Login = () => {
         body: { nome: nome.trim(), matricula: matricula.trim() },
       }).catch((err) => console.error("Notification error:", err));
 
-      toast({ title: "✅ Cadastro realizado!", description: "Aguarde a aprovação do administrador. Você será notificado por e-mail quando sua conta for ativada." });
+      toast({
+        title: "✅ Cadastro realizado!",
+        description: "Aguarde a aprovação do administrador. Sua senha provisória é 12346@Ab. Após a aprovação, você deverá alterá-la no primeiro acesso.",
+        duration: 10000
+      });
       setView("login");
       setNome(""); setEmailContato(""); setEmpresa(""); setTelefone("");
-      setCargo(""); setArea(""); setMatricula(""); setSignupPassword(""); setSignupPasswordConfirm("");
+      setCargo(""); setArea(""); setMatricula("");
     } catch (err: any) {
       console.error("[Signup] Erro final:", err);
       toast({ title: "Erro ao cadastrar", description: err.message || "Erro desconhecido. Tente novamente.", variant: "destructive" });
@@ -461,65 +452,17 @@ const Login = () => {
                   />
                 </div>
 
-                {/* Senha Temporária */}
                 <div className="space-y-1 pt-2 border-t border-border">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Senha Temporária de Acesso
+                    Senha Temporária
                   </p>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Crie sua senha</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        type={showSignupPwd ? "text" : "password"}
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        placeholder="Mínimo 6 caracteres"
-                        required
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSignupPwd(!showSignupPwd)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSignupPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      Deve conter: maiúscula, minúscula, número e caractere especial (!@#$%)
-                    </p>
-                    {signupPassword.length > 0 && !PASSWORD_REGEX.test(signupPassword) && (
-                      <p className="text-xs text-destructive">Senha não atende aos requisitos</p>
-                    )}
-                  </div>
-                  <div className="space-y-2 mt-2">
-                    <Label htmlFor="signup-password-confirm">Confirme a senha</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password-confirm"
-                        type={showSignupPwdConfirm ? "text" : "password"}
-                        value={signupPasswordConfirm}
-                        onChange={(e) => setSignupPasswordConfirm(e.target.value)}
-                        placeholder="Repita a senha"
-                        required
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSignupPwdConfirm(!showSignupPwdConfirm)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showSignupPwdConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    {signupPasswordConfirm.length > 0 && signupPassword !== signupPasswordConfirm && (
-                      <p className="text-xs text-destructive">As senhas não conferem</p>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-amber-600 font-medium pt-1">
-                    ⚠️ Esta senha é temporária. Você será solicitado a alterá-la no primeiro login após a aprovação do administrador.
-                  </p>
+                  <Alert variant="default" className="bg-blue-50 border-blue-200 py-2">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-700 text-[11px] leading-tight">
+                      Sua senha provisória será <strong className="font-bold">12346@Ab</strong>.
+                      Após o administrador aprovar seu acesso, você deverá alterá-la no primeiro login.
+                    </AlertDescription>
+                  </Alert>
                 </div>
 
                 <Button

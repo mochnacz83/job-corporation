@@ -123,7 +123,7 @@ serve(async (req) => {
         passwordToUse = profile.requested_password;
       } else if (!profile?.email && !newPassword) {
         // if no email and no new password provided, use default
-        passwordToUse = '12345@Ab';
+        passwordToUse = '12346@Ab';
       }
 
       const { error: updateError } = await serviceClient.auth.admin.updateUserById(userId, {
@@ -205,7 +205,7 @@ serve(async (req) => {
 
       console.log(`Resending password for user ${userId}, email: ${profile.email}`);
 
-      const defaultPassword = '12345@Ab';
+      const defaultPassword = '12346@Ab';
       const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: defaultPassword,
       });
@@ -231,7 +231,7 @@ serve(async (req) => {
           <p>Conforme solicitado, estamos encaminhando sua senha inicial de acesso.</p>
           <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
             <p style="margin: 0; font-size: 16px;">Sua senha é:</p>
-            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">12345@Ab</p>
+            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">12346@Ab</p>
           </div>
           <p style="color: #666; font-size: 14px;"><strong>DICA:</strong> Por segurança, você deverá alterar essa senha ao realizar o primeiro acesso.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />

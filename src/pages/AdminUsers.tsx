@@ -130,9 +130,9 @@ const AdminUsers = () => {
 
       if (newStatus === "ativo") {
         if (emailSent) {
-          successMsg = "Usuário ativado e senha inicial (12345@Ab) enviada por e-mail.";
+          successMsg = "Usuário ativado e senha inicial (12346@Ab) enviada por e-mail.";
         } else {
-          successMsg = "Usuário ativado. Senha definida como: 12345@Ab (E-mail não pôde ser enviado).";
+          successMsg = "Usuário ativado. Senha definida como: 12346@Ab (E-mail não pôde ser enviado).";
         }
       }
 
