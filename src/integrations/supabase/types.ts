@@ -113,6 +113,7 @@ export type Database = {
           must_change_password: boolean
           nome: string
           requested_password: string | null
+          reset_password_pending: boolean
           status: string
           telefone: string | null
           updated_at: string
@@ -129,6 +130,7 @@ export type Database = {
           must_change_password?: boolean
           nome: string
           requested_password?: string | null
+          reset_password_pending?: boolean
           status?: string
           telefone?: string | null
           updated_at?: string
@@ -145,6 +147,7 @@ export type Database = {
           must_change_password?: boolean
           nome?: string
           requested_password?: string | null
+          reset_password_pending?: boolean
           status?: string
           telefone?: string | null
           updated_at?: string

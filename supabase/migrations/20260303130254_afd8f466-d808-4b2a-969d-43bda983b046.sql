@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN reset_password_pending boolean NOT NULL DEFAULT false;
