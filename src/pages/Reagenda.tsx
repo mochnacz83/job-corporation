@@ -122,7 +122,7 @@ Estou entrando em contato pois conseguimos uma abertura em nossa agenda e podemo
 
 Você teria interesse em realizar esse serviço antes do prazo?
 
-Se sim, por favor, me confirme qual período (manhã ou tarde) e horário você teria disponibilidade para nos receber.
+Se sim, por favor, me confirme qual Data, período (manhã ou tarde) e horário você teria disponibilidade para nos receber.
 
 Fico no aguardo!`;
     };
