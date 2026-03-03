@@ -207,7 +207,27 @@ const Login = () => {
 
       console.log("[Signup] Usuário criado com sucesso:", signUpData.user.id);
 
-      // Trigger notification (optional, handled by SB if configured, but keeping for robustness)
+      // Failsafe: Create/Complete profile via Edge Function to ensure Area and Cargo are saved
+      try {
+        console.log("[Signup] Criando perfil via Edge Function...");
+        const { data: profileRes, error: profileErr } = await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "complete-signup",
+            userId: signUpData.user.id,
+            profileData: signupMetadata
+          },
+        });
+
+        if (profileErr || profileRes?.error) {
+          console.warn("[Signup] Erro não crítico ao criar perfil via function:", profileErr || profileRes?.error);
+        } else {
+          console.log("[Signup] Perfil criado/atualizado com sucesso via function.");
+        }
+      } catch (err) {
+        console.warn("[Signup] Falha na chamada da Edge Function para perfil:", err);
+      }
+
+      // Trigger notification
       try {
         await supabase.functions.invoke("notify-new-user", {
           body: { nome: nome.trim(), matricula: matricula.trim() },

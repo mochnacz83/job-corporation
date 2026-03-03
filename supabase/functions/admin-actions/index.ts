@@ -91,13 +91,26 @@ serve(async (req) => {
       .eq('role', 'admin')
       .maybeSingle();
 
-    if (!roleData) {
+    const isAdmin = !!roleData;
+
+    const { action, userId, newStatus, newPassword, profileData } = await req.json();
+
+    // Verify admin role ONLY for privileged actions
+    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status'];
+    if (adminActions.includes(action) && !isAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { action, userId, newStatus, newPassword, profileData } = await req.json();
+    // Protection for non-admin profile updates: only allow updating own profile
+    if (action === 'complete-signup' || action === 'update-profile') {
+      if (!isAdmin && caller.id !== userId) {
+        return new Response(JSON.stringify({ error: 'Permission denied: cannot update another user profile' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     if (action === 'reset-password') {
       if (!userId) {
@@ -360,6 +373,44 @@ serve(async (req) => {
         .eq('user_id', userId);
 
       if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'complete-signup') {
+      if (!userId || !profileData) {
+        return new Response(JSON.stringify({ error: 'userId and profileData required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`[complete-signup] Completing profile for user ${userId}:`, JSON.stringify(profileData));
+
+      // Map keys to match the profiles table precisely
+      const mappedData = {
+        user_id: userId,
+        nome: profileData.nome || '',
+        matricula: profileData.matricula || '',
+        email: profileData.email_contato || profileData.email || '',
+        empresa: profileData.empresa || '',
+        telefone: profileData.telefone || '',
+        cargo: profileData.cargo || '',
+        area: profileData.area || '',
+        status: 'pendente',
+        must_change_password: true
+      };
+
+      // Use upsert to handle cases where the trigger might have already created a partial profile
+      const { error: upsertError } = await serviceClient
+        .from('profiles')
+        .upsert(mappedData, { onConflict: 'user_id' });
+
+      if (upsertError) {
+        console.error('[complete-signup] Error:', upsertError);
+        throw new Error(`Failed to complete signup: ${upsertError.message}`);
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
