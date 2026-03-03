@@ -4,28 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-function generatePassword(): string {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const digits = '0123456789';
-  const special = '!@#$%&*';
-
-  let pw = '';
-  pw += upper[Math.floor(Math.random() * upper.length)];
-  pw += lower[Math.floor(Math.random() * lower.length)];
-  pw += digits[Math.floor(Math.random() * digits.length)];
-  pw += special[Math.floor(Math.random() * special.length)];
-
-  const all = upper + lower + digits + special;
-  for (let i = 0; i < 4; i++) {
-    pw += all[Math.floor(Math.random() * all.length)];
-  }
-
-  return pw.split('').sort(() => Math.random() - 0.5).join('');
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,9 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const { matricula, newPassword } = await req.json();
-    if (!matricula || !newPassword) {
-      return new Response(JSON.stringify({ error: 'Matrícula e nova senha são obrigatórios' }), {
+    const { matricula } = await req.json();
+    if (!matricula) {
+      return new Response(JSON.stringify({ error: 'Matrícula é obrigatória' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -44,7 +24,7 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
-    // 1. Find user by matricula in profiles
+    // Find user by matricula
     const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
       .select('user_id, nome, email, matricula')
@@ -57,21 +37,18 @@ serve(async (req) => {
       });
     }
 
-    // 2. Mark as pending reset in the database
+    // Mark as pending reset
     const { error: dbError } = await serviceClient
       .from('profiles')
-      .update({
-        reset_password_pending: true,
-        requested_password: newPassword
-      })
+      .update({ reset_password_pending: true, requested_password: null })
       .eq('user_id', profile.user_id);
 
     if (dbError) throw new Error(`Erro ao registrar solicitação: ${dbError.message}`);
 
-    // 3. Notify Admin (Juniomar Alex)
+    // Notify Admin
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>';
-    const ADMIN_EMAIL = 'juniomar.mochnacz@abilitytecnologia.com.br'; // O admin principal
+    const ADMIN_EMAIL = 'juniomar.mochnacz@abilitytecnologia.com.br';
 
     if (RESEND_API_KEY) {
       try {
@@ -87,17 +64,14 @@ serve(async (req) => {
             subject: '⚠️ Solicitação de Reset de Senha - Portal Corporativo',
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
-                <h2 style="color: #d9480f;">Solicitação de Nova Senha</h2>
+                <h2 style="color: #d9480f;">Solicitação de Reset de Senha</h2>
                 <p>O seguinte usuário solicitou a recuperação de acesso:</p>
                 <div style="background: #fff4e6; padding: 15px; border-radius: 8px;">
                   <p><strong>Nome:</strong> ${profile.nome}</p>
                   <p><strong>Matrícula:</strong> ${profile.matricula}</p>
-                  <p><strong>E-mail:</strong> ${profile.email}</p>
-                  <p style="color: #d9480f; margin-top: 10px; border-top: 1px dashed #ffd8a8; pt: 10px;">
-                    <strong>Nova Senha Solicitada:</strong> O usuário escolheu uma nova senha que aguarda sua aprovação.
-                  </p>
+                  <p><strong>E-mail:</strong> ${profile.email || 'Não informado'}</p>
                 </div>
-                <p>Acesse o painel administrativo para validar a solicitação e aplicar a nova senha.</p>
+                <p>Acesse o painel administrativo para definir uma nova senha e encaminhar ao usuário.</p>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
                 <p style="font-size: 12px; color: #999;">Este é um alerta automático do sistema.</p>
               </div>
@@ -111,7 +85,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: 'Sua solicitação foi enviada ao administrador. Você receberá um e-mail com a nova senha assim que for aprovada.'
+      message: 'Sua solicitação foi enviada ao administrador. Aguarde o contato para receber sua nova senha.'
     }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
