@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, Info } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -20,6 +20,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ReagendaData {
     id: string;
@@ -29,6 +30,10 @@ interface ReagendaData {
     tipoAtividade: string;
     dataAgendamento: string;
     status: "Pendente" | "Contatado" | "Aguardando retorno" | "Sem Contato";
+    decisao: string;
+    periodo: string;
+    horario: string;
+    selecionado: boolean;
 }
 
 const Reagenda = () => {
@@ -37,9 +42,8 @@ const Reagenda = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    // Load data from localStorage on mount
     useEffect(() => {
-        const savedData = localStorage.getItem("reagenda_history");
+        const savedData = localStorage.getItem("reagenda_history_v2");
         if (savedData) {
             try {
                 setData(JSON.parse(savedData));
@@ -49,9 +53,8 @@ const Reagenda = () => {
         }
     }, []);
 
-    // Sync data to localStorage on change
     useEffect(() => {
-        localStorage.setItem("reagenda_history", JSON.stringify(data));
+        localStorage.setItem("reagenda_history_v2", JSON.stringify(data));
     }, [data]);
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,27 +79,29 @@ const Reagenda = () => {
                     tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
                     dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "",
                     status: "Pendente",
+                    decisao: "Pendente",
+                    periodo: "",
+                    horario: "",
+                    selecionado: false,
                 }));
 
                 const validNewEntries = newEntries.filter(item => item.nome && item.contato);
-
-                // Append to existing data
                 setData(prev => [...prev, ...validNewEntries]);
 
                 toast({
                     title: "Planilha carregada",
-                    description: `${validNewEntries.length} novos registros adicionados ao histórico.`,
+                    description: `${validNewEntries.length} novos registros adicionados.`,
                 });
             } catch (error) {
                 console.error("Erro ao ler planilha:", error);
                 toast({
                     title: "Erro ao ler planilha",
-                    description: "Verifique se o arquivo está no formato correto.",
+                    description: "Verifique o formato do arquivo.",
                     variant: "destructive",
                 });
             } finally {
                 setLoading(false);
-                if (e.target) e.target.value = ""; // Reset input
+                if (e.target) e.target.value = "";
             }
         };
         reader.readAsBinaryString(file);
@@ -118,34 +123,24 @@ Se sim, por favor, me confirme qual período (manhã ou tarde) e horário você 
 Fico no aguardo!`;
     };
 
-    const openWhatsApp = (item: ReagendaData, id: string) => {
+    const openWhatsApp = (item: ReagendaData) => {
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
-        // Using api.whatsapp.com/send as a more direct method
-        const url = `https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`;
-        window.open(url, "_blank");
-        updateStatus(id, "Contatado");
+        window.open(`https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`, "_blank");
+        updateStatus(item.id, "Contatado");
     };
 
-    const openTelegram = (item: ReagendaData, id: string) => {
+    const openTelegram = (item: ReagendaData) => {
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
-        const url = `https://t.me/share/url?url=&text=${encodedMessage}`;
-        // For Telegram with specific phone, t.me/+55... is usually for profiles, 
-        // but sharing text is more reliable for pre-filled messages.
-        // If they have the contact, it opens the chat.
-        window.open(url, "_blank");
-        updateStatus(id, "Contatado");
+        window.open(`https://t.me/share/url?url=&text=${encodedMessage}`, "_blank");
+        updateStatus(item.id, "Contatado");
     };
 
-    const copyToClipboard = (item: ReagendaData, id: string) => {
-        const message = getMessageTemplate(item);
-        navigator.clipboard.writeText(message).then(() => {
-            toast({
-                title: "Mensagem copiada!",
-                description: "Pronto para colar no chat do cliente.",
-            });
-            updateStatus(id, "Contatado");
+    const copyToClipboard = (item: ReagendaData) => {
+        navigator.clipboard.writeText(getMessageTemplate(item)).then(() => {
+            toast({ title: "Copiado!" });
+            updateStatus(item.id, "Contatado");
         });
     };
 
@@ -153,53 +148,85 @@ Fico no aguardo!`;
         setData(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
     };
 
+    const updateField = (id: string, field: keyof ReagendaData, value: any) => {
+        setData(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    };
+
+    const toggleSelection = (id: string) => {
+        setData(prev => prev.map(item => item.id === id ? { ...item, selecionado: !item.selecionado } : item));
+    };
+
+    const toggleAll = () => {
+        const allSelected = data.every(item => item.selecionado);
+        setData(prev => prev.map(item => ({ ...item, selecionado: !allSelected })));
+    };
+
     const deleteEntry = (id: string) => {
         setData(prev => prev.filter(item => item.id !== id));
-        toast({
-            title: "Registro removido",
-            description: "O contato foi excluído do histórico.",
-        });
     };
 
     const clearHistory = () => {
-        if (confirm("Tem certeza que deseja apagar TODO o histórico? Esta ação não pode ser desfeita.")) {
-            setData([]);
-            localStorage.removeItem("reagenda_history");
-            toast({
-                title: "Histórico limpo",
-            });
-        }
+        if (confirm("Apagar histórico?")) setData([]);
     };
 
     const downloadSample = () => {
         const sampleData = [
             {
-                "NOME": "João Silva",
+                "NOME": "Nome do Cliente",
                 "CONTATO": "11999999999",
                 "OPERADORA": "Vivo",
                 "TIPO DE ATIVIDADE": "Instalação",
                 "DATA DE AGENDAMENTO": "10/03/2026"
             }
         ];
-        const worksheet = XLSX.utils.json_to_sheet(sampleData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
-        XLSX.writeFile(workbook, "modelo_reagendamento.xlsx");
+        const ws = XLSX.utils.json_to_sheet(sampleData);
+
+        // Set column widths
+        ws['!cols'] = [
+            { wch: 30 }, // Nome
+            { wch: 15 }, // Contato
+            { wch: 15 }, // Operadora
+            { wch: 20 }, // Atividade
+            { wch: 20 }, // Data
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Modelo");
+        XLSX.writeFile(wb, "modelo_reagendamento_formatado.xlsx");
     };
 
-    const getStatusColor = (status: ReagendaData["status"]) => {
-        switch (status) {
-            case "Contatado": return "bg-green-100 text-green-800 border-green-200";
-            case "Aguardando retorno": return "bg-blue-100 text-blue-800 border-blue-200";
-            case "Sem Contato": return "bg-red-100 text-red-800 border-red-200";
-            default: return "bg-amber-100 text-amber-800 border-amber-200";
+    const exportResults = () => {
+        const exportData = data.filter(item => item.selecionado).map(item => ({
+            "Nome": item.nome,
+            "Contato": item.contato,
+            "Operadora": item.operadora,
+            "Atividade": item.tipoAtividade,
+            "Data Original": item.dataAgendamento,
+            "Status": item.status,
+            "Decisão": item.decisao,
+            "Período": item.periodo,
+            "Horário": item.horario
+        }));
+
+        if (exportData.length === 0) {
+            toast({ title: "Atenção", description: "Selecione ao menos um contato para exportar.", variant: "destructive" });
+            return;
         }
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        ws['!cols'] = [
+            { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 },
+            { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Resultados");
+        XLSX.writeFile(wb, "resultados_reagendamento.xlsx");
     };
 
     return (
         <TooltipProvider>
             <div className="min-h-screen bg-background p-4">
-                <header className="container mx-auto max-w-6xl mb-6 flex items-center justify-between gap-4 flex-wrap">
+                <header className="container mx-auto max-w-7xl mb-6 flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
                             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
@@ -211,36 +238,32 @@ Fico no aguardo!`;
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={downloadSample} className="flex items-center gap-2">
-                            <Download className="w-4 h-4" /> Modelo
+                            <Download className="w-4 h-4" /> Baixar Modelo
                         </Button>
                         {data.length > 0 && (
-                            <Button variant="destructive" size="sm" onClick={clearHistory}>
-                                <Trash2 className="w-4 h-4 mr-2" /> Limpar Tudo
-                            </Button>
+                            <>
+                                <Button variant="default" size="sm" onClick={exportResults} className="bg-primary hover:bg-primary/90">
+                                    <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados
+                                </Button>
+                                <Button variant="destructive" size="sm" onClick={clearHistory}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </>
                         )}
                     </div>
                 </header>
 
-                <main className="container mx-auto max-w-6xl space-y-6">
+                <main className="container mx-auto max-w-7xl space-y-6">
                     <Card className="glass-card">
                         <CardHeader>
-                            <CardTitle>Importar e Acumular Contatos</CardTitle>
+                            <CardTitle className="text-lg">Importar Contatos</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 hover:border-primary/50 transition-colors bg-card/50">
-                                <Upload className="w-10 h-10 text-muted-foreground mb-4" />
-                                <p className="text-sm text-muted-foreground mb-4 text-center">
-                                    Novas planilhas serão adicionadas ao histórico existente abaixo.
-                                </p>
-                                <Input
-                                    id="file-upload"
-                                    type="file"
-                                    accept=".xlsx, .xls, .csv"
-                                    onChange={handleFileUpload}
-                                    className="hidden"
-                                />
-                                <Button onClick={() => document.getElementById("file-upload")?.click()} disabled={loading}>
-                                    {loading ? "Processando..." : "Selecionar Arquivo"}
+                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-primary/50 transition-colors bg-card/50">
+                                <Upload className="w-8 h-8 text-muted-foreground mb-4" />
+                                <Input id="file-upload" type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" />
+                                <Button size="sm" onClick={() => document.getElementById("file-upload")?.click()} disabled={loading}>
+                                    {loading ? "Processando..." : "Carregar Planilha"}
                                 </Button>
                             </div>
                         </CardContent>
@@ -248,82 +271,106 @@ Fico no aguardo!`;
 
                     {data.length > 0 && (
                         <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Histórico de Contatos ({data.length})</CardTitle>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-lg font-semibold">Contatos Disponíveis ({data.length})</CardTitle>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Checkbox checked={data.every(i => i.selecionado)} onCheckedChange={toggleAll} />
+                                    <span>Selecionar Todos</span>
+                                </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="rounded-md border overflow-hidden">
+                                <div className="rounded-md border overflow-x-auto">
                                     <Table>
                                         <TableHeader className="bg-muted/50">
                                             <TableRow>
-                                                <TableHead className="w-[180px]">Status</TableHead>
-                                                <TableHead>Nome</TableHead>
-                                                <TableHead>Contato</TableHead>
-                                                <TableHead>Atividade</TableHead>
-                                                <TableHead className="text-center">Ações</TableHead>
+                                                <TableHead className="w-10"></TableHead>
+                                                <TableHead className="w-[140px]">Status</TableHead>
+                                                <TableHead>Nome / Contato</TableHead>
+                                                <TableHead className="w-[180px]">Decisão</TableHead>
+                                                <TableHead className="w-[120px]">Período</TableHead>
+                                                <TableHead className="w-[100px]">Horário</TableHead>
+                                                <TableHead className="text-center w-[160px]">Ações</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {[...data].reverse().map((item, index) => (
-                                                <TableRow key={item.id} className={item.status === "Contatado" ? "bg-muted/20" : ""}>
+                                            {[...data].reverse().map((item) => (
+                                                <TableRow key={item.id} className={`${item.selecionado ? "bg-primary/5" : ""} ${item.status === "Contatado" ? "opacity-90" : ""}`}>
                                                     <TableCell>
-                                                        <Select
-                                                            value={item.status}
-                                                            onValueChange={(value: any) => updateStatus(item.id, value)}
-                                                        >
-                                                            <SelectTrigger className={`h-8 w-full text-xs font-semibold ${getStatusColor(item.status)}`}>
+                                                        <Checkbox checked={item.selecionado} onCheckedChange={() => toggleSelection(item.id)} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
+                                                            <SelectTrigger className="h-8 text-[11px] font-bold uppercase">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
                                                                 <SelectItem value="Pendente">Pendente</SelectItem>
                                                                 <SelectItem value="Contatado">Contatado</SelectItem>
-                                                                <SelectItem value="Aguardando retorno">Aguardando retorno</SelectItem>
+                                                                <SelectItem value="Aguardando retorno">Aguardando</SelectItem>
                                                                 <SelectItem value="Sem Contato">Sem Contato</SelectItem>
                                                             </SelectContent>
                                                         </Select>
                                                     </TableCell>
-                                                    <TableCell className="font-medium whitespace-nowrap text-sm">{item.nome}</TableCell>
-                                                    <TableCell className="whitespace-nowrap text-sm">{item.contato}</TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground">
-                                                        {item.tipoAtividade} ({item.operadora})
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-medium">{item.nome}</span>
+                                                            <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
+                                                        </div>
                                                     </TableCell>
-                                                    <TableCell className="text-right whitespace-nowrap">
-                                                        <div className="flex justify-center items-center gap-1">
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => openWhatsApp(item, item.id)}>
-                                                                        <MessageSquare className="w-4 h-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Iniciar contato Whats</TooltipContent>
-                                                            </Tooltip>
+                                                    <TableCell>
+                                                        <Select value={item.decisao} onValueChange={(v) => updateField(item.id, "decisao", v)}>
+                                                            <SelectTrigger className="h-8 text-xs">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Pendente">Aguardando Decisão</SelectItem>
+                                                                <SelectItem value="Confirmada">Antecipação Confirmada</SelectItem>
+                                                                <SelectItem value="Recusou">Cliente Recusou</SelectItem>
+                                                                <SelectItem value="Mantida">Data Original Mantida</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Select
+                                                            disabled={item.decisao !== "Confirmada"}
+                                                            value={item.periodo}
+                                                            onValueChange={(v) => updateField(item.id, "periodo", v)}
+                                                        >
+                                                            <SelectTrigger className="h-8 text-xs">
+                                                                <SelectValue placeholder="-" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="Manhã">Manhã</SelectItem>
+                                                                <SelectItem value="Tarde">Tarde</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            placeholder="00:00"
+                                                            className="h-8 text-xs"
+                                                            disabled={item.decisao !== "Confirmada"}
+                                                            value={item.horario}
+                                                            onChange={(e) => updateField(item.id, "horario", e.target.value)}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex justify-center gap-1">
+                                                            <Tooltip><TooltipTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)}><MessageSquare className="w-4 h-4" /></Button>
+                                                            </TooltipTrigger><TooltipContent>Iniciar contato Whats</TooltipContent></Tooltip>
 
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50" onClick={() => openTelegram(item, item.id)}>
-                                                                        <Send className="w-4 h-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Iniciar contato Telegram</TooltipContent>
-                                                            </Tooltip>
+                                                            <Tooltip><TooltipTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)}><Send className="w-4 h-4" /></Button>
+                                                            </TooltipTrigger><TooltipContent>Iniciar contato Telegram</TooltipContent></Tooltip>
 
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/5" onClick={() => copyToClipboard(item, item.id)}>
-                                                                        <Copy className="w-4 h-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Copiar mensagem</TooltipContent>
-                                                            </Tooltip>
+                                                            <Tooltip><TooltipTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
+                                                            </TooltipTrigger><TooltipContent>Copiar mensagem</TooltipContent></Tooltip>
 
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => deleteEntry(item.id)}>
-                                                                        <Trash2 className="w-4 h-4" />
-                                                                    </Button>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent>Excluir contato</TooltipContent>
-                                                            </Tooltip>
+                                                            <Tooltip><TooltipTrigger asChild>
+                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                                                            </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
