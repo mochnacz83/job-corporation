@@ -167,7 +167,7 @@ const Login = () => {
       const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
       console.log("[Signup] Iniciando cadastro para:", authEmail);
 
-      const { data: signUpData, error } = await supabase.auth.signUp({
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: authEmail,
         password: signupPassword,
         options: {
@@ -183,16 +183,14 @@ const Login = () => {
         },
       });
 
-      if (error) {
-        console.error("[Signup] Erro do Supabase Auth:", error);
+      if (signUpError) {
+        console.error("[Signup] Erro do Supabase Auth:", signUpError);
         // Translate common Supabase error messages
-        let friendlyMsg = error.message;
-        if (error.message.includes("already registered") || error.message.includes("already exists")) {
-          friendlyMsg = "Esta matrícula já foi cadastrada. Tente fazer login ou use outra matrícula.";
-        } else if (error.message.includes("password")) {
-          friendlyMsg = "A senha não atende aos requisitos mínimos de segurança.";
-        } else if (error.message.includes("email")) {
-          friendlyMsg = "Erro no formato do e-mail interno. Tente novamente.";
+        let friendlyMsg = signUpError.message;
+        if (signUpError.message.toLowerCase().includes("already registered") || signUpError.message.toLowerCase().includes("already exists")) {
+          friendlyMsg = "Esta matrícula já foi cadastrada. Tente fazer login ou use a recuperação de senha.";
+        } else if (signUpError.message.toLowerCase().includes("password")) {
+          friendlyMsg = "A senha temporária padrão não atende aos requisitos internos. Contate o suporte.";
         }
         throw new Error(friendlyMsg);
       }
@@ -205,21 +203,26 @@ const Login = () => {
 
       console.log("[Signup] Usuário criado com sucesso:", signUpData.user.id);
 
-      supabase.functions.invoke("notify-new-user", {
-        body: { nome: nome.trim(), matricula: matricula.trim() },
-      }).catch((err) => console.error("Notification error:", err));
+      // Trigger notification (optional, handled by SB if configured, but keeping for robustness)
+      try {
+        await supabase.functions.invoke("notify-new-user", {
+          body: { nome: nome.trim(), matricula: matricula.trim() },
+        });
+      } catch (notifyErr) {
+        console.warn("Notification error (non-blocking):", notifyErr);
+      }
 
       toast({
-        title: "✅ Cadastro realizado!",
-        description: "Aguarde a aprovação do administrador. Sua senha provisória é 12346@Ab. Após a aprovação, você deverá alterá-la no primeiro acesso.",
-        duration: 10000
+        title: "✅ Cadastro realizado com sucesso!",
+        description: `Sua solicitação foi enviada. Senha Provisória: 12346@Ab. Aguarde a aprovação do administrador para acessar.`,
+        duration: 15000
       });
       setView("login");
       setNome(""); setEmailContato(""); setEmpresa(""); setTelefone("");
       setCargo(""); setArea(""); setMatricula("");
     } catch (err: any) {
       console.error("[Signup] Erro final:", err);
-      toast({ title: "Erro ao cadastrar", description: err.message || "Erro desconhecido. Tente novamente.", variant: "destructive" });
+      toast({ title: "Ops! Algo deu errado", description: err.message || "Não foi possível completar seu cadastro. Tente novamente em instantes.", variant: "destructive", duration: 8000 });
     } finally {
       setLoading(false);
     }

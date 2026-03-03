@@ -307,7 +307,7 @@ serve(async (req) => {
               <p>Boa notícia! Sua conta no <strong>Portal Corporativo da Ability Tecnologia</strong> foi aprovada e já está ativa.</p>
               <div style="background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bfdbfe;">
                 <p style="margin: 0; font-size: 15px; font-weight: bold; color: #1a1a2e;">Como acessar:</p>
-                <p style="margin: 8px 0 0 0; color: #374151;">Use a senha que você cadastrou no momento do seu registro.</p>
+                <p style="margin: 8px 0 0 0; color: #374151;">Sua senha provisória de acesso é: <strong style="color: #4361ee; font-family: monospace;">12346@Ab</strong></p>
                 <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">⚠️ No primeiro acesso, você será solicitado a criar uma nova senha permanente.</p>
               </div>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
