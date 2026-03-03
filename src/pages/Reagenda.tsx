@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, CheckCircle2, Clock, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -84,7 +84,31 @@ Se sim, por favor, me confirme qual período (manhã ou tarde) e horário você 
 Fico no aguardo!`;
 
         const encodedMessage = encodeURIComponent(message);
-        return `https://wa.me/55${item.contato}?text=${encodedMessage}`;
+        return `https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`;
+    };
+
+    const copyToClipboard = (item: ReagendaData, index: number) => {
+        const message = `Olá, ${item.nome}! Tudo bem?
+
+Aqui é da equipe de agendamento da ${item.operadora}.
+
+Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} para sua internet ${item.operadora}, agendada originalmente para o dia ${item.dataAgendamento}.
+
+Estou entrando em contato pois conseguimos uma abertura em nossa agenda e podemos antecipar o seu atendimento! 🚀
+
+Você teria interesse em realizar esse serviço antes do prazo?
+
+Se sim, por favor, me confirme qual período (manhã ou tarde) e horário você teria disponibilidade para nos receber.
+
+Fico no aguardo!`;
+
+        navigator.clipboard.writeText(message).then(() => {
+            toast({
+                title: "Mensagem copiada!",
+                description: "Agora você pode colar diretamente no WhatsApp.",
+            });
+            markAsContacted(index);
+        });
     };
 
     const markAsContacted = (index: number) => {
@@ -199,23 +223,34 @@ Fico no aguardo!`;
                                                 <TableCell className="whitespace-nowrap">{item.tipoAtividade}</TableCell>
                                                 <TableCell className="whitespace-nowrap text-center">{item.dataAgendamento}</TableCell>
                                                 <TableCell className="text-right whitespace-nowrap">
-                                                    <Button
-                                                        asChild
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-                                                        onClick={() => markAsContacted(index)}
-                                                    >
-                                                        <a
-                                                            href={getWhatsAppUrl(item)}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center"
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-8 w-8 p-0"
+                                                            onClick={() => copyToClipboard(item, index)}
+                                                            title="Copiar mensagem"
                                                         >
-                                                            <MessageSquare className="w-4 h-4 mr-2" />
-                                                            WhatsApp
-                                                        </a>
-                                                    </Button>
+                                                            <Copy className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            asChild
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                                                            onClick={() => markAsContacted(index)}
+                                                        >
+                                                            <a
+                                                                href={getWhatsAppUrl(item)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center"
+                                                            >
+                                                                <MessageSquare className="w-4 h-4 mr-2" />
+                                                                WhatsApp
+                                                            </a>
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
