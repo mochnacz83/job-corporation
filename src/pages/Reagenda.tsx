@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import * as XLSX from "xlsx";
 import {
     Select,
@@ -39,10 +40,29 @@ interface ReagendaData {
 }
 
 const Reagenda = () => {
+    const { isAdmin, areaPermissions, loading: authLoading } = useAuth();
     const [data, setData] = useState<ReagendaData[]>([]);
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     const { toast } = useToast();
+
+    // Permission guard
+    useEffect(() => {
+        if (!authLoading) {
+            const hasAccess = isAdmin ||
+                areaPermissions?.all_access ||
+                areaPermissions?.modules?.includes("reagenda");
+
+            if (!hasAccess) {
+                navigate("/dashboard");
+                toast({
+                    title: "Acesso restrito",
+                    description: "Sua área não possui permissão para acessar o Sistema de Reagendamento.",
+                    variant: "destructive"
+                });
+            }
+        }
+    }, [isAdmin, areaPermissions, authLoading, navigate, toast]);
 
     useEffect(() => {
         const savedData = localStorage.getItem("reagenda_history_v3");

@@ -25,13 +25,14 @@ interface AreaPermission {
 const DEFAULT_AREAS: AreaPermission[] = [
     { area: "Comunicação de Dados", modules: [], powerbi_report_ids: [], all_access: false },
     { area: "Home Connect", modules: [], powerbi_report_ids: [], all_access: false },
-    { area: "Gerencia", modules: ["dashboard", "powerbi"], powerbi_report_ids: [], all_access: true },
+    { area: "Gerencia", modules: ["dashboard", "powerbi", "reagenda"], powerbi_report_ids: [], all_access: true },
     { area: "Suporte CL", modules: [], powerbi_report_ids: [], all_access: false },
 ];
 
 const AVAILABLE_MODULES = [
     { id: "dashboard", label: "Dashboard Principal", icon: LayoutDashboard },
     { id: "powerbi", label: "Relatórios Power BI", icon: BarChart3 },
+    { id: "reagenda", label: "Sistema de Reagendamento", icon: CalendarDays },
 ];
 
 const AdminPermissions = () => {
