@@ -140,27 +140,39 @@ const Reagenda = () => {
 
         const validNewEntries = newEntries.filter(item => item.nome && item.contato);
 
-        // Deduplicação: Remove duplicados baseados em SA ou Contato que já existem na base
-        const uniqueNewEntries = validNewEntries.filter(newItem => {
-            const isDuplicate = data.some(existingItem =>
+        const uniqueNewEntries: ReagendaData[] = [];
+        let duplicatesCount = 0;
+
+        for (const newItem of validNewEntries) {
+            // Check if it already exists in the previous database state
+            const inData = data.some(existingItem =>
                 (newItem.sa && existingItem.sa && newItem.sa === existingItem.sa) ||
                 (newItem.contato === existingItem.contato)
             );
-            return !isDuplicate;
-        });
 
-        const duplicatesCount = validNewEntries.length - uniqueNewEntries.length;
+            // Check if we already processed it in this exact upload batch
+            const inBatch = uniqueNewEntries.some(addedItem =>
+                (newItem.sa && addedItem.sa && newItem.sa === addedItem.sa) ||
+                (newItem.contato === addedItem.contato)
+            );
+
+            if (inData || inBatch) {
+                duplicatesCount++;
+            } else {
+                uniqueNewEntries.push(newItem);
+            }
+        }
 
         if (uniqueNewEntries.length > 0) {
             setData(prev => [...prev, ...uniqueNewEntries]);
             toast({
                 title: "Planilha carregada",
-                description: `${uniqueNewEntries.length} novos registros adicionados.${duplicatesCount > 0 ? ` ${duplicatesCount} duplicados ignorados.` : ""}`,
+                description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados excluídos.` : ""}`,
             });
         } else if (duplicatesCount > 0) {
             toast({
                 title: "Nenhum registro novo",
-                description: `${duplicatesCount} registros duplicados foram ignorados.`,
+                description: `${duplicatesCount} registros duplicados foram ignorados/excluídos.`,
                 variant: "destructive"
             });
         }
@@ -324,10 +336,20 @@ Fico no aguardo!`;
                 "CONTATO": "11999999999",
                 "OPERADORA": "Vivo",
                 "TIPO DE ATIVIDADE": "Instalação",
-                "DATA DE AGENDAMENTO": "10/03/2026"
+                "DATA DE AGENDAMENTO": new Date(2026, 2, 10)
+            },
+            {
+                "SA": "654321",
+                "SETOR": "Setor B",
+                "NOME": "Maria da Silva",
+                "CONTATO": "11988888888",
+                "OPERADORA": "Claro",
+                "TIPO DE ATIVIDADE": "Reparo",
+                "DATA DE AGENDAMENTO": new Date(2026, 2, 12)
             }
         ];
-        const ws = XLSX.utils.json_to_sheet(sampleData);
+        // Usar cellDates para formatar como data nativa no Excel e dateNF para definir o formato DD/MM/AAAA
+        const ws = XLSX.utils.json_to_sheet(sampleData, { cellDates: true, dateNF: "dd/mm/yyyy" });
 
         ws['!cols'] = [
             { wch: 10 }, // SA
@@ -393,21 +415,25 @@ Fico no aguardo!`;
                                 <X className="w-4 h-4" />
                             </Button>
                         </CardHeader>
-                        <CardContent className="p-4 space-y-3 text-xs leading-relaxed">
+                        <CardContent className="p-4 space-y-3 text-xs leading-relaxed max-h-[70vh] overflow-y-auto">
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">Deduplicação Inteligente:</p>
-                                <p>O sistema agora detecta automaticamente registros duplicados através do número de **SA** ou **Contato**. Registros repetidos não serão adicionados.</p>
+                                <p className="font-semibold text-primary">📝 Upload Drag & Drop:</p>
+                                <p>Arraste arquivos <code>.xlsx</code> ou <code>.csv</code> diretamente no painel pontilhado para iniciar o processamento. Você também pode clicar nele para abrir as pastas do sistema.</p>
                             </div>
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">Formatação de Data:</p>
-                                <p>As datas são automaticamente convertidas para o padrão brasileiro **DD/MM/AAAA** no carregamento.</p>
+                                <p className="font-semibold text-primary">🛡️ Deduplicação Flexível Inteligente:</p>
+                                <p>O sistema escaneia a sua planilha <strong>linha a linha</strong> para procurar duplicados de número de Contato ou número de SA. Ele também compara o que você está enviando agora com o que <strong>já existe cadastrado</strong>. Qualquer item repetido é sumariamente ignorado e mantemos apenas os indivíduos únicos.</p>
                             </div>
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">Importação:</p>
-                                <p>Arraste arquivos `.xlsx` diretamente no painel de importação ou clique no botão para selecionar.</p>
+                                <p className="font-semibold text-primary">📅 Tabela e Formatação de Data:</p>
+                                <p>A coluna Data na tabela modelo baixada agora possui o formato nativo de data no sistema DD/MM/AAAA. Ao subir uma planilha nossa engine extrai essas datas do Excel com sucesso.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">💬 Mensagem via Chat:</p>
+                                <p>O ícone de enviar WhatsApp copia as informações do cliente baseadas na operadora e preenche o convite de reagendamento direto no WebApp.</p>
                             </div>
                             <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
-                                Arraste este painel pelo cabeçalho para reposicionar.
+                                Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
                             </div>
                         </CardContent>
                     </Card>
