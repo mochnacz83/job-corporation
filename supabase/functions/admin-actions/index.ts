@@ -95,21 +95,34 @@ serve(async (req) => {
 
     const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
+    console.log(`[AUTH] Action: ${action} | Caller: ${caller.id} | Target: ${userId} | isAdmin: ${isAdmin}`);
+
     // Verify admin role ONLY for privileged actions
     const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status'];
-    if (adminActions.includes(action) && !isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+    // Authorization logic
+    let authorized = false;
+
+    if (action === 'complete-signup') {
+      // Allow user to complete their own signup
+      authorized = caller.id === userId;
+    } else if (action === 'update-profile') {
+      // Allow user to update their own profile OR admin to update any
+      authorized = isAdmin || caller.id === userId;
+    } else if (adminActions.includes(action)) {
+      // Require admin for these actions
+      authorized = isAdmin;
+    } else {
+      // Default: require admin for unknown actions
+      authorized = isAdmin;
     }
 
-    // Protection for non-admin profile updates: only allow updating own profile
-    if (action === 'complete-signup' || action === 'update-profile') {
-      if (!isAdmin && caller.id !== userId) {
-        return new Response(JSON.stringify({ error: 'Permission denied: cannot update another user profile' }), {
-          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    if (!authorized) {
+      console.warn(`[AUTH] Unauthorized ${action} attempt by ${caller.id} for ${userId}`);
+      const errorMsg = isAdmin ? 'Permission denied' : 'Forbidden: admin role required';
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (action === 'reset-password') {
@@ -396,8 +409,8 @@ serve(async (req) => {
         email: profileData.email_contato || profileData.email || '',
         empresa: profileData.empresa || '',
         telefone: profileData.telefone || '',
-        cargo: profileData.cargo || '',
-        area: profileData.area || '',
+        cargo: profileData.reg_cargo || profileData.cargo || '',
+        area: profileData.reg_area || profileData.area || '',
         status: 'pendente',
         must_change_password: true
       };
