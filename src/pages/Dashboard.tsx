@@ -100,7 +100,7 @@ const Dashboard = () => {
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <User className="w-4 h-4" />
               <span>{profile?.nome}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary-foreground">{profile?.matricula}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-primary-foreground">{profile?.matricula}</span>
             </div>
             <TooltipProvider>
               <Tooltip>
