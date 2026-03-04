@@ -33,6 +33,7 @@ interface ReagendaData {
     tipoAtividade: string;
     dataAgendamento: string;
     dataOriginalFormatada?: string;
+    dataNova?: string;
     status: "Pendente" | "Contatado" | "Aguardando retorno" | "Sem Contato";
     decisao: string;
     periodo: string;
@@ -126,16 +127,24 @@ const Reagenda = () => {
             const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";
             const formattedDate = formatDate(rawData);
 
+            let saValue = String(row["SA"] || row["sa"] || row["S.A"] || "").trim();
+            if (saValue && !/^SA-/i.test(saValue)) {
+                saValue = `SA-${saValue}`;
+            }
+
+            const operadoraValue = String(row["OPERADORA"] || row["Operadora"] || "").trim().toUpperCase();
+
             return {
                 id: crypto.randomUUID(),
-                sa: String(row["SA"] || row["sa"] || row["S.A"] || "").trim(),
+                sa: saValue,
                 setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
                 nome: row["NOME"] || row["Nome"] || "",
                 contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
-                operadora: row["OPERADORA"] || row["Operadora"] || "",
+                operadora: operadoraValue,
                 tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
                 dataAgendamento: formattedDate,
                 dataOriginalFormatada: formattedDate,
+                dataNova: "",
                 status: "Pendente",
                 decisao: "Pendente",
                 periodo: "",
@@ -384,6 +393,7 @@ Fico no aguardo!`;
             "Data Original": item.dataAgendamento,
             "Status": item.status,
             "Decisão": item.decisao,
+            "Data Nova": item.dataNova || "",
             "Período": item.periodo,
             "Horário": item.horario
         }));
@@ -396,7 +406,8 @@ Fico no aguardo!`;
         const ws = XLSX.utils.json_to_sheet(exportData);
         ws['!cols'] = [
             { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
-            { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }
+            { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
+            { wch: 15 }, { wch: 15 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Resultados");
@@ -519,14 +530,15 @@ Fico no aguardo!`;
                                                 <TableHead>Nome / Contato</TableHead>
                                                 <TableHead>Data Orig.</TableHead>
                                                 <TableHead className="w-[180px]">Decisão</TableHead>
-                                                <TableHead className="w-[120px]">Período</TableHead>
+                                                <TableHead className="w-[120px]">Data Nova</TableHead>
+                                                <TableHead className="w-[110px]">Período</TableHead>
                                                 <TableHead className="w-[100px]">Horário</TableHead>
                                                 <TableHead className="text-center w-[160px]">Ações</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {[...data].reverse().map((item) => (
-                                                <TableRow key={item.id} className={`${item.selecionado ? "bg-primary/5" : ""} ${item.status === "Contatado" ? "opacity-90" : ""}`}>
+                                                <TableRow key={item.id} className={`${item.selecionado ? "bg-primary/5" : ""} ${item.status === "Contatado" ? "bg-blue-50/60 dark:bg-blue-900/20" : ""}`}>
                                                     <TableCell>
                                                         <Checkbox checked={item.selecionado} onCheckedChange={() => toggleSelection(item.id)} />
                                                     </TableCell>
@@ -570,6 +582,15 @@ Fico no aguardo!`;
                                                                 <SelectItem value="Mantida">Data Original Mantida</SelectItem>
                                                             </SelectContent>
                                                         </Select>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="date"
+                                                            className="h-8 text-xs"
+                                                            disabled={item.decisao !== "Confirmada"}
+                                                            value={item.dataNova || ""}
+                                                            onChange={(e) => updateField(item.id, "dataNova", e.target.value)}
+                                                        />
                                                     </TableCell>
                                                     <TableCell>
                                                         <Select
