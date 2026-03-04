@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Login from "./pages/Login";
@@ -14,8 +14,51 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import NotFound from "./pages/NotFound";
+import { useEffect, useRef, useState } from "react";
 
 const queryClient = new QueryClient();
+
+// Keeps Reagenda mounted (hidden) so it doesn't lose state on navigation
+const PersistentReagenda = () => {
+  const location = useLocation();
+  const isActive = location.pathname === "/reagenda";
+  const [hasBeenMounted, setHasBeenMounted] = useState(false);
+
+  useEffect(() => {
+    if (isActive && !hasBeenMounted) setHasBeenMounted(true);
+  }, [isActive, hasBeenMounted]);
+
+  if (!hasBeenMounted) return null;
+
+  return (
+    <div style={{ display: isActive ? "block" : "none" }}>
+      <ProtectedRoute><Reagenda /></ProtectedRoute>
+    </div>
+  );
+};
+
+const AppRoutes = () => {
+  const location = useLocation();
+  const isReagenda = location.pathname === "/reagenda";
+
+  return (
+    <>
+      <PersistentReagenda />
+      {!isReagenda && (
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
+          <Route path="/powerbi" element={<ProtectedRoute><PowerBI /></ProtectedRoute>} />
+          <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
+          <Route path="/admin/perfis" element={<ProtectedRoute><AdminPermissions /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      )}
+    </>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -24,17 +67,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Login />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
-            <Route path="/powerbi" element={<ProtectedRoute><PowerBI /></ProtectedRoute>} />
-            <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
-            <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
-            <Route path="/admin/perfis" element={<ProtectedRoute><AdminPermissions /></ProtectedRoute>} />
-            <Route path="/reagenda" element={<ProtectedRoute><Reagenda /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
