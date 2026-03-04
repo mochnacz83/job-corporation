@@ -14,14 +14,14 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import NotFound from "./pages/NotFound";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
 
 const queryClient = new QueryClient();
 
-// Keeps Reagenda mounted (hidden) so it doesn't lose state on navigation
-const PersistentReagenda = () => {
+// Generic persistent page wrapper: mounts once, then hides/shows via CSS
+const PersistentPage = ({ path, children }: { path: string; children: ReactNode }) => {
   const location = useLocation();
-  const isActive = location.pathname === "/reagenda";
+  const isActive = location.pathname === path;
   const [hasBeenMounted, setHasBeenMounted] = useState(false);
 
   useEffect(() => {
@@ -32,27 +32,39 @@ const PersistentReagenda = () => {
 
   return (
     <div style={{ display: isActive ? "block" : "none" }}>
-      <ProtectedRoute><Reagenda /></ProtectedRoute>
+      {children}
     </div>
   );
 };
 
+// Pages that should persist their state (all protected pages except Dashboard which resets)
+const persistentPages = [
+  { path: "/alterar-senha", element: <ProtectedRoute><ChangePassword /></ProtectedRoute> },
+  { path: "/powerbi", element: <ProtectedRoute><PowerBI /></ProtectedRoute> },
+  { path: "/admin/usuarios", element: <ProtectedRoute><AdminUsers /></ProtectedRoute> },
+  { path: "/admin/analytics", element: <ProtectedRoute><AdminAnalytics /></ProtectedRoute> },
+  { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
+  { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
+];
+
 const AppRoutes = () => {
   const location = useLocation();
-  const isReagenda = location.pathname === "/reagenda";
+  const isPersistentRoute = persistentPages.some(p => p.path === location.pathname);
 
   return (
     <>
-      <PersistentReagenda />
-      {!isReagenda && (
+      {/* Persistent pages stay mounted, hidden via CSS */}
+      {persistentPages.map(({ path, element }) => (
+        <PersistentPage key={path} path={path}>
+          {element}
+        </PersistentPage>
+      ))}
+
+      {/* Non-persistent pages render normally via Routes */}
+      {!isPersistentRoute && (
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/alterar-senha" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
-          <Route path="/powerbi" element={<ProtectedRoute><PowerBI /></ProtectedRoute>} />
-          <Route path="/admin/usuarios" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
-          <Route path="/admin/analytics" element={<ProtectedRoute><AdminAnalytics /></ProtectedRoute>} />
-          <Route path="/admin/perfis" element={<ProtectedRoute><AdminPermissions /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       )}
