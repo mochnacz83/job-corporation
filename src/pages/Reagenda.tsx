@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ interface ReagendaData {
     operadora: string;
     tipoAtividade: string;
     dataAgendamento: string;
+    dataOriginalFormatada?: string;
     status: "Pendente" | "Contatado" | "Aguardando retorno" | "Sem Contato";
     decisao: string;
     periodo: string;
@@ -43,6 +44,11 @@ const Reagenda = () => {
     const { isAdmin, areaPermissions, loading: authLoading } = useAuth();
     const [data, setData] = useState<ReagendaData[]>([]);
     const [loading, setLoading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [showInfo, setShowInfo] = useState(false);
+    const [infoPosition, setInfoPosition] = useState({ x: 20, y: 80 });
+    const [isDraggingInfo, setIsDraggingInfo] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -79,6 +85,87 @@ const Reagenda = () => {
         localStorage.setItem("reagenda_history_v3", JSON.stringify(data));
     }, [data]);
 
+    const formatDate = (dateValue: any): string => {
+        if (!dateValue) return "";
+
+        // Se já estiver no formato DD/MM/AAAA, retorna
+        if (typeof dateValue === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
+            return dateValue;
+        }
+
+        try {
+            let date: Date;
+            if (typeof dateValue === 'number') {
+                // Serial do Excel
+                date = new Date((dateValue - 25569) * 86400 * 1000);
+            } else {
+                date = new Date(dateValue);
+            }
+
+            if (!isNaN(date.getTime())) {
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+            }
+        } catch (e) {
+            console.error("Erro ao formatar data:", e);
+        }
+
+        return String(dateValue);
+    };
+
+    const processJsonData = (jsonData: any[]) => {
+        const newEntries: ReagendaData[] = jsonData.map((row) => {
+            const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";
+            const formattedDate = formatDate(rawData);
+
+            return {
+                id: crypto.randomUUID(),
+                sa: String(row["SA"] || row["sa"] || row["S.A"] || "").trim(),
+                setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
+                nome: row["NOME"] || row["Nome"] || "",
+                contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
+                operadora: row["OPERADORA"] || row["Operadora"] || "",
+                tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
+                dataAgendamento: formattedDate,
+                dataOriginalFormatada: formattedDate,
+                status: "Pendente",
+                decisao: "Pendente",
+                periodo: "",
+                horario: "",
+                selecionado: false,
+            };
+        });
+
+        const validNewEntries = newEntries.filter(item => item.nome && item.contato);
+
+        // Deduplicação: Remove duplicados baseados em SA ou Contato que já existem na base
+        const uniqueNewEntries = validNewEntries.filter(newItem => {
+            const isDuplicate = data.some(existingItem =>
+                (newItem.sa && existingItem.sa && newItem.sa === existingItem.sa) ||
+                (newItem.contato === existingItem.contato)
+            );
+            return !isDuplicate;
+        });
+
+        const duplicatesCount = validNewEntries.length - uniqueNewEntries.length;
+
+        if (uniqueNewEntries.length > 0) {
+            setData(prev => [...prev, ...uniqueNewEntries]);
+            toast({
+                title: "Planilha carregada",
+                description: `${uniqueNewEntries.length} novos registros adicionados.${duplicatesCount > 0 ? ` ${duplicatesCount} duplicados ignorados.` : ""}`,
+            });
+        } else if (duplicatesCount > 0) {
+            toast({
+                title: "Nenhum registro novo",
+                description: `${duplicatesCount} registros duplicados foram ignorados.`,
+                variant: "destructive"
+            });
+        }
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -93,29 +180,7 @@ const Reagenda = () => {
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-                const newEntries: ReagendaData[] = jsonData.map((row) => ({
-                    id: crypto.randomUUID(),
-                    sa: String(row["SA"] || row["sa"] || row["S.A"] || "").trim(),
-                    setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
-                    nome: row["NOME"] || row["Nome"] || "",
-                    contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
-                    operadora: row["OPERADORA"] || row["Operadora"] || "",
-                    tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
-                    dataAgendamento: row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "",
-                    status: "Pendente",
-                    decisao: "Pendente",
-                    periodo: "",
-                    horario: "",
-                    selecionado: false,
-                }));
-
-                const validNewEntries = newEntries.filter(item => item.nome && item.contato);
-                setData(prev => [...prev, ...validNewEntries]);
-
-                toast({
-                    title: "Planilha carregada",
-                    description: `${validNewEntries.length} novos registros adicionados.`,
-                });
+                processJsonData(jsonData);
             } catch (error) {
                 console.error("Erro ao ler planilha:", error);
                 toast({
@@ -129,6 +194,63 @@ const Reagenda = () => {
             }
         };
         reader.readAsBinaryString(file);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv"))) {
+            const reader = new FileReader();
+            setLoading(true);
+            reader.onload = (event) => {
+                try {
+                    const bstr = event.target?.result;
+                    const workbook = XLSX.read(bstr, { type: "binary" });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+                    processJsonData(jsonData);
+                } catch (error) {
+                    toast({ title: "Erro", description: "Falha ao processar arquivo.", variant: "destructive" });
+                } finally {
+                    setLoading(false);
+                }
+            };
+            reader.readAsBinaryString(file);
+        } else {
+            toast({ title: "Arquivo inválido", description: "Por favor, use arquivos .xlsx, .xls ou .csv", variant: "destructive" });
+        }
+    };
+
+    const handleMouseDownInfo = (e: React.MouseEvent) => {
+        setIsDraggingInfo(true);
+        setDragStart({
+            x: e.clientX - infoPosition.x,
+            y: e.clientY - infoPosition.y
+        });
+    };
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (isDraggingInfo) {
+            setInfoPosition({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDraggingInfo(false);
     };
 
     const getMessageTemplate = (item: ReagendaData) => {
@@ -254,7 +376,43 @@ Fico no aguardo!`;
 
     return (
         <TooltipProvider>
-            <div className="min-h-screen bg-background p-4">
+            <div className="min-h-screen bg-background p-4 relative" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+                {showInfo && (
+                    <Card
+                        className="fixed z-50 w-80 shadow-2xl border-primary/20 glass-card animate-in fade-in zoom-in duration-200"
+                        style={{ left: `${infoPosition.x}px`, top: `${infoPosition.y}px` }}
+                    >
+                        <CardHeader className="p-3 bg-primary/10 flex flex-row items-center justify-between cursor-move" onMouseDown={handleMouseDownInfo}>
+                            <div className="flex items-center gap-2">
+                                <GripHorizontal className="w-4 h-4 text-muted-foreground" />
+                                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                    <Info className="w-4 h-4 text-primary" /> Ajuda & Informações
+                                </CardTitle>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInfo(false)}>
+                                <X className="w-4 h-4" />
+                            </Button>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-3 text-xs leading-relaxed">
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">Deduplicação Inteligente:</p>
+                                <p>O sistema agora detecta automaticamente registros duplicados através do número de **SA** ou **Contato**. Registros repetidos não serão adicionados.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">Formatação de Data:</p>
+                                <p>As datas são automaticamente convertidas para o padrão brasileiro **DD/MM/AAAA** no carregamento.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">Importação:</p>
+                                <p>Arraste arquivos `.xlsx` diretamente no painel de importação ou clique no botão para selecionar.</p>
+                            </div>
+                            <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
+                                Arraste este painel pelo cabeçalho para reposicionar.
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 <header className="container mx-auto max-w-7xl mb-6 flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
@@ -271,6 +429,9 @@ Fico no aguardo!`;
                         </Button>
                         {data.length > 0 && (
                             <>
+                                <Button variant="outline" size="sm" onClick={() => setShowInfo(!showInfo)} className="flex items-center gap-2">
+                                    <Info className="w-4 h-4" /> Guia
+                                </Button>
                                 <Button variant="default" size="sm" onClick={exportResults} className="bg-primary hover:bg-primary/90">
                                     <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados (Dinamicas)
                                 </Button>
@@ -288,12 +449,19 @@ Fico no aguardo!`;
                             <CardTitle className="text-lg">Painel de Importação</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-primary/50 transition-colors bg-card/50">
-                                <Upload className="w-8 h-8 text-muted-foreground mb-4" />
+                            <div
+                                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 transition-all bg-card/50 ${isDragging ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/25 hover:border-primary/50"
+                                    }`}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
+                                <Upload className={`w-8 h-8 mb-4 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                                 <Input id="file-upload" type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" />
                                 <Button size="sm" onClick={() => document.getElementById("file-upload")?.click()} disabled={loading}>
                                     {loading ? "Processando..." : "Carregar Planilha"}
                                 </Button>
+                                <p className="text-[10px] text-muted-foreground mt-2">ou arraste o arquivo aqui</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -316,6 +484,7 @@ Fico no aguardo!`;
                                                 <TableHead className="w-[140px]">Status</TableHead>
                                                 <TableHead>SA / Setor</TableHead>
                                                 <TableHead>Nome / Contato</TableHead>
+                                                <TableHead>Data Orig.</TableHead>
                                                 <TableHead className="w-[180px]">Decisão</TableHead>
                                                 <TableHead className="w-[120px]">Período</TableHead>
                                                 <TableHead className="w-[100px]">Horário</TableHead>
@@ -352,6 +521,9 @@ Fico no aguardo!`;
                                                             <span className="text-sm font-medium">{item.nome}</span>
                                                             <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
                                                         </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-xs font-mono">{item.dataAgendamento}</span>
                                                     </TableCell>
                                                     <TableCell>
                                                         <Select value={item.decisao} onValueChange={(v) => updateField(item.id, "decisao", v)}>
