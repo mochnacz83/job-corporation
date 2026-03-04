@@ -7,6 +7,7 @@ import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Se
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 import {
     Select,
@@ -71,20 +72,46 @@ const Reagenda = () => {
         }
     }, [isAdmin, areaPermissions, authLoading, navigate, toast]);
 
-    useEffect(() => {
-        const savedData = localStorage.getItem("reagenda_history_v3");
-        if (savedData) {
-            try {
-                setData(JSON.parse(savedData));
-            } catch (e) {
-                console.error("Erro ao carregar histórico:", e);
+    const loadHistory = async () => {
+        try {
+            const { data: historyData, error } = await supabase
+                .from("reagenda_history" as any)
+                .select("*")
+                .order("created_at", { ascending: true });
+
+            if (error) {
+                console.error("Erro do supabase:", error);
+                return; // Fallback silent to avoid crashing if table not migrated yet
             }
+
+            if (historyData) {
+                const mappedData: ReagendaData[] = historyData.map((row: any) => ({
+                    id: row.id,
+                    sa: row.sa,
+                    setor: row.setor,
+                    nome: row.nome,
+                    contato: row.contato,
+                    operadora: row.operadora,
+                    tipoAtividade: row.tipo_atividade,
+                    dataAgendamento: row.data_agendamento,
+                    dataOriginalFormatada: row.data_original_formatada,
+                    dataNova: row.data_nova,
+                    status: row.status as ReagendaData["status"],
+                    decisao: row.decisao,
+                    periodo: row.periodo || "",
+                    horario: row.horario || "",
+                    selecionado: row.selecionado || false
+                }));
+                setData(mappedData);
+            }
+        } catch (err) {
+            console.error("Error loading history:", err);
         }
-    }, []);
+    };
 
     useEffect(() => {
-        localStorage.setItem("reagenda_history_v3", JSON.stringify(data));
-    }, [data]);
+        loadHistory();
+    }, []);
 
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
@@ -179,10 +206,50 @@ const Reagenda = () => {
         }
 
         if (uniqueNewEntries.length > 0) {
-            setData(prev => [...prev, ...uniqueNewEntries]);
-            toast({
-                title: "Planilha carregada",
-                description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados excluídos.` : ""}`,
+            setLoading(true);
+
+            // Resolve the current userId safely because supabase.auth.user is deprecated in some versions
+            supabase.auth.getSession().then(({ data }) => {
+                const uid = data.session?.user.id;
+                if (!uid) {
+                    toast({ title: "Erro de sessão", description: "Não foi possível sincronizar.", variant: "destructive" });
+                    setLoading(false);
+                    return;
+                }
+
+                // Sync to supabase
+                const userHistoryPayload = uniqueNewEntries.map(entry => ({
+                    id: entry.id,
+                    user_id: uid,
+                    sa: entry.sa,
+                    setor: entry.setor,
+                    nome: entry.nome,
+                    contato: entry.contato,
+                    operadora: entry.operadora,
+                    tipo_atividade: entry.tipoAtividade,
+                    data_agendamento: entry.dataAgendamento,
+                    data_original_formatada: entry.dataOriginalFormatada,
+                    data_nova: entry.dataNova,
+                    status: entry.status,
+                    decisao: entry.decisao,
+                    periodo: entry.periodo,
+                    horario: entry.horario,
+                    selecionado: entry.selecionado
+                }));
+
+                supabase.from("reagenda_history" as any).insert(userHistoryPayload)
+                    .then(({ error }) => {
+                        setLoading(false);
+                        if (error) {
+                            console.error("Supabase insert error:", error);
+                            toast({ title: "Aviso", description: "Registros carregados localmente, mas a tabela no banco não foi migrada/encontrada ainda.", variant: "destructive" });
+                        }
+                        setData(prev => [...prev, ...uniqueNewEntries]);
+                        toast({
+                            title: "Planilha carregada",
+                            description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados excluídos.` : ""}`,
+                        });
+                    });
             });
         } else if (duplicatesCount > 0) {
             toast({
@@ -318,29 +385,64 @@ Fico no aguardo!`;
         });
     };
 
-    const updateStatus = (id: string, newStatus: ReagendaData["status"]) => {
+    const updateStatus = async (id: string, newStatus: ReagendaData["status"]) => {
         setData(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+        try {
+            await supabase.from("reagenda_history" as any).update({ status: newStatus }).eq("id", id);
+        } catch (e) { }
     };
 
-    const updateField = (id: string, field: keyof ReagendaData, value: any) => {
+    const updateField = async (id: string, field: keyof ReagendaData, value: any) => {
         setData(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+
+        try {
+            // Map frontend fields to database fields if needed
+            const dbFieldMap: any = {
+                dataNova: "data_nova",
+                tipoAtividade: "tipo_atividade"
+            };
+            const snakeCaseField = dbFieldMap[field] || field;
+
+            await supabase.from("reagenda_history" as any).update({ [snakeCaseField]: value }).eq("id", id);
+        } catch (e) { }
     };
 
-    const toggleSelection = (id: string) => {
+    const toggleSelection = async (id: string) => {
+        const item = data.find(i => i.id === id);
+        if (!item) return;
+
         setData(prev => prev.map(item => item.id === id ? { ...item, selecionado: !item.selecionado } : item));
+        try {
+            await supabase.from("reagenda_history" as any).update({ selecionado: !item.selecionado }).eq("id", id);
+        } catch (e) { }
     };
 
     const toggleAll = () => {
         const allSelected = data.every(item => item.selecionado);
         setData(prev => prev.map(item => ({ ...item, selecionado: !allSelected })));
+
+        try {
+            supabase.from("reagenda_history" as any).update({ selecionado: !allSelected }).in("id", data.map(d => d.id)).then();
+        } catch (e) { }
     };
 
-    const deleteEntry = (id: string) => {
+    const deleteEntry = async (id: string) => {
         setData(prev => prev.filter(item => item.id !== id));
+        try {
+            await supabase.from("reagenda_history" as any).delete().eq("id", id);
+        } catch (e) { }
     };
 
-    const clearHistory = () => {
-        if (confirm("Apagar histórico?")) setData([]);
+    const clearHistory = async () => {
+        if (confirm("Apagar TODO o histórico? Esta ação é irreversível.")) {
+            setData([]);
+            try {
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (sessionData.session?.user.id) {
+                    await supabase.from("reagenda_history" as any).delete().eq("user_id", sessionData.session.user.id);
+                }
+            } catch (e) { }
+        }
     };
 
     const downloadSample = () => {
