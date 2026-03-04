@@ -35,6 +35,8 @@ interface ReagendaData {
     dataAgendamento: string;
     dataOriginalFormatada?: string;
     dataNova?: string;
+    lastContactedAt?: string;
+    isManualStatus?: boolean;
     status: "Pendente" | "Contatado" | "Aguardando retorno" | "Sem Contato";
     decisao: string;
     periodo: string;
@@ -96,6 +98,8 @@ const Reagenda = () => {
                     dataAgendamento: row.data_agendamento,
                     dataOriginalFormatada: row.data_original_formatada,
                     dataNova: row.data_nova,
+                    lastContactedAt: row.last_contacted_at,
+                    isManualStatus: row.is_manual_status || false,
                     status: row.status as ReagendaData["status"],
                     decisao: row.decisao,
                     periodo: row.periodo || "",
@@ -172,6 +176,8 @@ const Reagenda = () => {
                 dataAgendamento: formattedDate,
                 dataOriginalFormatada: formattedDate,
                 dataNova: "",
+                lastContactedAt: undefined,
+                isManualStatus: false,
                 status: "Pendente",
                 decisao: "Pendente",
                 periodo: "",
@@ -230,6 +236,8 @@ const Reagenda = () => {
                     data_agendamento: entry.dataAgendamento,
                     data_original_formatada: entry.dataOriginalFormatada,
                     data_nova: entry.dataNova,
+                    last_contacted_at: entry.lastContactedAt,
+                    is_manual_status: entry.isManualStatus,
                     status: entry.status,
                     decisao: entry.decisao,
                     periodo: entry.periodo,
@@ -364,31 +372,43 @@ Se sim, por favor, me confirme qual Data, período (manhã ou tarde) e horário 
 Fico no aguardo!`;
     };
 
+    const startContactTimer = async (id: string, contactStatus: ReagendaData["status"] = "Contatado") => {
+        const nowIso = new Date().toISOString();
+        setData(prev => prev.map(item => item.id === id ? { ...item, status: contactStatus, lastContactedAt: nowIso, isManualStatus: false } : item));
+        try {
+            await supabase.from("reagenda_history" as any).update({
+                status: contactStatus,
+                last_contacted_at: nowIso,
+                is_manual_status: false
+            }).eq("id", id);
+        } catch (e) { console.error(e) }
+    };
+
     const openWhatsApp = (item: ReagendaData) => {
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`, "_blank");
-        updateStatus(item.id, "Contatado");
+        startContactTimer(item.id, "Contatado");
     };
 
     const openTelegram = (item: ReagendaData) => {
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://t.me/share/url?url=&text=${encodedMessage}`, "_blank");
-        updateStatus(item.id, "Contatado");
+        startContactTimer(item.id, "Contatado");
     };
 
     const copyToClipboard = (item: ReagendaData) => {
         navigator.clipboard.writeText(getMessageTemplate(item)).then(() => {
             toast({ title: "Copiado!" });
-            updateStatus(item.id, "Contatado");
+            startContactTimer(item.id, "Contatado");
         });
     };
 
     const updateStatus = async (id: string, newStatus: ReagendaData["status"]) => {
-        setData(prev => prev.map(item => item.id === id ? { ...item, status: newStatus } : item));
+        setData(prev => prev.map(item => item.id === id ? { ...item, status: newStatus, isManualStatus: true } : item));
         try {
-            await supabase.from("reagenda_history" as any).update({ status: newStatus }).eq("id", id);
+            await supabase.from("reagenda_history" as any).update({ status: newStatus, is_manual_status: true }).eq("id", id);
         } catch (e) { }
     };
 
@@ -444,6 +464,46 @@ Fico no aguardo!`;
             } catch (e) { }
         }
     };
+
+    // Auto Timer Loop for 5-minute Status Progression
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (data.length === 0) return;
+            const now = new Date().getTime();
+            let hasChanges = false;
+
+            const updatedData = data.map(item => {
+                if (item.isManualStatus || !item.lastContactedAt || item.status === "Sem Contato" || item.status === "Pendente") {
+                    return item; // Do not touch manual overrides, finished, or virgin items
+                }
+
+                const contactedTime = new Date(item.lastContactedAt).getTime();
+                const diffMinutes = (now - contactedTime) / (1000 * 60);
+
+                let newStatus = item.status;
+                if (item.status === "Contatado" && diffMinutes >= 5) {
+                    newStatus = "Aguardando retorno";
+                    hasChanges = true;
+                } else if (item.status === "Aguardando retorno" && diffMinutes >= 10) {
+                    newStatus = "Sem Contato";
+                    hasChanges = true;
+                }
+
+                if (newStatus !== item.status) {
+                    // Fire-and-forget DB update
+                    supabase.from("reagenda_history" as any).update({ status: newStatus }).eq("id", item.id).then();
+                    return { ...item, status: newStatus };
+                }
+                return item;
+            });
+
+            if (hasChanges) {
+                setData(updatedData);
+            }
+        }, 15000); // Check every 15 seconds
+
+        return () => clearInterval(interval);
+    }, [data]);
 
     const downloadSample = () => {
         const sampleData = [
@@ -639,106 +699,118 @@ Fico no aguardo!`;
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {[...data].reverse().map((item) => (
-                                                <TableRow key={item.id} className={`${item.selecionado ? "bg-primary/5" : ""} ${item.status === "Contatado" ? "bg-blue-50/60 dark:bg-blue-900/20" : ""}`}>
-                                                    <TableCell>
-                                                        <Checkbox checked={item.selecionado} onCheckedChange={() => toggleSelection(item.id)} />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
-                                                            <SelectTrigger className="h-8 text-[11px] font-bold uppercase">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="Pendente">Pendente</SelectItem>
-                                                                <SelectItem value="Contatado">Contatado</SelectItem>
-                                                                <SelectItem value="Aguardando retorno">Aguardando</SelectItem>
-                                                                <SelectItem value="Sem Contato">Sem Contato</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-medium">{item.sa || "-"}</span>
-                                                            <span className="text-[11px] text-muted-foreground uppercase">{item.setor || "-"}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className="text-sm font-medium">{item.nome}</span>
-                                                            <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="text-xs font-mono">{formatDate(item.dataAgendamento)}</span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Select value={item.decisao} onValueChange={(v) => updateField(item.id, "decisao", v)}>
-                                                            <SelectTrigger className="h-8 text-xs">
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="Pendente">Aguardando Decisão</SelectItem>
-                                                                <SelectItem value="Confirmada">Antecipação Confirmada</SelectItem>
-                                                                <SelectItem value="Recusou">Cliente Recusou</SelectItem>
-                                                                <SelectItem value="Mantida">Data Original Mantida</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Input
-                                                            type="date"
-                                                            className="h-8 text-xs"
-                                                            disabled={item.decisao !== "Confirmada"}
-                                                            value={item.dataNova || ""}
-                                                            onChange={(e) => updateField(item.id, "dataNova", e.target.value)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Select
-                                                            disabled={item.decisao !== "Confirmada"}
-                                                            value={item.periodo}
-                                                            onValueChange={(v) => updateField(item.id, "periodo", v)}
-                                                        >
-                                                            <SelectTrigger className="h-8 text-xs">
-                                                                <SelectValue placeholder="-" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="Manhã">Manhã</SelectItem>
-                                                                <SelectItem value="Tarde">Tarde</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Input
-                                                            placeholder="00:00"
-                                                            className="h-8 text-xs"
-                                                            disabled={item.decisao !== "Confirmada"}
-                                                            value={item.horario}
-                                                            onChange={(e) => updateField(item.id, "horario", e.target.value)}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex justify-center gap-1">
-                                                            <Tooltip><TooltipTrigger asChild>
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)}><MessageSquare className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
+                                            {[...data].reverse().map((item) => {
+                                                // Determine row background color dynamically based on Status
+                                                let rowColorClass = "";
+                                                if (item.status === "Contatado") rowColorClass = "bg-blue-50/60 dark:bg-blue-900/20";
+                                                else if (item.status === "Aguardando retorno") rowColorClass = "bg-amber-50/60 dark:bg-amber-900/20";
+                                                else if (item.status === "Sem Contato") rowColorClass = "bg-red-50/60 dark:bg-red-900/10 opacity-75";
 
-                                                            <Tooltip><TooltipTrigger asChild>
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)}><Send className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Telegram</TooltipContent></Tooltip>
+                                                if (item.selecionado) {
+                                                    rowColorClass = "bg-primary/10 border-primary";
+                                                }
 
-                                                            <Tooltip><TooltipTrigger asChild>
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Copiar</TooltipContent></Tooltip>
+                                                return (
+                                                    <TableRow key={item.id} className={rowColorClass}>
+                                                        <TableCell>
+                                                            <Checkbox checked={item.selecionado} onCheckedChange={() => toggleSelection(item.id)} />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
+                                                                <SelectTrigger className="h-8 text-[11px] font-bold uppercase">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Pendente">Pendente</SelectItem>
+                                                                    <SelectItem value="Contatado">Contatado</SelectItem>
+                                                                    <SelectItem value="Aguardando retorno">Aguardando</SelectItem>
+                                                                    <SelectItem value="Sem Contato">Sem Contato</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{item.sa || "-"}</span>
+                                                                <span className="text-[11px] text-muted-foreground uppercase">{item.setor || "-"}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium">{item.nome}</span>
+                                                                <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className="text-xs font-mono">{formatDate(item.dataAgendamento)}</span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Select value={item.decisao} onValueChange={(v) => updateField(item.id, "decisao", v)}>
+                                                                <SelectTrigger className="h-8 text-xs">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Pendente">Aguardando Decisão</SelectItem>
+                                                                    <SelectItem value="Confirmada">Antecipação Confirmada</SelectItem>
+                                                                    <SelectItem value="Recusou">Cliente Recusou</SelectItem>
+                                                                    <SelectItem value="Mantida">Data Original Mantida</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input
+                                                                type="date"
+                                                                className="h-8 text-xs"
+                                                                disabled={item.decisao !== "Confirmada"}
+                                                                value={item.dataNova || ""}
+                                                                onChange={(e) => updateField(item.id, "dataNova", e.target.value)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Select
+                                                                disabled={item.decisao !== "Confirmada"}
+                                                                value={item.periodo}
+                                                                onValueChange={(v) => updateField(item.id, "periodo", v)}
+                                                            >
+                                                                <SelectTrigger className="h-8 text-xs">
+                                                                    <SelectValue placeholder="-" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Manhã">Manhã</SelectItem>
+                                                                    <SelectItem value="Tarde">Tarde</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Input
+                                                                placeholder="00:00"
+                                                                className="h-8 text-xs"
+                                                                disabled={item.decisao !== "Confirmada"}
+                                                                value={item.horario}
+                                                                onChange={(e) => updateField(item.id, "horario", e.target.value)}
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex justify-center gap-1">
+                                                                <Tooltip><TooltipTrigger asChild>
+                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)} title="WhatsApp e iniciar Timer!"><MessageSquare className="w-4 h-4" /></Button>
+                                                                </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
 
-                                                            <Tooltip><TooltipTrigger asChild>
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
-                                                            </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                                <Tooltip><TooltipTrigger asChild>
+                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)} title="Telegram e iniciar Timer!"><Send className="w-4 h-4" /></Button>
+                                                                </TooltipTrigger><TooltipContent>Telegram</TooltipContent></Tooltip>
+
+                                                                <Tooltip><TooltipTrigger asChild>
+                                                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
+                                                                </TooltipTrigger><TooltipContent>Copiar</TooltipContent></Tooltip>
+
+                                                                <Tooltip><TooltipTrigger asChild>
+                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                                                                </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 </div>
