@@ -9,8 +9,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  TooltipTrigger } from
+"@/components/ui/tooltip";
 
 interface PowerBILink {
   id: string;
@@ -43,7 +43,7 @@ const Dashboard = () => {
 
       setLinks(() => {
         const combined = [...dbLinks];
-        if (!combined.some(link => link.titulo === "Dashboard Operacional de Comunicação de Dados")) {
+        if (!combined.some((link) => link.titulo === "Dashboard Operacional de Comunicação de Dados")) {
           combined.push({ id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" });
         }
         return combined;
@@ -59,23 +59,23 @@ const Dashboard = () => {
     supabase.from("access_logs").insert({
       user_id: user.id,
       action: "page_view",
-      page: "/dashboard",
-    }).then(() => { });
+      page: "/dashboard"
+    }).then(() => {});
 
     // Update presence
     supabase.from("user_presence").upsert({
       user_id: user.id,
       last_seen_at: new Date().toISOString(),
-      current_page: "/dashboard",
-    }).then(() => { });
+      current_page: "/dashboard"
+    }).then(() => {});
 
     // Heartbeat every 30s
     const interval = setInterval(() => {
       supabase.from("user_presence").upsert({
         user_id: user.id,
         last_seen_at: new Date().toISOString(),
-        current_page: window.location.pathname,
-      }).then(() => { });
+        current_page: window.location.pathname
+      }).then(() => {});
     }, 30000);
 
     return () => clearInterval(interval);
@@ -100,7 +100,7 @@ const Dashboard = () => {
             <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
               <User className="w-4 h-4" />
               <span>{profile?.nome}</span>
-              <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">{profile?.matricula}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary-foreground">{profile?.matricula}</span>
             </div>
             <TooltipProvider>
               <Tooltip>
@@ -130,8 +130,8 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Power BI Section */}
-          {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("powerbi")) && (
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/powerbi")}>
+          {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("powerbi")) &&
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/powerbi")}>
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                   <BarChart3 className="w-6 h-6 text-primary" />
@@ -142,16 +142,16 @@ const Dashboard = () => {
                 <p className="text-muted-foreground text-sm">
                   Acesse os dashboards e relatórios de análise de dados.
                 </p>
-                {links.length > 0 && (
-                  <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
-                )}
+                {links.length > 0 &&
+              <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
+              }
               </CardContent>
             </Card>
-          )}
+          }
 
           {/* Reagenda Section */}
-          {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("reagenda")) && (
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/reagenda")}>
+          {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("reagenda")) &&
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/reagenda")}>
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                   <CalendarDays className="w-6 h-6 text-primary" />
@@ -164,11 +164,11 @@ const Dashboard = () => {
                 </p>
               </CardContent>
             </Card>
-          )}
+          }
 
           {/* Admin Section */}
-          {isAdmin && (
-            <>
+          {isAdmin &&
+          <>
               <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer border-primary/20" onClick={() => navigate("/admin/usuarios")}>
                 <CardHeader className="pb-3">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
@@ -197,11 +197,11 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
             </>
-          )}
+          }
         </div>
       </main>
-    </div>
-  );
+    </div>);
+
 };
 
 export default Dashboard;
