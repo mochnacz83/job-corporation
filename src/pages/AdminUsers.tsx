@@ -116,22 +116,7 @@ const AdminUsers = () => {
       setAdminUserIds(new Set(rolesData.map((r: any) => r.user_id)));
     }
 
-    // Diagnostic: Fetch last 5 registration debug logs
-    try {
-      const { data: debugLogs } = await supabase
-        .from("registration_debug")
-        .select("*")
-        .order("captured_at", { ascending: false })
-        .limit(5);
-
-      if (debugLogs && debugLogs.length > 0) {
-        console.log("=========================================");
-        console.log("[ADMIN DIAGNOSTIC] Recent Registration Debug Logs:", debugLogs);
-        console.log("=========================================");
-      }
-    } catch (e) {
-      // Silent catch, this table might not exist until migration is applied
-    }
+    // Diagnostic logs removed - registration_debug table not in schema
   };
 
   const updateUserStatus = async (userId: string, newStatus: string) => {
