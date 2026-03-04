@@ -175,9 +175,16 @@ const Login = () => {
         telefone: phoneDigits,
         cargo: cargo.trim(),
         area: area.trim(),
+        // Dual keys for extra robustness during transition
+        reg_cargo: cargo.trim(),
+        reg_area: area.trim()
       };
 
-      console.log("[Signup] Enviando metadados:", signupMetadata);
+      console.log("=========================================");
+      console.log("[Signup Diagnostic] Full Metadata:", JSON.stringify(signupMetadata, null, 2));
+      console.log("[Signup Diagnostic] Area Value:", area.trim(), "| Type:", typeof area);
+      console.log("[Signup Diagnostic] Cargo Value:", cargo.trim(), "| Type:", typeof cargo);
+      console.log("=========================================");
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: authEmail,
