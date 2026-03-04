@@ -88,24 +88,30 @@ const Reagenda = () => {
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
 
+        let val = dateValue;
+        // Check if string is a numeric excel serial
+        if (typeof val === 'string' && /^\d{5}$/.test(val)) {
+            val = Number(val);
+        }
+
         // Se já estiver no formato DD/MM/AAAA, retorna
-        if (typeof dateValue === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
-            return dateValue;
+        if (typeof val === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+            return val;
         }
 
         try {
             let date: Date;
-            if (typeof dateValue === 'number') {
+            if (typeof val === 'number') {
                 // Serial do Excel
-                date = new Date((dateValue - 25569) * 86400 * 1000);
+                date = new Date((val - 25569) * 86400 * 1000);
             } else {
-                date = new Date(dateValue);
+                date = new Date(val);
             }
 
             if (!isNaN(date.getTime())) {
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const year = date.getUTCFullYear();
                 return `${day}/${month}/${year}`;
             }
         } catch (e) {
@@ -266,11 +272,12 @@ const Reagenda = () => {
     };
 
     const getMessageTemplate = (item: ReagendaData) => {
+        const dataSafelyFormatted = formatDate(item.dataAgendamento);
         return `Olá, ${item.nome}! Tudo bem?
 
 Aqui é da equipe de agendamento da ${item.operadora}.
 
-Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} para sua internet ${item.operadora}, agendada originalmente para o dia ${item.dataAgendamento}.
+Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} para sua internet ${item.operadora}, agendada originalmente para o dia ${dataSafelyFormatted}.
 
 Estou entrando em contato pois conseguimos uma abertura em nossa agenda e podemos antecipar o seu atendimento! 🚀
 
@@ -549,7 +556,7 @@ Fico no aguardo!`;
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <span className="text-xs font-mono">{item.dataAgendamento}</span>
+                                                        <span className="text-xs font-mono">{formatDate(item.dataAgendamento)}</span>
                                                     </TableCell>
                                                     <TableCell>
                                                         <Select value={item.decisao} onValueChange={(v) => updateField(item.id, "decisao", v)}>
