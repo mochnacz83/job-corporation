@@ -480,7 +480,7 @@ Fico no aguardo!`;
                 const contactedTime = new Date(item.lastContactedAt).getTime();
                 const diffMinutes = (now - contactedTime) / (1000 * 60);
 
-                let newStatus = item.status;
+                let newStatus: ReagendaData["status"] = item.status;
                 if (item.status === "Contatado" && diffMinutes >= 5) {
                     newStatus = "Aguardando retorno";
                     hasChanges = true;
@@ -702,9 +702,10 @@ Fico no aguardo!`;
                                             {[...data].reverse().map((item) => {
                                                 // Determine row background color dynamically based on Status
                                                 let rowColorClass = "";
-                                                if (item.status === "Contatado") rowColorClass = "bg-blue-50/60 dark:bg-blue-900/20";
-                                                else if (item.status === "Aguardando retorno") rowColorClass = "bg-amber-50/60 dark:bg-amber-900/20";
-                                                else if (item.status === "Sem Contato") rowColorClass = "bg-red-50/60 dark:bg-red-900/10 opacity-75";
+                                                if (item.status === "Pendente") rowColorClass = "bg-gray-50/40 dark:bg-gray-900/10";
+                                                else if (item.status === "Contatado") rowColorClass = "bg-emerald-50/60 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500";
+                                                else if (item.status === "Aguardando retorno") rowColorClass = "bg-amber-50/60 dark:bg-amber-900/20 border-l-4 border-l-amber-500";
+                                                else if (item.status === "Sem Contato") rowColorClass = "bg-red-50/60 dark:bg-red-900/10 border-l-4 border-l-red-500 opacity-75";
 
                                                 if (item.selecionado) {
                                                     rowColorClass = "bg-primary/10 border-primary";
@@ -717,14 +718,19 @@ Fico no aguardo!`;
                                                         </TableCell>
                                                         <TableCell>
                                                             <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
-                                                                <SelectTrigger className="h-8 text-[11px] font-bold uppercase">
+                                                                <SelectTrigger className={`h-8 text-[11px] font-bold uppercase border-2 ${
+                                                                    item.status === "Pendente" ? "border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300" :
+                                                                    item.status === "Contatado" ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/40 dark:text-emerald-300" :
+                                                                    item.status === "Aguardando retorno" ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-300" :
+                                                                    item.status === "Sem Contato" ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/40 dark:text-red-300" : ""
+                                                                }`}>
                                                                     <SelectValue />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="Pendente">Pendente</SelectItem>
-                                                                    <SelectItem value="Contatado">Contatado</SelectItem>
-                                                                    <SelectItem value="Aguardando retorno">Aguardando</SelectItem>
-                                                                    <SelectItem value="Sem Contato">Sem Contato</SelectItem>
+                                                                    <SelectItem value="Pendente"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-gray-400"></span>Pendente</span></SelectItem>
+                                                                    <SelectItem value="Contatado"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>Contatado</span></SelectItem>
+                                                                    <SelectItem value="Aguardando retorno"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500"></span>Aguardando</span></SelectItem>
+                                                                    <SelectItem value="Sem Contato"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500"></span>Sem Contato</span></SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         </TableCell>
