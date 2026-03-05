@@ -578,7 +578,7 @@ Fico no aguardo!`;
 
     return (
         <TooltipProvider>
-            <div className="min-h-screen bg-background p-4 relative" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+            <div className="h-screen bg-background p-2 sm:p-4 relative flex flex-col overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                 {showInfo && (
                     <Card
                         className="fixed z-50 w-80 shadow-2xl border-primary/20 glass-card animate-in fade-in zoom-in duration-200"
@@ -619,14 +619,14 @@ Fico no aguardo!`;
                     </Card>
                 )}
 
-                <header className="container mx-auto max-w-7xl mb-6 flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+                <header className="w-full max-w-full mb-2 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 flex-wrap shrink-0 px-1">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="shrink-0">
+                            <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Voltar</span>
                         </Button>
-                        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                            <FileSpreadsheet className="w-6 h-6 text-primary" />
-                            Sistema de Reagendamento
+                        <h1 className="text-base sm:text-xl md:text-2xl font-bold flex items-center gap-2 truncate">
+                            <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+                            <span className="truncate">Reagendamento</span>
                         </h1>
                     </div>
                     <div className="flex gap-2">
@@ -649,7 +649,7 @@ Fico no aguardo!`;
                     </div>
                 </header>
 
-                <main className="container mx-auto max-w-7xl space-y-6">
+                <main className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 px-1">
                     <Card className="glass-card">
                         <CardHeader>
                             <CardTitle className="text-lg">Painel de Importação</CardTitle>
@@ -682,8 +682,8 @@ Fico no aguardo!`;
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="rounded-md border overflow-x-auto">
-                                    <Table>
+                            <div className="rounded-md border overflow-x-auto max-h-[calc(100vh-320px)]">
+                                    <Table className="text-xs sm:text-sm">
                                         <TableHeader className="bg-muted/50">
                                             <TableRow>
                                                 <TableHead className="w-10"></TableHead>
