@@ -140,7 +140,7 @@ const PowerBI = () => {
             </div>
 
             {/* All mounted iframes - persist once opened, show/hide via CSS */}
-            {links.filter(link => mountedIframes.has(link.id)).map(link => (
+            {filteredLinks.filter(link => mountedIframes.has(link.id)).map(link => (
               <div
                 key={link.id}
                 className="absolute inset-0"
