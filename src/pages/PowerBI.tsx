@@ -117,7 +117,7 @@ const PowerBI = () => {
               style={{ display: selectedLinkId ? "none" : "block" }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {links.map((link) => (
+                {filteredLinks.map((link) => (
                   <Card
                     key={link.id}
                     className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all duration-200 group"
