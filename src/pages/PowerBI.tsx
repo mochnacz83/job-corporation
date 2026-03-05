@@ -25,7 +25,10 @@ const PowerBI = () => {
   const [mountedIframes, setMountedIframes] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
+  const hasFetched = useRef(false);
+
   useEffect(() => {
+    if (hasFetched.current) return;
     const fetchLinks = async () => {
       setLoading(true);
       try {
@@ -36,16 +39,8 @@ const PowerBI = () => {
           .order("ordem");
 
         if (error) throw error;
-
-        let filteredLinks = (data || []) as PowerBILink[];
-
-        if (!isAdmin && areaPermissions && !areaPermissions.all_access) {
-          filteredLinks = filteredLinks.filter(link =>
-            areaPermissions.powerbi_report_ids?.includes(link.id)
-          );
-        }
-
-        setLinks(filteredLinks);
+        setLinks((data || []) as PowerBILink[]);
+        hasFetched.current = true;
       } catch (err) {
         console.error("Erro ao carregar relatórios Power BI:", err);
       } finally {
@@ -54,7 +49,12 @@ const PowerBI = () => {
     };
 
     fetchLinks();
-  }, [areaPermissions, isAdmin]);
+  }, []);
+
+  // Filter links based on permissions (runs reactively but doesn't trigger loading)
+  const filteredLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
+    ? links.filter(link => areaPermissions.powerbi_report_ids?.includes(link.id))
+    : links;
 
   const selectLink = (link: PowerBILink) => {
     setSelectedLinkId(link.id);
