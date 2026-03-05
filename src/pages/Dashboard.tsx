@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays } from "lucide-react";
+import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays, ClipboardList } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
