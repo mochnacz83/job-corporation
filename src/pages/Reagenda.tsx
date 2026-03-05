@@ -578,7 +578,7 @@ Fico no aguardo!`;
 
     return (
         <TooltipProvider>
-            <div className="min-h-screen bg-background p-4 relative" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
+            <div className="h-screen bg-background p-2 sm:p-4 relative flex flex-col overflow-hidden" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                 {showInfo && (
                     <Card
                         className="fixed z-50 w-80 shadow-2xl border-primary/20 glass-card animate-in fade-in zoom-in duration-200"
