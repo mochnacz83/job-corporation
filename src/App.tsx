@@ -53,6 +53,7 @@ const persistentPages = [
   { path: "/admin/analytics", element: <ProtectedRoute><AdminAnalytics /></ProtectedRoute> },
   { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
+  { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
