@@ -13,6 +13,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
+import MaterialColeta from "./pages/MaterialColeta";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState, ReactNode } from "react";
 
