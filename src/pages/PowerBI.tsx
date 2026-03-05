@@ -101,7 +101,7 @@ const PowerBI = () => {
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
-        ) : links.length === 0 ? (
+        ) : filteredLinks.length === 0 ? (
           <div className="text-center py-20 px-4">
             <BarChart3 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-1">Nenhum relatório disponível</h3>
