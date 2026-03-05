@@ -25,7 +25,10 @@ const PowerBI = () => {
   const [mountedIframes, setMountedIframes] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
 
+  const hasFetched = useRef(false);
+
   useEffect(() => {
+    if (hasFetched.current) return;
     const fetchLinks = async () => {
       setLoading(true);
       try {
@@ -36,16 +39,8 @@ const PowerBI = () => {
           .order("ordem");
 
         if (error) throw error;
-
-        let filteredLinks = (data || []) as PowerBILink[];
-
-        if (!isAdmin && areaPermissions && !areaPermissions.all_access) {
-          filteredLinks = filteredLinks.filter(link =>
-            areaPermissions.powerbi_report_ids?.includes(link.id)
-          );
-        }
-
-        setLinks(filteredLinks);
+        setLinks((data || []) as PowerBILink[]);
+        hasFetched.current = true;
       } catch (err) {
         console.error("Erro ao carregar relatórios Power BI:", err);
       } finally {
@@ -54,7 +49,12 @@ const PowerBI = () => {
     };
 
     fetchLinks();
-  }, [areaPermissions, isAdmin]);
+  }, []);
+
+  // Filter links based on permissions (runs reactively but doesn't trigger loading)
+  const filteredLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
+    ? links.filter(link => areaPermissions.powerbi_report_ids?.includes(link.id))
+    : links;
 
   const selectLink = (link: PowerBILink) => {
     setSelectedLinkId(link.id);
@@ -66,7 +66,7 @@ const PowerBI = () => {
     });
   };
 
-  const selectedLink = links.find(l => l.id === selectedLinkId) || null;
+  const selectedLink = filteredLinks.find(l => l.id === selectedLinkId) || null;
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
@@ -101,7 +101,7 @@ const PowerBI = () => {
           <div className="flex-1 flex items-center justify-center">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
-        ) : links.length === 0 ? (
+        ) : filteredLinks.length === 0 ? (
           <div className="text-center py-20 px-4">
             <BarChart3 className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-1">Nenhum relatório disponível</h3>
@@ -117,7 +117,7 @@ const PowerBI = () => {
               style={{ display: selectedLinkId ? "none" : "block" }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {links.map((link) => (
+                {filteredLinks.map((link) => (
                   <Card
                     key={link.id}
                     className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all duration-200 group"
@@ -140,7 +140,7 @@ const PowerBI = () => {
             </div>
 
             {/* All mounted iframes - persist once opened, show/hide via CSS */}
-            {links.filter(link => mountedIframes.has(link.id)).map(link => (
+            {filteredLinks.filter(link => mountedIframes.has(link.id)).map(link => (
               <div
                 key={link.id}
                 className="absolute inset-0"
