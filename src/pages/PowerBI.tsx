@@ -66,7 +66,7 @@ const PowerBI = () => {
     });
   };
 
-  const selectedLink = links.find(l => l.id === selectedLinkId) || null;
+  const selectedLink = filteredLinks.find(l => l.id === selectedLinkId) || null;
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
