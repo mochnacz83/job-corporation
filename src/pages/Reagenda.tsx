@@ -649,7 +649,7 @@ Fico no aguardo!`;
                     </div>
                 </header>
 
-                <main className="container mx-auto max-w-7xl space-y-6">
+                <main className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 px-1">
                     <Card className="glass-card">
                         <CardHeader>
                             <CardTitle className="text-lg">Painel de Importação</CardTitle>
