@@ -68,6 +68,107 @@ export type Database = {
         }
         Relationships: []
       }
+      materiais_cadastro: {
+        Row: {
+          codigo: string
+          created_at: string
+          id: string
+          nome_material: string
+          uploaded_by: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          id?: string
+          nome_material: string
+          uploaded_by: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          id?: string
+          nome_material?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      material_coleta_items: {
+        Row: {
+          codigo_material: string
+          coleta_id: string
+          created_at: string
+          id: string
+          nome_material: string
+          quantidade: number
+          serial: string | null
+          unidade: string
+        }
+        Insert: {
+          codigo_material: string
+          coleta_id: string
+          created_at?: string
+          id?: string
+          nome_material: string
+          quantidade?: number
+          serial?: string | null
+          unidade?: string
+        }
+        Update: {
+          codigo_material?: string
+          coleta_id?: string
+          created_at?: string
+          id?: string
+          nome_material?: string
+          quantidade?: number
+          serial?: string | null
+          unidade?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_coleta_items_coleta_id_fkey"
+            columns: ["coleta_id"]
+            isOneToOne: false
+            referencedRelation: "material_coletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_coletas: {
+        Row: {
+          atividade: string
+          ba: string | null
+          circuito: string | null
+          created_at: string
+          id: string
+          nome_tecnico: string
+          tipo_aplicacao: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          atividade: string
+          ba?: string | null
+          circuito?: string | null
+          created_at?: string
+          id?: string
+          nome_tecnico: string
+          tipo_aplicacao: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          atividade?: string
+          ba?: string | null
+          circuito?: string | null
+          created_at?: string
+          id?: string
+          nome_tecnico?: string
+          tipo_aplicacao?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       powerbi_links: {
         Row: {
           ativo: boolean | null
@@ -152,6 +253,42 @@ export type Database = {
           telefone?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      tecnicos_cadastro: {
+        Row: {
+          coordenador: string | null
+          created_at: string
+          id: string
+          nome_empresa: string | null
+          nome_tecnico: string
+          supervisor: string | null
+          tr: string | null
+          tt: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          coordenador?: string | null
+          created_at?: string
+          id?: string
+          nome_empresa?: string | null
+          nome_tecnico: string
+          supervisor?: string | null
+          tr?: string | null
+          tt?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          coordenador?: string | null
+          created_at?: string
+          id?: string
+          nome_empresa?: string | null
+          nome_tecnico?: string
+          supervisor?: string | null
+          tr?: string | null
+          tt?: string | null
+          uploaded_by?: string
         }
         Relationships: []
       }

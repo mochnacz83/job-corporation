@@ -13,6 +13,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
+import MaterialColeta from "./pages/MaterialColeta";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState, ReactNode } from "react";
 
@@ -52,6 +53,7 @@ const persistentPages = [
   { path: "/admin/analytics", element: <ProtectedRoute><AdminAnalytics /></ProtectedRoute> },
   { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
+  { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
