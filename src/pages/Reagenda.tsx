@@ -619,14 +619,14 @@ Fico no aguardo!`;
                     </Card>
                 )}
 
-                <header className="container mx-auto max-w-7xl mb-6 flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-                            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+                <header className="w-full max-w-full mb-2 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 flex-wrap shrink-0 px-1">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="shrink-0">
+                            <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Voltar</span>
                         </Button>
-                        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-                            <FileSpreadsheet className="w-6 h-6 text-primary" />
-                            Sistema de Reagendamento
+                        <h1 className="text-base sm:text-xl md:text-2xl font-bold flex items-center gap-2 truncate">
+                            <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
+                            <span className="truncate">Reagendamento</span>
                         </h1>
                     </div>
                     <div className="flex gap-2">
