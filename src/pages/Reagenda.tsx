@@ -682,8 +682,8 @@ Fico no aguardo!`;
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="rounded-md border overflow-x-auto">
-                                    <Table>
+                            <div className="rounded-md border overflow-x-auto max-h-[calc(100vh-320px)]">
+                                    <Table className="text-xs sm:text-sm">
                                         <TableHeader className="bg-muted/50">
                                             <TableRow>
                                                 <TableHead className="w-10"></TableHead>
