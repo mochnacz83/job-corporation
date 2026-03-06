@@ -577,7 +577,11 @@ const MaterialColeta = () => {
       }
 
       // Reset form
+      setMatriculaTt("");
       setNomeTecnico("");
+      setCidade("");
+      setSiglaCidade("");
+      setUf("");
       setAtividade("");
       setTipoAplicacao("");
       setCircuito("");
