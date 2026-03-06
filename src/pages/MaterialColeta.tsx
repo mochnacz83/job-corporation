@@ -481,7 +481,7 @@ const MaterialColeta = () => {
   // Submit form
   const handleSubmit = async () => {
     if (!user) return;
-    if (!nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao) {
+    if (!matriculaTt || !nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao || !cidade || !siglaCidade || !uf) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
