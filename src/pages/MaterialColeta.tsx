@@ -560,7 +560,11 @@ const MaterialColeta = () => {
       // Generate PDF for Reversa
       if (isReversa) {
         generatePDF({
+          matriculaTt,
           nomeTecnico,
+          cidade,
+          siglaCidade,
+          uf,
           atividade,
           ba,
           circuito,
