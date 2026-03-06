@@ -61,12 +61,25 @@ const MaterialColeta = () => {
   const [activeTab, setActiveTab] = useState("formulario");
 
   // Form state
+  const [matriculaTt, setMatriculaTt] = useState("");
   const [nomeTecnico, setNomeTecnico] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [siglaCidade, setSiglaCidade] = useState("");
+  const [uf, setUf] = useState("");
   const [atividade, setAtividade] = useState("");
   const [tipoAplicacao, setTipoAplicacao] = useState("");
   const [circuito, setCircuito] = useState("");
   const [ba, setBa] = useState("");
   const [dataExecucao, setDataExecucao] = useState(new Date().toISOString().slice(0, 10));
+
+  // Auto-fill técnico from TT
+  const handleMatriculaTtChange = (value: string) => {
+    setMatriculaTt(value);
+    const found = tecnicos.find((t) => t.tt?.toLowerCase() === value.toLowerCase());
+    if (found) {
+      setNomeTecnico(found.nome_tecnico);
+    }
+  };
   const [materiais, setMateriais] = useState<MaterialItem[]>([
     { id: crypto.randomUUID(), codigo_material: "", nome_material: "", quantidade: 1, unidade: "Un", serial: "" },
   ]);
