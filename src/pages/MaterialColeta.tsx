@@ -351,7 +351,9 @@ const MaterialColeta = () => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     const info = [
+      ["Matrícula (TT):", coletaData.matriculaTt || "-"],
       ["Técnico:", coletaData.nomeTecnico],
+      ["Cidade:", coletaData.cidade ? `${coletaData.cidade} (${coletaData.siglaCidade || ""}) - ${coletaData.uf || ""}` : "-"],
       ["Atividade:", coletaData.atividade],
       ["Tipo Aplicação:", "Reversa"],
       ["BA:", coletaData.ba || "-"],
