@@ -622,9 +622,13 @@ const MaterialColeta = () => {
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
     const rows = coletas.flatMap((c) =>
       c.material_coleta_items.map((item) => ({
+        "Matrícula (TT)": c.matricula_tt || "",
         BA: c.ba || "",
         Circuito: c.circuito || "",
         Técnico: c.nome_tecnico,
+        Cidade: c.cidade || "",
+        Sigla: c.sigla_cidade || "",
+        UF: c.uf || "",
         Atividade: c.atividade,
         "Tipo Aplicação": c.tipo_aplicacao,
         "Código Material": item.codigo_material,
