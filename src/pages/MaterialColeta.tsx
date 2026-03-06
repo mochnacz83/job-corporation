@@ -314,7 +314,11 @@ const MaterialColeta = () => {
 
   // Generate PDF for Reversa
   const generatePDF = (coletaData: {
+    matriculaTt: string;
     nomeTecnico: string;
+    cidade: string;
+    siglaCidade: string;
+    uf: string;
     atividade: string;
     ba: string;
     circuito: string;
