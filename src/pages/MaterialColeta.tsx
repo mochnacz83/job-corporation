@@ -524,7 +524,11 @@ const MaterialColeta = () => {
         .from("material_coletas")
         .insert({
           user_id: user.id,
+          matricula_tt: matriculaTt || null,
           nome_tecnico: nomeTecnico,
+          cidade: cidade || null,
+          sigla_cidade: siglaCidade || null,
+          uf: uf || null,
           atividade,
           tipo_aplicacao: tipoAplicacao,
           circuito: circuito || null,
