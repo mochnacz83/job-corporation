@@ -40,6 +40,10 @@ interface MaterialCadastro {
 interface ColetaRecord {
   id: string;
   nome_tecnico: string;
+  matricula_tt: string | null;
+  cidade: string | null;
+  sigla_cidade: string | null;
+  uf: string | null;
   atividade: string;
   tipo_aplicacao: string;
   circuito: string | null;
@@ -57,12 +61,25 @@ const MaterialColeta = () => {
   const [activeTab, setActiveTab] = useState("formulario");
 
   // Form state
+  const [matriculaTt, setMatriculaTt] = useState("");
   const [nomeTecnico, setNomeTecnico] = useState("");
+  const [cidade, setCidade] = useState("");
+  const [siglaCidade, setSiglaCidade] = useState("");
+  const [uf, setUf] = useState("");
   const [atividade, setAtividade] = useState("");
   const [tipoAplicacao, setTipoAplicacao] = useState("");
   const [circuito, setCircuito] = useState("");
   const [ba, setBa] = useState("");
   const [dataExecucao, setDataExecucao] = useState(new Date().toISOString().slice(0, 10));
+
+  // Auto-fill técnico from TT
+  const handleMatriculaTtChange = (value: string) => {
+    setMatriculaTt(value);
+    const found = tecnicos.find((t) => t.tt?.toLowerCase() === value.toLowerCase());
+    if (found) {
+      setNomeTecnico(found.nome_tecnico);
+    }
+  };
   const [materiais, setMateriais] = useState<MaterialItem[]>([
     { id: crypto.randomUUID(), codigo_material: "", nome_material: "", quantidade: 1, unidade: "Un", serial: "" },
   ]);
@@ -297,7 +314,11 @@ const MaterialColeta = () => {
 
   // Generate PDF for Reversa
   const generatePDF = (coletaData: {
+    matriculaTt: string;
     nomeTecnico: string;
+    cidade: string;
+    siglaCidade: string;
+    uf: string;
     atividade: string;
     ba: string;
     circuito: string;
@@ -334,7 +355,9 @@ const MaterialColeta = () => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     const info = [
+      ["Matrícula (TT):", coletaData.matriculaTt || "-"],
       ["Técnico:", coletaData.nomeTecnico],
+      ["Cidade:", coletaData.cidade ? `${coletaData.cidade} (${coletaData.siglaCidade || ""}) - ${coletaData.uf || ""}` : "-"],
       ["Atividade:", coletaData.atividade],
       ["Tipo Aplicação:", "Reversa"],
       ["BA:", coletaData.ba || "-"],
@@ -458,7 +481,7 @@ const MaterialColeta = () => {
   // Submit form
   const handleSubmit = async () => {
     if (!user) return;
-    if (!nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao) {
+    if (!matriculaTt || !nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao || !cidade || !siglaCidade || !uf) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -501,7 +524,11 @@ const MaterialColeta = () => {
         .from("material_coletas")
         .insert({
           user_id: user.id,
+          matricula_tt: matriculaTt || null,
           nome_tecnico: nomeTecnico,
+          cidade: cidade || null,
+          sigla_cidade: siglaCidade || null,
+          uf: uf || null,
           atividade,
           tipo_aplicacao: tipoAplicacao,
           circuito: circuito || null,
@@ -533,7 +560,11 @@ const MaterialColeta = () => {
       // Generate PDF for Reversa
       if (isReversa) {
         generatePDF({
+          matriculaTt,
           nomeTecnico,
+          cidade,
+          siglaCidade,
+          uf,
           atividade,
           ba,
           circuito,
@@ -546,7 +577,11 @@ const MaterialColeta = () => {
       }
 
       // Reset form
+      setMatriculaTt("");
       setNomeTecnico("");
+      setCidade("");
+      setSiglaCidade("");
+      setUf("");
       setAtividade("");
       setTipoAplicacao("");
       setCircuito("");
@@ -568,7 +603,7 @@ const MaterialColeta = () => {
   const handleSearch = async () => {
     setSearching(true);
     try {
-      let query = supabase.from("material_coletas").select("id, nome_tecnico, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
+      let query = supabase.from("material_coletas").select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
       if (searchBa) query = query.ilike("ba", `%${searchBa}%`);
       if (searchCircuito) query = query.ilike("circuito", `%${searchCircuito}%`);
       if (searchTecnico) query = query.ilike("nome_tecnico", `%${searchTecnico}%`);
@@ -587,9 +622,13 @@ const MaterialColeta = () => {
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
     const rows = coletas.flatMap((c) =>
       c.material_coleta_items.map((item) => ({
+        "Matrícula (TT)": c.matricula_tt || "",
         BA: c.ba || "",
         Circuito: c.circuito || "",
         Técnico: c.nome_tecnico,
+        Cidade: c.cidade || "",
+        Sigla: c.sigla_cidade || "",
+        UF: c.uf || "",
         Atividade: c.atividade,
         "Tipo Aplicação": c.tipo_aplicacao,
         "Código Material": item.codigo_material,
@@ -636,23 +675,57 @@ const MaterialColeta = () => {
                 <CardTitle className="text-base">Dados da Coleta</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Row 1: Técnico + Atividade */}
+                {/* Row 0: Matrícula (TT) + Nome do Técnico */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>Nome do Técnico *</Label>
-                    <Select value={nomeTecnico} onValueChange={setNomeTecnico}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o técnico" /></SelectTrigger>
-                      <SelectContent>
-                        {tecnicos.map((t, i) => (
-                          <SelectItem key={i} value={t.nome_tecnico}>{t.nome_tecnico}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {nomeTecnico === "" && tecnicos.length === 0 && (
+                    <Label>Matrícula (TT) *</Label>
+                    <Input
+                      value={matriculaTt}
+                      onChange={(e) => handleMatriculaTtChange(e.target.value)}
+                      placeholder="Ex: TT12345"
+                      list="tt-list"
+                    />
+                    <datalist id="tt-list">
+                      {tecnicos.filter((t) => t.tt).map((t, i) => (
+                        <option key={i} value={t.tt}>{t.nome_tecnico}</option>
+                      ))}
+                    </datalist>
+                    {tecnicos.length === 0 && (
                       <p className="text-xs text-muted-foreground">Importe a planilha de técnicos na aba "Cadastros"</p>
                     )}
                   </div>
 
+                  <div className="space-y-1.5">
+                    <Label>Nome do Técnico *</Label>
+                    <Input value={nomeTecnico} onChange={(e) => setNomeTecnico(e.target.value)} placeholder="Preenchido automaticamente pela TT" />
+                  </div>
+                </div>
+
+                {/* Row 1: Cidade + Sigla + UF */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Cidade *</Label>
+                    <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Nome da cidade" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Sigla da Cidade *</Label>
+                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(e.target.value.toUpperCase().slice(0, 4))} placeholder="Máx 4 caracteres" maxLength={4} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>UF *</Label>
+                    <Select value={uf} onValueChange={setUf}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row 2: Atividade + Tipo Aplicação */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>Atividade *</Label>
                     <Select value={atividade} onValueChange={setAtividade}>
@@ -662,6 +735,17 @@ const MaterialColeta = () => {
                         <SelectItem value="Retirada">Retirada</SelectItem>
                         <SelectItem value="Reparo">Reparo</SelectItem>
                         <SelectItem value="Preventiva">Preventiva</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo Aplicação *</Label>
+                    <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Baixa">Baixa</SelectItem>
+                        <SelectItem value="Reversa">Reversa</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
