@@ -139,13 +139,17 @@ export type Database = {
           assinatura_colaborador: string | null
           atividade: string
           ba: string | null
+          cidade: string | null
           circuito: string | null
           created_at: string
           data_execucao: string
           foto_url: string | null
           id: string
+          matricula_tt: string | null
           nome_tecnico: string
+          sigla_cidade: string | null
           tipo_aplicacao: string
+          uf: string | null
           updated_at: string
           user_id: string
         }
@@ -154,13 +158,17 @@ export type Database = {
           assinatura_colaborador?: string | null
           atividade: string
           ba?: string | null
+          cidade?: string | null
           circuito?: string | null
           created_at?: string
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          matricula_tt?: string | null
           nome_tecnico: string
+          sigla_cidade?: string | null
           tipo_aplicacao: string
+          uf?: string | null
           updated_at?: string
           user_id: string
         }
@@ -169,13 +177,17 @@ export type Database = {
           assinatura_colaborador?: string | null
           atividade?: string
           ba?: string | null
+          cidade?: string | null
           circuito?: string | null
           created_at?: string
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          matricula_tt?: string | null
           nome_tecnico?: string
+          sigla_cidade?: string | null
           tipo_aplicacao?: string
+          uf?: string | null
           updated_at?: string
           user_id?: string
         }
