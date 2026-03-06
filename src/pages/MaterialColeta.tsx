@@ -603,7 +603,7 @@ const MaterialColeta = () => {
   const handleSearch = async () => {
     setSearching(true);
     try {
-      let query = supabase.from("material_coletas").select("id, nome_tecnico, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
+      let query = supabase.from("material_coletas").select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
       if (searchBa) query = query.ilike("ba", `%${searchBa}%`);
       if (searchCircuito) query = query.ilike("circuito", `%${searchCircuito}%`);
       if (searchTecnico) query = query.ilike("nome_tecnico", `%${searchTecnico}%`);
