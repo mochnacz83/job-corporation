@@ -135,10 +135,14 @@ export type Database = {
       }
       material_coletas: {
         Row: {
+          assinatura_almoxarifado: string | null
+          assinatura_colaborador: string | null
           atividade: string
           ba: string | null
           circuito: string | null
           created_at: string
+          data_execucao: string
+          foto_url: string | null
           id: string
           nome_tecnico: string
           tipo_aplicacao: string
@@ -146,10 +150,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assinatura_almoxarifado?: string | null
+          assinatura_colaborador?: string | null
           atividade: string
           ba?: string | null
           circuito?: string | null
           created_at?: string
+          data_execucao?: string
+          foto_url?: string | null
           id?: string
           nome_tecnico: string
           tipo_aplicacao: string
@@ -157,10 +165,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assinatura_almoxarifado?: string | null
+          assinatura_colaborador?: string | null
           atividade?: string
           ba?: string | null
           circuito?: string | null
           created_at?: string
+          data_execucao?: string
+          foto_url?: string | null
           id?: string
           nome_tecnico?: string
           tipo_aplicacao?: string
