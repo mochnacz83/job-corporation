@@ -40,6 +40,10 @@ interface MaterialCadastro {
 interface ColetaRecord {
   id: string;
   nome_tecnico: string;
+  matricula_tt: string | null;
+  cidade: string | null;
+  sigla_cidade: string | null;
+  uf: string | null;
   atividade: string;
   tipo_aplicacao: string;
   circuito: string | null;
