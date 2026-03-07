@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Plus, Trash2, Camera, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -21,6 +23,8 @@ interface MaterialItem {
   quantidade: number;
   unidade: string;
   serial: string;
+  seriais: string[];
+  askSeriais: boolean;
 }
 
 interface Tecnico {
@@ -30,6 +34,8 @@ interface Tecnico {
   nome_tecnico: string;
   supervisor: string;
   coordenador: string;
+  telefone: string;
+  cidade_residencia: string;
 }
 
 interface MaterialCadastro {
@@ -55,14 +61,30 @@ interface ColetaRecord {
 
 const FRASE_REVERSA = "Declaro que os materiais apresentados neste documento foram devidamente retirados no local da atividade e separados para devolução, conforme registro realizado nesta data. A imagem anexada comprova visualmente os itens coletados, estando todos visíveis para conferência. O colaborador responsável confirma a veracidade das informações registradas e a correta separação dos materiais para encaminhamento ao Almoxarifado/Logística da Ability Tecnologia, ficando sujeitos à validação e conferência no ato da entrega.";
 
+const UF_LIST = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
+const toUpper = (v: string) => v.toUpperCase();
+
+const newMaterial = (): MaterialItem => ({
+  id: crypto.randomUUID(),
+  codigo_material: "",
+  nome_material: "",
+  quantidade: 1,
+  unidade: "Un",
+  serial: "",
+  seriais: [],
+  askSeriais: false,
+});
+
 const MaterialColeta = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("formulario");
 
   // Form state
   const [matriculaTt, setMatriculaTt] = useState("");
   const [nomeTecnico, setNomeTecnico] = useState("");
+  const [telefoneTecnico, setTelefoneTecnico] = useState("");
   const [cidade, setCidade] = useState("");
   const [siglaCidade, setSiglaCidade] = useState("");
   const [uf, setUf] = useState("");
@@ -71,23 +93,12 @@ const MaterialColeta = () => {
   const [circuito, setCircuito] = useState("");
   const [ba, setBa] = useState("");
   const [dataExecucao, setDataExecucao] = useState(new Date().toISOString().slice(0, 10));
+  const [ttError, setTtError] = useState("");
 
-  // Auto-fill técnico from TT
-  const handleMatriculaTtChange = (value: string) => {
-    setMatriculaTt(value);
-    const found = tecnicos.find((t) => t.tt?.toLowerCase() === value.toLowerCase());
-    if (found) {
-      setNomeTecnico(found.nome_tecnico);
-    }
-  };
-  const [materiais, setMateriais] = useState<MaterialItem[]>([
-    { id: crypto.randomUUID(), codigo_material: "", nome_material: "", quantidade: 1, unidade: "Un", serial: "" },
-  ]);
+  const [materiais, setMateriais] = useState<MaterialItem[]>([newMaterial()]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Reversa-specific state
-  const [assinaturaColaborador, setAssinaturaColaborador] = useState("");
-  const [assinaturaAlmoxarifado, setAssinaturaAlmoxarifado] = useState("");
+  // Reversa state
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const sigColabCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -105,22 +116,39 @@ const MaterialColeta = () => {
   const [searchTecnico, setSearchTecnico] = useState("");
   const [coletas, setColetas] = useState<ColetaRecord[]>([]);
   const [searching, setSearching] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
 
-  // Camera ref
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [cameraActive, setCameraActive] = useState<string | null>(null);
-
-  const isReversa = tipoAplicacao === "Reversa";
+  const isReversa = tipoAplicacao === "REVERSA";
 
   // Load catalogs
   useEffect(() => {
-    supabase.from("tecnicos_cadastro").select("tr, tt, nome_empresa, nome_tecnico, supervisor, coordenador").then(({ data }) => {
-      if (data) setTecnicos(data as Tecnico[]);
+    supabase.from("tecnicos_cadastro").select("tr, tt, nome_empresa, nome_tecnico, supervisor, coordenador, telefone, cidade_residencia").then(({ data }) => {
+      if (data) setTecnicos(data.map((t: any) => ({ ...t, telefone: t.telefone || "", cidade_residencia: t.cidade_residencia || "" })));
     });
     supabase.from("materiais_cadastro").select("codigo, nome_material").then(({ data }) => {
       if (data) setMateriaisCadastro(data as MaterialCadastro[]);
     });
   }, []);
+
+  // Auto-fill técnico from TT
+  const handleMatriculaTtChange = (value: string) => {
+    const upper = toUpper(value);
+    setMatriculaTt(upper);
+    setTtError("");
+    if (upper.length >= 3) {
+      const found = tecnicos.find((t) => t.tt?.toUpperCase() === upper);
+      if (found) {
+        setNomeTecnico(found.nome_tecnico.toUpperCase());
+        setTelefoneTecnico(found.telefone || "");
+        if (found.cidade_residencia) setCidade(found.cidade_residencia.toUpperCase());
+      } else {
+        setTtError("TT informado não localizado no cadastro.");
+        setNomeTecnico("");
+        setTelefoneTecnico("");
+      }
+    }
+  };
 
   // Signature canvas helpers
   const getCanvasPos = (canvas: HTMLCanvasElement, e: React.TouchEvent | React.MouseEvent) => {
@@ -169,9 +197,7 @@ const MaterialColeta = () => {
     ctx.stroke();
   };
 
-  const endDraw = (setDrawing: (v: boolean) => void) => {
-    setDrawing(false);
-  };
+  const endDraw = (setDrawing: (v: boolean) => void) => setDrawing(false);
 
   const clearCanvas = (canvas: HTMLCanvasElement | null) => {
     if (!canvas) return;
@@ -211,6 +237,8 @@ const MaterialColeta = () => {
         nome_tecnico: String(r["Nome Técnico"] || r["Nome Tecnico"] || r.nome_tecnico || ""),
         supervisor: String(r.Supervisor || r.supervisor || ""),
         coordenador: String(r.Coordenador || r.coordenador || ""),
+        telefone: String(r.Telefone || r.telefone || r.Celular || r.celular || ""),
+        cidade_residencia: String(r.Cidade || r.cidade || r["Cidade Residência"] || r.cidade_residencia || ""),
         uploaded_by: user.id,
       }));
       const { error } = await supabase.from("tecnicos_cadastro").insert(mapped as any);
@@ -249,7 +277,7 @@ const MaterialColeta = () => {
 
   // Download template spreadsheets
   const downloadTemplateTecnicos = () => {
-    const ws = XLSX.utils.aoa_to_sheet([["TR", "TT", "Nome Empresa", "Nome Técnico", "Supervisor", "Coordenador"]]);
+    const ws = XLSX.utils.aoa_to_sheet([["TR", "TT", "Nome Empresa", "Nome Técnico", "Supervisor", "Coordenador", "Telefone", "Cidade"]]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Técnicos");
     XLSX.writeFile(wb, "planilha_modelo_tecnicos.xlsx");
@@ -262,60 +290,81 @@ const MaterialColeta = () => {
     XLSX.writeFile(wb, "planilha_modelo_materiais.xlsx");
   };
 
-  // Auto-fill material name from code
+  // Auto-fill material name from code with validation
   const handleCodigoChange = (id: string, codigo: string) => {
+    const upper = toUpper(codigo);
     setMateriais((prev) =>
       prev.map((m) => {
         if (m.id !== id) return m;
-        const found = materiaisCadastro.find((mc) => mc.codigo === codigo);
-        return { ...m, codigo_material: codigo, nome_material: found?.nome_material || m.nome_material };
+        const found = materiaisCadastro.find((mc) => mc.codigo.toUpperCase() === upper);
+        return { ...m, codigo_material: upper, nome_material: found ? found.nome_material.toUpperCase() : "" };
       })
     );
   };
 
-  const updateMaterial = (id: string, field: keyof MaterialItem, value: string | number) => {
+  const getMaterialError = (mat: MaterialItem): string => {
+    if (!mat.codigo_material) return "";
+    const found = materiaisCadastro.find((mc) => mc.codigo.toUpperCase() === mat.codigo_material.toUpperCase());
+    if (!found) return "Código de equipamento não localizado no cadastro.";
+    return "";
+  };
+
+  const updateMaterial = (id: string, field: keyof MaterialItem, value: any) => {
     setMateriais((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
-  const addMaterial = () => {
-    setMateriais((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), codigo_material: "", nome_material: "", quantidade: 1, unidade: "Un", serial: "" },
-    ]);
+  const handleQuantidadeChange = (id: string, qty: number) => {
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        if (qty > 1 && !m.askSeriais) {
+          return { ...m, quantidade: qty, askSeriais: true, seriais: Array(qty).fill("") };
+        }
+        if (qty <= 1) {
+          return { ...m, quantidade: qty, askSeriais: false, seriais: [] };
+        }
+        // qty changed but already asked
+        const newSeriais = Array(qty).fill("").map((_, i) => m.seriais[i] || "");
+        return { ...m, quantidade: qty, seriais: newSeriais };
+      })
+    );
   };
+
+  const handleAskSeriaisResponse = (id: string, yes: boolean) => {
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        if (yes) {
+          return { ...m, askSeriais: false, seriais: Array(m.quantidade).fill("") };
+        }
+        return { ...m, askSeriais: false, seriais: [] };
+      })
+    );
+  };
+
+  const updateSerial = (matId: string, index: number, value: string) => {
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== matId) return m;
+        const newSeriais = [...m.seriais];
+        newSeriais[index] = toUpper(value);
+        return { ...m, seriais: newSeriais };
+      })
+    );
+  };
+
+  const addMaterial = () => setMateriais((prev) => [...prev, newMaterial()]);
 
   const removeMaterial = (id: string) => {
     if (materiais.length <= 1) return;
     setMateriais((prev) => prev.filter((m) => m.id !== id));
   };
 
-  // Camera for serial barcode
-  const startCamera = async (materialId: string) => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setCameraActive(materialId);
-      toast.info("Câmera aberta. Se não conseguir ler, digite o serial manualmente.");
-    } catch {
-      toast.error("Não foi possível acessar a câmera. Digite o serial manualmente.");
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraActive(null);
-  };
-
-  // Generate PDF for Reversa
+  // Generate PDF for Reversa - fit in 1 A4 page
   const generatePDF = (coletaData: {
     matriculaTt: string;
     nomeTecnico: string;
+    telefoneTecnico: string;
     cidade: string;
     siglaCidade: string;
     uf: string;
@@ -330,150 +379,170 @@ const MaterialColeta = () => {
   }) => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageW = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    let y = 15;
+    const margin = 10;
+    let y = 8;
 
     // Logo
     try {
       const logoImg = new Image();
       logoImg.src = "/ability-logo.png";
-      doc.addImage(logoImg, "PNG", margin, y, 25, 12);
+      doc.addImage(logoImg, "PNG", margin, y, 20, 10);
     } catch {}
 
     // Header
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Material de Reversa", pageW / 2, y + 8, { align: "center" });
-
-    y += 20;
-    doc.setDrawColor(0, 90, 160);
-    doc.setLineWidth(0.5);
-    doc.line(margin, y, pageW - margin, y);
-    y += 8;
-
-    // Info
-    doc.setFontSize(10);
+    doc.text("MATERIAL DE REVERSA", pageW / 2, y + 7, { align: "center" });
+    doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
-    const info = [
-      ["Matrícula (TT):", coletaData.matriculaTt || "-"],
-      ["Técnico:", coletaData.nomeTecnico],
-      ["Cidade:", coletaData.cidade ? `${coletaData.cidade} (${coletaData.siglaCidade || ""}) - ${coletaData.uf || ""}` : "-"],
-      ["Atividade:", coletaData.atividade],
-      ["Tipo Aplicação:", "Reversa"],
-      ["BA:", coletaData.ba || "-"],
-      ["Circuito:", coletaData.circuito || "-"],
-      ["Data Execução:", coletaData.dataExecucao ? new Date(coletaData.dataExecucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"],
-    ];
-    info.forEach(([label, value]) => {
-      doc.setFont("helvetica", "bold");
-      doc.text(label, margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(value, margin + 35, y);
-      y += 6;
-    });
+    doc.text(`Data: ${coletaData.dataExecucao ? new Date(coletaData.dataExecucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}`, pageW - margin, y + 4, { align: "right" });
 
+    y += 14;
+    doc.setDrawColor(0, 90, 160);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageW - margin, y);
     y += 4;
 
-    // Materials table header
+    // Info in 2 columns
+    doc.setFontSize(8);
+    const leftCol = margin;
+    const rightCol = pageW / 2 + 5;
+    const infoLeft = [
+      ["Matrícula (TT):", coletaData.matriculaTt || "-"],
+      ["Técnico:", coletaData.nomeTecnico],
+      ["Telefone:", coletaData.telefoneTecnico || "-"],
+      ["Cidade:", coletaData.cidade ? `${coletaData.cidade} (${coletaData.siglaCidade || ""}) - ${coletaData.uf || ""}` : "-"],
+    ];
+    const infoRight = [
+      ["Atividade:", coletaData.atividade],
+      ["Tipo Aplicação:", "REVERSA"],
+      ["BA:", coletaData.ba || "-"],
+      ["Circuito:", coletaData.circuito || "-"],
+    ];
+    let infoY = y;
+    infoLeft.forEach(([label, value]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, leftCol, infoY);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, leftCol + 28, infoY);
+      infoY += 4;
+    });
+    infoY = y;
+    infoRight.forEach(([label, value]) => {
+      doc.setFont("helvetica", "bold");
+      doc.text(label, rightCol, infoY);
+      doc.setFont("helvetica", "normal");
+      doc.text(value, rightCol + 28, infoY);
+      infoY += 4;
+    });
+    y += 18;
+
+    // Materials table
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
     doc.setFillColor(0, 90, 160);
     doc.setTextColor(255, 255, 255);
-    doc.rect(margin, y, pageW - 2 * margin, 7, "F");
-    const cols = [margin + 2, margin + 28, margin + 85, margin + 105, margin + 125, margin + 145];
-    doc.text("Código", cols[0], y + 5);
-    doc.text("Nome Material", cols[1], y + 5);
-    doc.text("Qtde", cols[2], y + 5);
-    doc.text("Un/Metro", cols[3], y + 5);
-    doc.text("Serial", cols[4], y + 5);
-    y += 7;
+    doc.rect(margin, y, pageW - 2 * margin, 5, "F");
+    const cols = [margin + 1, margin + 22, margin + 75, margin + 90, margin + 108, margin + 128];
+    doc.text("CÓDIGO", cols[0], y + 3.5);
+    doc.text("NOME MATERIAL", cols[1], y + 3.5);
+    doc.text("QTDE", cols[2], y + 3.5);
+    doc.text("UN/METRO", cols[3], y + 3.5);
+    doc.text("SERIAL", cols[4], y + 3.5);
+    y += 5;
 
     doc.setTextColor(0, 0, 0);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    coletaData.materiais.forEach((m, i) => {
-      if (y > 260) {
-        doc.addPage();
-        y = 15;
+    doc.setFontSize(6.5);
+
+    // Flatten materials with seriais
+    const flatItems: { codigo: string; nome: string; qtde: string; un: string; serial: string }[] = [];
+    coletaData.materiais.forEach((m) => {
+      if (m.seriais.length > 0) {
+        m.seriais.forEach((s, i) => {
+          flatItems.push({
+            codigo: i === 0 ? m.codigo_material : "",
+            nome: i === 0 ? m.nome_material : "",
+            qtde: i === 0 ? String(m.quantidade) : "",
+            un: i === 0 ? m.unidade : "",
+            serial: s || "-",
+          });
+        });
+      } else {
+        flatItems.push({
+          codigo: m.codigo_material,
+          nome: m.nome_material,
+          qtde: String(m.quantidade),
+          un: m.unidade,
+          serial: m.serial || "-",
+        });
       }
-      const bg = i % 2 === 0 ? 245 : 255;
-      doc.setFillColor(bg, bg, bg);
-      doc.rect(margin, y, pageW - 2 * margin, 6, "F");
-      doc.text(m.codigo_material, cols[0], y + 4);
-      doc.text(m.nome_material.substring(0, 30), cols[1], y + 4);
-      doc.text(String(m.quantidade), cols[2], y + 4);
-      doc.text(m.unidade, cols[3], y + 4);
-      doc.text(m.serial || "-", cols[4], y + 4);
-      y += 6;
     });
 
-    y += 8;
+    flatItems.forEach((item, i) => {
+      const bg = i % 2 === 0 ? 245 : 255;
+      doc.setFillColor(bg, bg, bg);
+      doc.rect(margin, y, pageW - 2 * margin, 4, "F");
+      doc.text(item.codigo, cols[0], y + 3);
+      doc.text(item.nome.substring(0, 28), cols[1], y + 3);
+      doc.text(item.qtde, cols[2], y + 3);
+      doc.text(item.un, cols[3], y + 3);
+      doc.text(item.serial.substring(0, 20), cols[4], y + 3);
+      y += 4;
+    });
+
+    y += 3;
 
     // Frase padrão
-    if (y > 200) { doc.addPage(); y = 15; }
-    doc.setFontSize(9);
+    doc.setFontSize(6);
     doc.setFont("helvetica", "italic");
     const splitText = doc.splitTextToSize(FRASE_REVERSA, pageW - 2 * margin);
     doc.text(splitText, margin, y);
-    y += splitText.length * 4 + 8;
+    y += splitText.length * 2.5 + 3;
 
-    // Photo
+    // Photo + Signatures side by side
+    const sigStartY = y;
+    const photoW = 45;
+    const photoH = 35;
+
     if (coletaData.fotoDataUrl) {
-      if (y > 180) { doc.addPage(); y = 15; }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.text("Registro Fotográfico dos Materiais:", margin, y);
-      y += 5;
       try {
-        doc.addImage(coletaData.fotoDataUrl, "JPEG", margin, y, 80, 60);
-        y += 65;
+        doc.addImage(coletaData.fotoDataUrl, "JPEG", margin, y, photoW, photoH);
       } catch {}
     }
 
-    // Signatures
-    if (y > 230) { doc.addPage(); y = 15; }
-    y += 5;
+    // Signatures on the right side
+    const sigX = margin + photoW + 10;
+    const sigW = 45;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
+    doc.setFontSize(7);
 
-    // Colaborador signature
     if (coletaData.assinaturaColaborador) {
-      doc.text("Assinatura do Colaborador:", margin, y);
-      y += 3;
+      doc.text("Assinatura Colaborador:", sigX, y + 2);
       try {
-        doc.addImage(coletaData.assinaturaColaborador, "PNG", margin, y, 60, 20);
+        doc.addImage(coletaData.assinaturaColaborador, "PNG", sigX, y + 3, sigW, 14);
       } catch {}
-      y += 22;
-      doc.line(margin, y, margin + 60, y);
-      y += 4;
-      doc.setFontSize(8);
-      doc.text(coletaData.nomeTecnico, margin, y);
-      y += 10;
+      doc.line(sigX, y + 18, sigX + sigW, y + 18);
+      doc.setFontSize(6);
+      doc.text(coletaData.nomeTecnico, sigX, y + 21);
     }
 
-    // Almox signature
     if (coletaData.assinaturaAlmoxarifado) {
-      doc.setFontSize(10);
-      doc.text("Assinatura Almoxarifado/Logística:", margin, y);
-      y += 3;
+      const almoxY = y + 24;
+      doc.setFontSize(7);
+      doc.text("Assinatura Almox/Logística:", sigX, almoxY);
       try {
-        doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", margin, y, 60, 20);
+        doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", sigX, almoxY + 1, sigW, 14);
       } catch {}
-      y += 22;
-      doc.line(margin, y, margin + 60, y);
-      y += 4;
-      doc.setFontSize(8);
-      doc.text("Almoxarifado/Logística", margin, y);
+      doc.line(sigX, almoxY + 16, sigX + sigW, almoxY + 16);
+      doc.setFontSize(6);
+      doc.text("Almoxarifado/Logística", sigX, almoxY + 19);
     }
 
     // Footer
-    const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i);
-      doc.setFontSize(7);
-      doc.setTextColor(150, 150, 150);
-      doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
-      doc.text(`Página ${i} de ${totalPages}`, pageW - margin, 290, { align: "right" });
-    }
+    doc.setFontSize(6);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
 
     doc.save(`material_reversa_${coletaData.ba || "sem_ba"}_${new Date().toISOString().slice(0, 10)}.pdf`);
   };
@@ -481,13 +550,44 @@ const MaterialColeta = () => {
   // Submit form
   const handleSubmit = async () => {
     if (!user) return;
+
+    // Validate required fields
     if (!matriculaTt || !nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao || !cidade || !siglaCidade || !uf) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    if (materiais.some((m) => !m.codigo_material || !m.nome_material)) {
-      toast.error("Preencha código e nome de todos os materiais");
+
+    // Validate TT exists
+    if (ttError) {
+      toast.error("TT informado não localizado no cadastro.");
       return;
+    }
+    const ttExists = tecnicos.find((t) => t.tt?.toUpperCase() === matriculaTt.toUpperCase());
+    if (!ttExists) {
+      toast.error("TT informado não localizado no cadastro.");
+      return;
+    }
+
+    // Validate materials
+    for (const m of materiais) {
+      if (!m.codigo_material || !m.nome_material) {
+        toast.error("Preencha código e nome de todos os materiais");
+        return;
+      }
+      const matExists = materiaisCadastro.find((mc) => mc.codigo.toUpperCase() === m.codigo_material.toUpperCase());
+      if (!matExists) {
+        toast.error(`Código de equipamento "${m.codigo_material}" não localizado no cadastro.`);
+        return;
+      }
+      // Validate seriais
+      if (m.seriais.length > 0) {
+        for (let i = 0; i < m.seriais.length; i++) {
+          if (!m.seriais[i]) {
+            toast.error(`Informe o serial ${i + 1} do material ${m.codigo_material}`);
+            return;
+          }
+        }
+      }
     }
 
     if (isReversa) {
@@ -507,7 +607,6 @@ const MaterialColeta = () => {
       let fotoUrl: string | null = null;
       let fotoDataUrl: string | null = fotoPreview;
 
-      // Upload photo if reversa
       if (isReversa && fotoFile) {
         const ext = fotoFile.name.split(".").pop();
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
@@ -543,25 +642,42 @@ const MaterialColeta = () => {
 
       if (coletaError) throw coletaError;
 
-      const items = materiais.map((m) => ({
-        coleta_id: (coleta as any).id,
-        codigo_material: m.codigo_material,
-        nome_material: m.nome_material,
-        quantidade: m.quantidade,
-        unidade: m.unidade,
-        serial: m.serial || null,
-      }));
+      // Flatten seriais into individual items
+      const items: any[] = [];
+      materiais.forEach((m) => {
+        if (m.seriais.length > 0) {
+          m.seriais.forEach((s) => {
+            items.push({
+              coleta_id: (coleta as any).id,
+              codigo_material: m.codigo_material,
+              nome_material: m.nome_material,
+              quantidade: 1,
+              unidade: m.unidade,
+              serial: s || null,
+            });
+          });
+        } else {
+          items.push({
+            coleta_id: (coleta as any).id,
+            codigo_material: m.codigo_material,
+            nome_material: m.nome_material,
+            quantidade: m.quantidade,
+            unidade: m.unidade,
+            serial: m.serial || null,
+          });
+        }
+      });
 
       const { error: itemsError } = await supabase.from("material_coleta_items").insert(items as any);
       if (itemsError) throw itemsError;
 
-      toast.success("Coleta registrada com sucesso!");
+      toast.success("Salvo com sucesso!");
 
-      // Generate PDF for Reversa
       if (isReversa) {
         generatePDF({
           matriculaTt,
           nomeTecnico,
+          telefoneTecnico,
           cidade,
           siglaCidade,
           uf,
@@ -579,6 +695,7 @@ const MaterialColeta = () => {
       // Reset form
       setMatriculaTt("");
       setNomeTecnico("");
+      setTelefoneTecnico("");
       setCidade("");
       setSiglaCidade("");
       setUf("");
@@ -587,9 +704,10 @@ const MaterialColeta = () => {
       setCircuito("");
       setBa("");
       setDataExecucao(new Date().toISOString().slice(0, 10));
-      setMateriais([{ id: crypto.randomUUID(), codigo_material: "", nome_material: "", quantidade: 1, unidade: "Un", serial: "" }]);
+      setMateriais([newMaterial()]);
       setFotoFile(null);
       setFotoPreview(null);
+      setTtError("");
       clearCanvas(sigColabCanvasRef.current);
       clearCanvas(sigAlmoxCanvasRef.current);
     } catch (err: any) {
@@ -617,33 +735,53 @@ const MaterialColeta = () => {
     }
   };
 
-  // Export
-  const handleExport = () => {
+  // Delete
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await supabase.from("material_coleta_items").delete().eq("coleta_id", deleteId);
+      await supabase.from("material_coletas").delete().eq("id", deleteId);
+      setColetas((prev) => prev.filter((c) => c.id !== deleteId));
+      toast.success("Registro excluído");
+    } catch (err: any) {
+      toast.error("Erro ao excluir: " + err.message);
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  // Export Excel
+  const handleExport = (format: "xlsx" | "csv") => {
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
     const rows = coletas.flatMap((c) =>
       c.material_coleta_items.map((item) => ({
-        "Matrícula (TT)": c.matricula_tt || "",
+        "MATRÍCULA (TT)": c.matricula_tt || "",
         BA: c.ba || "",
-        Circuito: c.circuito || "",
-        Técnico: c.nome_tecnico,
-        Cidade: c.cidade || "",
-        Sigla: c.sigla_cidade || "",
+        CIRCUITO: c.circuito || "",
+        TÉCNICO: c.nome_tecnico,
+        CIDADE: c.cidade || "",
+        SIGLA: c.sigla_cidade || "",
         UF: c.uf || "",
-        Atividade: c.atividade,
-        "Tipo Aplicação": c.tipo_aplicacao,
-        "Código Material": item.codigo_material,
-        "Nome Material": item.nome_material,
-        Quantidade: item.quantidade,
-        Unidade: item.unidade,
-        Serial: item.serial || "",
-        "Data Execução": c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "",
-        "Data Registro": new Date(c.created_at).toLocaleDateString("pt-BR"),
+        ATIVIDADE: c.atividade,
+        "TIPO APLICAÇÃO": c.tipo_aplicacao,
+        "CÓDIGO MATERIAL": item.codigo_material,
+        "NOME MATERIAL": item.nome_material,
+        QUANTIDADE: item.quantidade,
+        UNIDADE: item.unidade,
+        SERIAL: item.serial || "",
+        "DATA EXECUÇÃO": c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "",
+        "DATA REGISTRO": new Date(c.created_at).toLocaleDateString("pt-BR"),
       }))
     );
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Coletas");
-    XLSX.writeFile(wb, `coleta_materiais_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const filename = `coleta_materiais_${new Date().toISOString().slice(0, 10)}`;
+    if (format === "csv") {
+      XLSX.writeFile(wb, `${filename}.csv`, { bookType: "csv" });
+    } else {
+      XLSX.writeFile(wb, `${filename}.xlsx`);
+    }
   };
 
   return (
@@ -675,48 +813,53 @@ const MaterialColeta = () => {
                 <CardTitle className="text-base">Dados da Coleta</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Row 0: Matrícula (TT) + Nome do Técnico */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Row: Matrícula + Nome + Telefone */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Matrícula (TT) *</Label>
                     <Input
                       value={matriculaTt}
                       onChange={(e) => handleMatriculaTtChange(e.target.value)}
-                      placeholder="Ex: TT12345"
+                      placeholder="EX: TT12345"
                       list="tt-list"
+                      className="uppercase"
                     />
                     <datalist id="tt-list">
                       {tecnicos.filter((t) => t.tt).map((t, i) => (
                         <option key={i} value={t.tt}>{t.nome_tecnico}</option>
                       ))}
                     </datalist>
+                    {ttError && <p className="text-xs text-destructive font-medium">{ttError}</p>}
                     {tecnicos.length === 0 && (
                       <p className="text-xs text-muted-foreground">Importe a planilha de técnicos na aba "Cadastros"</p>
                     )}
                   </div>
-
                   <div className="space-y-1.5">
                     <Label>Nome do Técnico *</Label>
-                    <Input value={nomeTecnico} onChange={(e) => setNomeTecnico(e.target.value)} placeholder="Preenchido automaticamente pela TT" />
+                    <Input value={nomeTecnico} readOnly placeholder="Preenchido automaticamente pela TT" className="bg-muted/50 uppercase" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Telefone do Técnico</Label>
+                    <Input value={telefoneTecnico} readOnly placeholder="Preenchido automaticamente" className="bg-muted/50" />
                   </div>
                 </div>
 
-                {/* Row 1: Cidade + Sigla + UF */}
+                {/* Row: Cidade + Sigla + UF */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Cidade *</Label>
-                    <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Nome da cidade" />
+                    <Input value={cidade} onChange={(e) => setCidade(toUpper(e.target.value))} placeholder="NOME DA CIDADE" className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Sigla da Cidade *</Label>
-                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(e.target.value.toUpperCase().slice(0, 4))} placeholder="Máx 4 caracteres" maxLength={4} />
+                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>UF *</Label>
                     <Select value={uf} onValueChange={setUf}>
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
-                        {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((s) => (
+                        {UF_LIST.map((s) => (
                           <SelectItem key={s} value={s}>{s}</SelectItem>
                         ))}
                       </SelectContent>
@@ -724,61 +867,45 @@ const MaterialColeta = () => {
                   </div>
                 </div>
 
-                {/* Row 2: Atividade + Tipo Aplicação */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Row: Atividade + Tipo Aplicação + Data Execução */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Atividade *</Label>
                     <Select value={atividade} onValueChange={setAtividade}>
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Ativação">Ativação</SelectItem>
-                        <SelectItem value="Retirada">Retirada</SelectItem>
-                        <SelectItem value="Reparo">Reparo</SelectItem>
-                        <SelectItem value="Preventiva">Preventiva</SelectItem>
+                        <SelectItem value="ATIVAÇÃO">ATIVAÇÃO</SelectItem>
+                        <SelectItem value="RETIRADA">RETIRADA</SelectItem>
+                        <SelectItem value="REPARO">REPARO</SelectItem>
+                        <SelectItem value="PREVENTIVA">PREVENTIVA</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div className="space-y-1.5">
                     <Label>Tipo Aplicação *</Label>
                     <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Baixa">Baixa</SelectItem>
-                        <SelectItem value="Reversa">Reversa</SelectItem>
+                        <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
+                        <SelectItem value="REVERSA">REVERSA</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                {/* Row 2: Tipo Aplicação + Data Execução */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Tipo Aplicação *</Label>
-                    <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
-                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Baixa">Baixa</SelectItem>
-                        <SelectItem value="Reversa">Reversa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div className="space-y-1.5">
                     <Label>Data de Execução *</Label>
                     <Input type="date" value={dataExecucao} onChange={(e) => setDataExecucao(e.target.value)} />
                   </div>
                 </div>
 
-                {/* Row 3: BA + Circuito */}
+                {/* Row: BA + Circuito */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>BA *</Label>
-                    <Input value={ba} onChange={(e) => setBa(e.target.value)} placeholder="Número do BA" />
+                    <Input value={ba} onChange={(e) => setBa(toUpper(e.target.value))} placeholder="NÚMERO DO BA" className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Circuito *</Label>
-                    <Input value={circuito} onChange={(e) => setCircuito(e.target.value)} placeholder="Circuito" />
+                    <Input value={circuito} onChange={(e) => setCircuito(toUpper(e.target.value))} placeholder="CIRCUITO" className="uppercase" />
                   </div>
                 </div>
               </CardContent>
@@ -793,93 +920,122 @@ const MaterialColeta = () => {
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                {materiais.map((mat, idx) => (
-                  <div key={mat.id} className="border rounded-lg p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
-                      {materiais.length > 1 && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                {materiais.map((mat, idx) => {
+                  const matError = getMaterialError(mat);
+                  return (
+                    <div key={mat.id} className="border rounded-lg p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
+                        {materiais.length > 1 && (
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Código *</Label>
+                          <Input
+                            value={mat.codigo_material}
+                            onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
+                            placeholder="CÓDIGO"
+                            list={`materiais-list-${mat.id}`}
+                            className="uppercase"
+                          />
+                          <datalist id={`materiais-list-${mat.id}`}>
+                            {materiaisCadastro.map((mc) => (
+                              <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
+                            ))}
+                          </datalist>
+                          {matError && <p className="text-xs text-destructive font-medium">{matError}</p>}
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Nome Material *</Label>
+                          <Input
+                            value={mat.nome_material}
+                            readOnly
+                            placeholder="PREENCHIDO AUTOMATICAMENTE"
+                            className="bg-muted/50 uppercase"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Qtde *</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={mat.quantidade}
+                            onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Un/Metro *</Label>
+                          <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Un">Un</SelectItem>
+                              <SelectItem value="Metro">Metro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {mat.seriais.length === 0 && (
+                          <div className="space-y-1">
+                            <Label className="text-xs">Serial</Label>
+                            <div className="flex gap-1">
+                              <Input
+                                value={mat.serial}
+                                onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
+                                placeholder="SERIAL"
+                                className="flex-1 uppercase"
+                              />
+                              <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
+                                <ScanBarcode className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Ask seriais dialog inline */}
+                      {mat.askSeriais && mat.quantidade > 1 && (
+                        <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
+                          <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => handleAskSeriaisResponse(mat.id, true)}>Sim</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleAskSeriaisResponse(mat.id, false)}>Não</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Multiple serial fields */}
+                      {mat.seriais.length > 0 && !mat.askSeriais && (
+                        <div className="space-y-2 border-t pt-2">
+                          <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                            {mat.seriais.map((s, i) => (
+                              <div key={i} className="flex gap-1">
+                                <Input
+                                  value={s}
+                                  onChange={(e) => updateSerial(mat.id, i, e.target.value)}
+                                  placeholder={`SERIAL ${i + 1} *`}
+                                  className="flex-1 uppercase"
+                                />
+                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
+                                  <ScanBarcode className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Código *</Label>
-                        <Input
-                          value={mat.codigo_material}
-                          onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
-                          placeholder="Código"
-                          list={`materiais-list-${mat.id}`}
-                        />
-                        <datalist id={`materiais-list-${mat.id}`}>
-                          {materiaisCadastro.map((mc) => (
-                            <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
-                          ))}
-                        </datalist>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nome Material *</Label>
-                        <Input
-                          value={mat.nome_material}
-                          onChange={(e) => updateMaterial(mat.id, "nome_material", e.target.value)}
-                          placeholder="Nome"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Qtde *</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={mat.quantidade}
-                          onChange={(e) => updateMaterial(mat.id, "quantidade", Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Un/Metro *</Label>
-                        <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Un">Un</SelectItem>
-                            <SelectItem value="Metro">Metro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Serial</Label>
-                        <div className="flex gap-1">
-                          <Input
-                            value={mat.serial}
-                            onChange={(e) => updateMaterial(mat.id, "serial", e.target.value)}
-                            placeholder="Serial"
-                            className="flex-1"
-                          />
-                          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={() => startCamera(mat.id)} title="Usar câmera">
-                            <Camera className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
-
-            {/* Camera modal */}
-            {cameraActive && (
-              <Card className="border-primary">
-                <CardContent className="p-4 flex flex-col items-center gap-3">
-                  <video ref={videoRef} className="w-full max-w-sm rounded border" />
-                  <p className="text-sm text-muted-foreground">Aponte para o código de barras. Se não funcionar, feche e digite manualmente.</p>
-                  <Button variant="outline" onClick={stopCamera}>Fechar Câmera</Button>
-                </CardContent>
-              </Card>
-            )}
 
             {/* ── REVERSA: Photo, Signatures, Frase ── */}
             {isReversa && (
               <>
-                {/* Photo */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
@@ -889,7 +1045,7 @@ const MaterialColeta = () => {
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
                     <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                      <Camera className="w-4 h-4" /> Capturar / Selecionar Foto
+                      <ImageIcon className="w-4 h-4" /> Capturar / Selecionar Foto
                       <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
                     </label>
                     {fotoPreview && (
@@ -900,14 +1056,12 @@ const MaterialColeta = () => {
                   </CardContent>
                 </Card>
 
-                {/* Frase padrão */}
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-xs text-muted-foreground italic leading-relaxed">{FRASE_REVERSA}</p>
                   </CardContent>
                 </Card>
 
-                {/* Assinatura Colaborador */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Assinatura do Colaborador *</CardTitle>
@@ -931,7 +1085,6 @@ const MaterialColeta = () => {
                   </CardContent>
                 </Card>
 
-                {/* Assinatura Almoxarifado */}
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Assinatura Almoxarifado/Logística <span className="text-xs text-muted-foreground font-normal">(opcional)</span></CardTitle>
@@ -959,12 +1112,12 @@ const MaterialColeta = () => {
 
             <div className="flex gap-3 flex-wrap">
               <Button onClick={handleSubmit} disabled={submitting} className="w-full md:w-auto">
-                {submitting ? "Salvando..." : "Registrar Coleta"}
+                {submitting ? "Salvando..." : "Salvar"}
               </Button>
               {isReversa && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <FileText className="w-4 h-4" />
-                  <span>O PDF será gerado automaticamente após o registro</span>
+                  <span>O PDF será gerado automaticamente após salvar</span>
                 </div>
               )}
             </div>
@@ -980,7 +1133,7 @@ const MaterialColeta = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador</strong>
+                  Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador, Telefone, Cidade</strong>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
@@ -1002,6 +1155,8 @@ const MaterialColeta = () => {
                           <TableHead className="text-xs">Técnico</TableHead>
                           <TableHead className="text-xs">Supervisor</TableHead>
                           <TableHead className="text-xs">Coordenador</TableHead>
+                          <TableHead className="text-xs">Telefone</TableHead>
+                          <TableHead className="text-xs">Cidade</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1013,6 +1168,8 @@ const MaterialColeta = () => {
                             <TableCell className="text-xs">{t.nome_tecnico}</TableCell>
                             <TableCell className="text-xs">{t.supervisor}</TableCell>
                             <TableCell className="text-xs">{t.coordenador}</TableCell>
+                            <TableCell className="text-xs">{t.telefone}</TableCell>
+                            <TableCell className="text-xs">{t.cidade_residencia}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1075,23 +1232,26 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">BA</Label>
-                    <Input value={searchBa} onChange={(e) => setSearchBa(e.target.value)} placeholder="Buscar BA" />
+                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="BUSCAR BA" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Circuito</Label>
-                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(e.target.value)} placeholder="Buscar Circuito" />
+                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="BUSCAR CIRCUITO" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Técnico</Label>
-                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(e.target.value)} placeholder="Buscar Técnico" />
+                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="BUSCAR TÉCNICO" className="uppercase" />
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button onClick={handleSearch} disabled={searching}>
                     <Search className="w-4 h-4 mr-1" /> {searching ? "Buscando..." : "Consultar"}
                   </Button>
-                  <Button variant="outline" onClick={handleExport}>
+                  <Button variant="outline" onClick={() => handleExport("xlsx")}>
                     <Download className="w-4 h-4 mr-1" /> Exportar Excel
+                  </Button>
+                  <Button variant="outline" onClick={() => handleExport("csv")}>
+                    <Download className="w-4 h-4 mr-1" /> Exportar CSV
                   </Button>
                 </div>
               </CardContent>
@@ -1111,6 +1271,7 @@ const MaterialColeta = () => {
                           <TableHead className="text-xs">Atividade</TableHead>
                           <TableHead className="text-xs">Tipo</TableHead>
                           <TableHead className="text-xs">Materiais</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1129,6 +1290,16 @@ const MaterialColeta = () => {
                                 <div key={i}>{item.codigo_material} - {item.nome_material} (x{item.quantidade})</div>
                               ))}
                             </TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1140,6 +1311,69 @@ const MaterialColeta = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. O registro e todos os materiais associados serão removidos.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View detail dialog */}
+      <Dialog open={!!viewColeta} onOpenChange={() => setViewColeta(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Coleta</DialogTitle>
+            <DialogDescription>Registro completo da coleta de materiais</DialogDescription>
+          </DialogHeader>
+          {viewColeta && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div><strong>TT:</strong> {viewColeta.matricula_tt || "-"}</div>
+                <div><strong>Técnico:</strong> {viewColeta.nome_tecnico}</div>
+                <div><strong>Cidade:</strong> {viewColeta.cidade || "-"} ({viewColeta.sigla_cidade || ""}) - {viewColeta.uf || ""}</div>
+                <div><strong>BA:</strong> {viewColeta.ba || "-"}</div>
+                <div><strong>Circuito:</strong> {viewColeta.circuito || "-"}</div>
+                <div><strong>Atividade:</strong> {viewColeta.atividade}</div>
+                <div><strong>Tipo:</strong> {viewColeta.tipo_aplicacao}</div>
+                <div><strong>Data:</strong> {viewColeta.data_execucao ? new Date(viewColeta.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}</div>
+              </div>
+              <div>
+                <strong>Materiais:</strong>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Código</TableHead>
+                      <TableHead className="text-xs">Nome</TableHead>
+                      <TableHead className="text-xs">Qtde</TableHead>
+                      <TableHead className="text-xs">Un</TableHead>
+                      <TableHead className="text-xs">Serial</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewColeta.material_coleta_items.map((item, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs">{item.codigo_material}</TableCell>
+                        <TableCell className="text-xs">{item.nome_material}</TableCell>
+                        <TableCell className="text-xs">{item.quantidade}</TableCell>
+                        <TableCell className="text-xs">{item.unidade}</TableCell>
+                        <TableCell className="text-xs">{item.serial || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
