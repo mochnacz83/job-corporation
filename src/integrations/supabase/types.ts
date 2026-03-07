@@ -282,34 +282,40 @@ export type Database = {
       }
       tecnicos_cadastro: {
         Row: {
+          cidade_residencia: string | null
           coordenador: string | null
           created_at: string
           id: string
           nome_empresa: string | null
           nome_tecnico: string
           supervisor: string | null
+          telefone: string | null
           tr: string | null
           tt: string | null
           uploaded_by: string
         }
         Insert: {
+          cidade_residencia?: string | null
           coordenador?: string | null
           created_at?: string
           id?: string
           nome_empresa?: string | null
           nome_tecnico: string
           supervisor?: string | null
+          telefone?: string | null
           tr?: string | null
           tt?: string | null
           uploaded_by: string
         }
         Update: {
+          cidade_residencia?: string | null
           coordenador?: string | null
           created_at?: string
           id?: string
           nome_empresa?: string | null
           nome_tecnico?: string
           supervisor?: string | null
+          telefone?: string | null
           tr?: string | null
           tt?: string | null
           uploaded_by?: string
