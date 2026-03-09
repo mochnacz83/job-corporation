@@ -334,7 +334,7 @@ const AdminUsers = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center gap-4">
+        <div className="w-full px-4 h-16 flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
           </Button>
@@ -347,7 +347,7 @@ const AdminUsers = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-6">
+      <main className="w-full px-2 sm:px-6 py-4 space-y-6">
         {users.filter(u => u.status === "pendente").length > 0 && (
           <Alert variant="default" className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600" />
