@@ -61,7 +61,13 @@ interface ColetaRecord {
 
 const FRASE_REVERSA = "Declaro que os materiais apresentados neste documento foram devidamente retirados no local da atividade e separados para devolução, conforme registro realizado nesta data. A imagem anexada comprova visualmente os itens coletados, estando todos visíveis para conferência. O colaborador responsável confirma a veracidade das informações registradas e a correta separação dos materiais para encaminhamento ao Almoxarifado/Logística da Ability Tecnologia, ficando sujeitos à validação e conferência no ato da entrega.";
 
-const UF_LIST = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+const UF_LIST = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
+
+const CIDADES_SC = [
+  "FLORIANÓPOLIS", "JOINVILLE", "BLUMENAU", "SÃO JOSÉ", "CHAPECÓ", "ITAJAÍ", "CRICIÚMA", "PALHOÇA", "LAGES", "BALNEÁRIO CAMBORIÚ",
+  "BRUSQUE", "TUBARÃO", "SÃO BENTO DO SUL", "CAÇADOR", "CONCÓRDIA", "RIO DO SUL", "GASPAR", "ITAUPEMA", "CAMBORIÚ", "NAVEGANTES",
+  "SÃO FRANCISCO DO SUL", "IÇARA", "VIDEIRA", "XANXERÊ", "LAGUNA", "TIJUCAS", "TIMBÓ", "FRAIBURGO", "ARARANGUÁ", "BIGUAÇU"
+];
 
 const toUpper = (v: string) => v.toUpperCase();
 
@@ -105,6 +111,10 @@ const MaterialColeta = () => {
   const sigAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingColab, setIsDrawingColab] = useState(false);
   const [isDrawingAlmox, setIsDrawingAlmox] = useState(false);
+  const [localRetirada, setLocalRetirada] = useState("");
+  const [classificacaoCenario, setClassificacaoCenario] = useState("");
+  const [circuitoCompartilhado, setCircuitoCompartilhado] = useState("");
+  const [opcoesAdicionais, setOpcoesAdicionais] = useState("");
 
   // Cadastro lists
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
@@ -119,7 +129,14 @@ const MaterialColeta = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
 
+  // Edit states
+  const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
+  const [editingMaterial, setEditingMaterial] = useState<MaterialCadastro | null>(null);
+  const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
+  const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
+
   const isReversa = tipoAplicacao === "REVERSA";
+  const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
 
   // Load catalogs
   useEffect(() => {
@@ -211,13 +228,62 @@ const MaterialColeta = () => {
     return canvas.toDataURL("image/png");
   };
 
-  // Photo handling
+  const handleCidadeChange = (value: string) => {
+    const upper = value.toUpperCase();
+    setCidade(upper);
+    if (CIDADES_SC.includes(upper)) {
+      setUf("SC");
+    }
+  };
+
+  // Photo handling with compression
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFotoFile(file);
+
     const reader = new FileReader();
-    reader.onload = (ev) => setFotoPreview(ev.target?.result as string);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Max dimensions
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG with 0.7 quality
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        setFotoPreview(compressedDataUrl);
+
+        // Create a new file from compressed data for upload
+        fetch(compressedDataUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const compressedFile = new File([blob], file.name, { type: "image/jpeg" });
+            setFotoFile(compressedFile);
+          });
+      };
+      img.src = event.target?.result as string;
+    };
     reader.readAsDataURL(file);
   };
 
@@ -230,23 +296,64 @@ const MaterialColeta = () => {
       const wb = XLSX.read(data);
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
-      const mapped = rows.map((r) => ({
-        tr: String(r.TR || r.tr || ""),
-        tt: String(r.TT || r.tt || ""),
-        nome_empresa: String(r["Nome Empresa"] || r.nome_empresa || ""),
-        nome_tecnico: String(r["Nome Técnico"] || r["Nome Tecnico"] || r.nome_tecnico || ""),
-        supervisor: String(r.Supervisor || r.supervisor || ""),
-        coordenador: String(r.Coordenador || r.coordenador || ""),
-        telefone: String(r.Telefone || r.telefone || r.Celular || r.celular || ""),
-        cidade_residencia: String(r.Cidade || r.cidade || r["Cidade Residência"] || r.cidade_residencia || ""),
-        uploaded_by: user.id,
-      }));
-      const { error } = await supabase.from("tecnicos_cadastro").insert(mapped as any);
-      if (error) throw error;
-      toast.success(`${mapped.length} técnicos importados com sucesso`);
-      setTecnicos((prev) => [...prev, ...mapped]);
+
+      let createdCount = 0;
+      let updatedCount = 0;
+      let duplicateCount = 0;
+
+      for (const r of rows) {
+        const tr = String(r.TR || r.tr || "").trim();
+        const tt = String(r.TT || r.tt || "").trim();
+        if (!tt && !tr) continue;
+
+        const nome_tecnico = String(r["Nome Técnico"] || r["Nome Tecnico"] || r.nome_tecnico || "").trim();
+        const nome_empresa = String(r["Nome Empresa"] || r.nome_empresa || "").trim();
+        const supervisor = String(r.Supervisor || r.supervisor || "").trim();
+        const coordenador = String(r.Coordenador || r.coordenador || "").trim();
+        const telefone = String(r.Telefone || r.telefone || r.Celular || r.celular || "").trim();
+        const cidade_residencia = String(r.Cidade || r.cidade || r["Cidade Residência"] || r.cidade_residencia || "").trim();
+
+        const existing = tecnicos.find(t => (tt && t.tt === tt) || (tr && t.tr === tr));
+
+        if (existing) {
+          const needsUpdate =
+            (!existing.nome_tecnico && nome_tecnico) ||
+            (!existing.nome_empresa && nome_empresa) ||
+            (!existing.supervisor && supervisor) ||
+            (!existing.coordenador && coordenador) ||
+            (!existing.telefone && telefone) ||
+            (!existing.cidade_residencia && cidade_residencia);
+
+          if (needsUpdate) {
+            const { error: upErr } = await supabase.from("tecnicos_cadastro")
+              .update({
+                nome_tecnico: existing.nome_tecnico || nome_tecnico,
+                nome_empresa: existing.nome_empresa || nome_empresa,
+                supervisor: existing.supervisor || supervisor,
+                coordenador: existing.coordenador || coordenador,
+                telefone: existing.telefone || telefone,
+                cidade_residencia: existing.cidade_residencia || cidade_residencia
+              })
+              .match({ tr: tr || existing.tr, tt: tt || existing.tt });
+
+            if (!upErr) updatedCount++;
+          } else {
+            duplicateCount++;
+          }
+        } else {
+          const { error: insErr } = await supabase.from("tecnicos_cadastro").insert({
+            tr, tt, nome_empresa, nome_tecnico, supervisor, coordenador, telefone, cidade_residencia, uploaded_by: user.id
+          });
+          if (!insErr) createdCount++;
+        }
+      }
+
+      toast.success(`${createdCount} novos cadastros. ${updatedCount} atualizados. ${duplicateCount} duplicados ignorados.`);
+
+      const { data: newData } = await supabase.from("tecnicos_cadastro").select("tr, tt, nome_empresa, nome_tecnico, supervisor, coordenador, telefone, cidade_residencia");
+      if (newData) setTecnicos(newData as any);
     } catch (err: any) {
-      toast.error("Erro ao importar planilha: " + err.message);
+      toast.error("Erro ao importar: " + err.message);
     }
     e.target.value = "";
   };
@@ -376,6 +483,11 @@ const MaterialColeta = () => {
     assinaturaColaborador: string;
     assinaturaAlmoxarifado: string;
     fotoDataUrl: string | null;
+    local_retirada?: string;
+    classificacao_cenario?: string;
+    circuito_compartilhado?: string;
+    opcoes_adicionais?: string;
+    tipo_aplicacao?: string;
   }) => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageW = doc.internal.pageSize.getWidth();
@@ -387,7 +499,7 @@ const MaterialColeta = () => {
       const logoImg = new Image();
       logoImg.src = "/ability-logo.png";
       doc.addImage(logoImg, "PNG", margin, y, 20, 10);
-    } catch {}
+    } catch { }
 
     // Header
     doc.setFontSize(14);
@@ -415,10 +527,18 @@ const MaterialColeta = () => {
     ];
     const infoRight = [
       ["Atividade:", coletaData.atividade],
-      ["Tipo Aplicação:", "REVERSA"],
+      ["Tipo Aplicação:", coletaData.tipo_aplicacao || "REVERSA"],
       ["BA:", coletaData.ba || "-"],
       ["Circuito:", coletaData.circuito || "-"],
     ];
+
+    if (coletaData.atividade === "RETIRADA") {
+      infoLeft.push(["Local Retirada:", coletaData.local_retirada || "-"]);
+      infoRight.push(["Cenário:", coletaData.classificacao_cenario || "-"]);
+      if (coletaData.circuito_compartilhado) {
+        infoRight.push(["Circ. Comp.:", coletaData.circuito_compartilhado]);
+      }
+    }
     let infoY = y;
     infoLeft.forEach(([label, value]) => {
       doc.setFont("helvetica", "bold");
@@ -508,7 +628,7 @@ const MaterialColeta = () => {
     if (coletaData.fotoDataUrl) {
       try {
         doc.addImage(coletaData.fotoDataUrl, "JPEG", margin, y, photoW, photoH);
-      } catch {}
+      } catch { }
     }
 
     // Signatures on the right side
@@ -521,7 +641,7 @@ const MaterialColeta = () => {
       doc.text("Assinatura Colaborador:", sigX, y + 2);
       try {
         doc.addImage(coletaData.assinaturaColaborador, "PNG", sigX, y + 3, sigW, 14);
-      } catch {}
+      } catch { }
       doc.line(sigX, y + 18, sigX + sigW, y + 18);
       doc.setFontSize(6);
       doc.text(coletaData.nomeTecnico, sigX, y + 21);
@@ -533,7 +653,7 @@ const MaterialColeta = () => {
       doc.text("Assinatura Almox/Logística:", sigX, almoxY);
       try {
         doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", sigX, almoxY + 1, sigW, 14);
-      } catch {}
+      } catch { }
       doc.line(sigX, almoxY + 16, sigX + sigW, almoxY + 16);
       doc.setFontSize(6);
       doc.text("Almoxarifado/Logística", sigX, almoxY + 19);
@@ -636,6 +756,10 @@ const MaterialColeta = () => {
           assinatura_colaborador: colabSig || null,
           assinatura_almoxarifado: almoxSig || null,
           foto_url: fotoUrl,
+          local_retirada: localRetirada || null,
+          classificacao_cenario: classificacaoCenario || null,
+          circuito_compartilhado: circuitoCompartilhado || null,
+          opcoes_adicionais: opcoesAdicionais || null,
         } as any)
         .select("id")
         .single();
@@ -689,6 +813,11 @@ const MaterialColeta = () => {
           assinaturaColaborador: colabSig || "",
           assinaturaAlmoxarifado: almoxSig || "",
           fotoDataUrl,
+          local_retirada: localRetirada,
+          classificacao_cenario: classificacaoCenario,
+          circuito_compartilhado: circuitoCompartilhado,
+          opcoes_adicionais: opcoesAdicionais,
+          tipo_aplicacao: tipoAplicacao,
         });
       }
 
@@ -733,6 +862,51 @@ const MaterialColeta = () => {
     } finally {
       setSearching(false);
     }
+  };
+
+  // Cadastro Management Functions
+  const handleEditTecnico = (t: Tecnico) => setEditingTecnico({ ...t });
+  const handleSaveTecnico = async () => {
+    if (!editingTecnico) return;
+    const { error } = await supabase.from("tecnicos_cadastro")
+      .update(editingTecnico)
+      .match({ tt: editingTecnico.tt, tr: editingTecnico.tr });
+    if (error) { toast.error("Erro ao salvar técnico"); return; }
+    toast.success("Técnico atualizado");
+    setTecnicos(prev => prev.map(t => (t.tt === editingTecnico.tt || t.tr === editingTecnico.tr) ? editingTecnico : t));
+    setEditingTecnico(null);
+  };
+
+  const handleDeleteTecnico = (t: Tecnico) => setDeleteTecnico(t);
+  const confirmDeleteTecnico = async () => {
+    if (!deleteTecnico) return;
+    const { error } = await supabase.from("tecnicos_cadastro").delete().match({ tt: deleteTecnico.tt, tr: deleteTecnico.tr });
+    if (error) { toast.error("Erro ao excluir técnico"); return; }
+    toast.success("Técnico excluído");
+    setTecnicos(prev => prev.filter(t => t.tt !== deleteTecnico.tt && t.tr !== deleteTecnico.tr));
+    setDeleteTecnico(null);
+  };
+
+  const handleEditMaterial = (m: MaterialCadastro) => setEditingMaterial({ ...m });
+  const handleSaveMaterial = async () => {
+    if (!editingMaterial) return;
+    const { error } = await supabase.from("materiais_cadastro")
+      .update({ nome_material: editingMaterial.nome_material })
+      .match({ codigo: editingMaterial.codigo });
+    if (error) { toast.error("Erro ao salvar material"); return; }
+    toast.success("Material atualizado");
+    setMateriaisCadastro(prev => prev.map(m => m.codigo === editingMaterial.codigo ? editingMaterial : m));
+    setEditingMaterial(null);
+  };
+
+  const handleDeleteMaterial = (m: MaterialCadastro) => setDeleteMaterial(m);
+  const confirmDeleteMaterial = async () => {
+    if (!deleteMaterial) return;
+    const { error } = await supabase.from("materiais_cadastro").delete().match({ codigo: deleteMaterial.codigo });
+    if (error) { toast.error("Erro ao excluir material"); return; }
+    toast.success("Material excluído");
+    setMateriaisCadastro(prev => prev.filter(m => m.codigo !== deleteMaterial.codigo));
+    setDeleteMaterial(null);
   };
 
   // Delete
@@ -848,10 +1022,19 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Cidade *</Label>
-                    <Input value={cidade} onChange={(e) => setCidade(toUpper(e.target.value))} placeholder="NOME DA CIDADE" className="uppercase" />
+                    <Input
+                      value={cidade}
+                      onChange={(e) => handleCidadeChange(e.target.value)}
+                      placeholder="NOME DA CIDADE"
+                      className="uppercase"
+                      list="cidades-sc"
+                    />
+                    <datalist id="cidades-sc">
+                      {CIDADES_SC.map(c => <option key={c} value={c} />)}
+                    </datalist>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>Sigla da Cidade *</Label>
+                    <Label>Sigla da Estação *</Label>
                     <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
@@ -888,6 +1071,7 @@ const MaterialColeta = () => {
                       <SelectContent>
                         <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
                         <SelectItem value="REVERSA">REVERSA</SelectItem>
+                        <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -911,127 +1095,178 @@ const MaterialColeta = () => {
               </CardContent>
             </Card>
 
-            {/* Materials */}
-            <Card>
-              <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Materiais Aplicados</CardTitle>
-                <Button size="sm" variant="outline" onClick={addMaterial}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {materiais.map((mat, idx) => {
-                  const matError = getMaterialError(mat);
-                  return (
-                    <div key={mat.id} className="border rounded-lg p-3 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
-                        {materiais.length > 1 && (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Código *</Label>
-                          <Input
-                            value={mat.codigo_material}
-                            onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
-                            placeholder="CÓDIGO"
-                            list={`materiais-list-${mat.id}`}
-                            className="uppercase"
-                          />
-                          <datalist id={`materiais-list-${mat.id}`}>
-                            {materiaisCadastro.map((mc) => (
-                              <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
-                            ))}
-                          </datalist>
-                          {matError && <p className="text-xs text-destructive font-medium">{matError}</p>}
+            {/* RETIRADA Checkpoints */}
+            {atividade === "RETIRADA" && !isSemMaterial && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>Local de retirada do material *</Label>
+                    <Select value={localRetirada} onValueChange={setLocalRetirada}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
+                        <SelectItem value="SO ESTACAO">SÓ ESTAÇÃO</SelectItem>
+                        <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(localRetirada === "SO ESTACAO" || localRetirada === "SO CLIENTE") && (
+                    <div className="space-y-1.5">
+                      <Label>Classificação do Cenário *</Label>
+                      <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEM MATERIAL LADO A">SEM MATERIAL LADO A</SelectItem>
+                          <SelectItem value="SEM MATERIAL LADO B">SEM MATERIAL LADO B</SelectItem>
+                          <SelectItem value="LADO A COMPARTILHADO">LADO A COMPARTILHADO</SelectItem>
+                          <SelectItem value="LADO B COMPARTILHADO">LADO B COMPARTILHADO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(classificacaoCenario === "LADO A COMPARTILHADO" || classificacaoCenario === "LADO B COMPARTILHADO") && (
+                    <div className="space-y-1.5">
+                      <Label>Circuito Compartilhado *</Label>
+                      <Input
+                        value={circuitoCompartilhado}
+                        onChange={(e) => setCircuitoCompartilhado(toUpper(e.target.value))}
+                        placeholder="IDENTIFIQUE O CIRCUITO"
+                        className="uppercase"
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Materials - Hide if SEM MATERIAL */}
+            {!isSemMaterial && (
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Materiais Aplicados</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addMaterial}>
+                    <Plus className="w-4 h-4 mr-1" /> Adicionar
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {materiais.map((mat, idx) => {
+                    const matError = getMaterialError(mat);
+                    return (
+                      <div key={mat.id} className="border rounded-lg p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
+                          {materiais.length > 1 && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Nome Material *</Label>
-                          <Input
-                            value={mat.nome_material}
-                            readOnly
-                            placeholder="PREENCHIDO AUTOMATICAMENTE"
-                            className="bg-muted/50 uppercase"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Qtde *</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={mat.quantidade}
-                            onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Un/Metro *</Label>
-                          <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Un">Un</SelectItem>
-                              <SelectItem value="Metro">Metro</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {mat.seriais.length === 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                           <div className="space-y-1">
-                            <Label className="text-xs">Serial</Label>
-                            <div className="flex gap-1">
-                              <Input
-                                value={mat.serial}
-                                onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
-                                placeholder="SERIAL"
-                                className="flex-1 uppercase"
-                              />
-                              <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
-                                <ScanBarcode className="w-4 h-4" />
-                              </Button>
+                            <Label className="text-xs">Código *</Label>
+                            <Input
+                              value={mat.codigo_material}
+                              onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
+                              placeholder="CÓDIGO"
+                              list={`materiais-list-${mat.id}`}
+                              className="uppercase"
+                            />
+                            <datalist id={`materiais-list-${mat.id}`}>
+                              {materiaisCadastro.map((mc) => (
+                                <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
+                              ))}
+                            </datalist>
+                            {matError && <p className="text-xs text-destructive font-medium">{matError}</p>}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nome Material *</Label>
+                            <Input
+                              value={mat.nome_material}
+                              readOnly
+                              placeholder="PREENCHIDO AUTOMATICAMENTE"
+                              className="bg-muted/50 uppercase"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Qtde *</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={mat.quantidade}
+                              onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Un/Metro *</Label>
+                            <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Un">Un</SelectItem>
+                                <SelectItem value="Metro">Metro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {mat.seriais.length === 0 && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Serial</Label>
+                              <div className="flex gap-1">
+                                <Input
+                                  value={mat.serial}
+                                  onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
+                                  placeholder="SERIAL"
+                                  className="flex-1 uppercase"
+                                />
+                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
+                                  <ScanBarcode className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ask seriais dialog inline */}
+                        {mat.askSeriais && mat.quantidade > 1 && (
+                          <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
+                            <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleAskSeriaisResponse(mat.id, true)}>Sim</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleAskSeriaisResponse(mat.id, false)}>Não</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Multiple serial fields */}
+                        {mat.seriais.length > 0 && !mat.askSeriais && (
+                          <div className="space-y-2 border-t pt-2">
+                            <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                              {mat.seriais.map((s, i) => (
+                                <div key={i} className="flex gap-1">
+                                  <Input
+                                    value={s}
+                                    onChange={(e) => updateSerial(mat.id, i, e.target.value)}
+                                    placeholder={`SERIAL ${i + 1} *`}
+                                    className="flex-1 uppercase"
+                                  />
+                                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
+                                    <ScanBarcode className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
                       </div>
-
-                      {/* Ask seriais dialog inline */}
-                      {mat.askSeriais && mat.quantidade > 1 && (
-                        <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
-                          <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleAskSeriaisResponse(mat.id, true)}>Sim</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleAskSeriaisResponse(mat.id, false)}>Não</Button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Multiple serial fields */}
-                      {mat.seriais.length > 0 && !mat.askSeriais && (
-                        <div className="space-y-2 border-t pt-2">
-                          <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                            {mat.seriais.map((s, i) => (
-                              <div key={i} className="flex gap-1">
-                                <Input
-                                  value={s}
-                                  onChange={(e) => updateSerial(mat.id, i, e.target.value)}
-                                  placeholder={`SERIAL ${i + 1} *`}
-                                  className="flex-1 uppercase"
-                                />
-                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
-                                  <ScanBarcode className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
 
             {/* ── REVERSA: Photo, Signatures, Frase ── */}
             {isReversa && (
@@ -1110,6 +1345,20 @@ const MaterialColeta = () => {
               </>
             )}
 
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Opções Adicionais</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <textarea
+                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Observações complementares da atividade..."
+                  value={opcoesAdicionais}
+                  onChange={(e) => setOpcoesAdicionais(e.target.value)}
+                />
+              </CardContent>
+            </Card>
+
             <div className="flex gap-3 flex-wrap">
               <Button onClick={handleSubmit} disabled={submitting} className="w-full md:w-auto">
                 {submitting ? "Salvando..." : "Salvar"}
@@ -1157,6 +1406,7 @@ const MaterialColeta = () => {
                           <TableHead className="text-xs">Coordenador</TableHead>
                           <TableHead className="text-xs">Telefone</TableHead>
                           <TableHead className="text-xs">Cidade</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1170,6 +1420,16 @@ const MaterialColeta = () => {
                             <TableCell className="text-xs">{t.coordenador}</TableCell>
                             <TableCell className="text-xs">{t.telefone}</TableCell>
                             <TableCell className="text-xs">{t.cidade_residencia}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditTecnico(t)} title="Editar">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteTecnico(t)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1205,6 +1465,7 @@ const MaterialColeta = () => {
                         <TableRow>
                           <TableHead className="text-xs">Código</TableHead>
                           <TableHead className="text-xs">Nome Material</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1212,6 +1473,16 @@ const MaterialColeta = () => {
                           <TableRow key={i}>
                             <TableCell className="text-xs">{m.codigo}</TableCell>
                             <TableCell className="text-xs">{m.nome_material}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditMaterial(m)} title="Editar">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteMaterial(m)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1312,7 +1583,7 @@ const MaterialColeta = () => {
         </Tabs>
       </main>
 
-      {/* Delete confirmation */}
+      {/* Delete confirmation (Coleta) */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1325,6 +1596,74 @@ const MaterialColeta = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete confirmation (Técnico) */}
+      <AlertDialog open={!!deleteTecnico} onOpenChange={() => setDeleteTecnico(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Técnico?</AlertDialogTitle>
+            <AlertDialogDescription>Deseja remover {deleteTecnico?.nome_tecnico} da base?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTecnico} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation (Material) */}
+      <AlertDialog open={!!deleteMaterial} onOpenChange={() => setDeleteMaterial(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Material?</AlertDialogTitle>
+            <AlertDialogDescription>Deseja remover o material {deleteMaterial?.nome_material} da base?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMaterial} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Técnico Dialog */}
+      <Dialog open={!!editingTecnico} onOpenChange={() => setEditingTecnico(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Técnico</DialogTitle></DialogHeader>
+          {editingTecnico && (
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>TT</Label><Input value={editingTecnico.tt} readOnly className="bg-muted" /></div>
+                <div className="space-y-1"><Label>TR</Label><Input value={editingTecnico.tr} readOnly className="bg-muted" /></div>
+              </div>
+              <div className="space-y-1"><Label>Nome Técnico</Label><Input value={editingTecnico.nome_tecnico} onChange={e => setEditingTecnico({ ...editingTecnico, nome_tecnico: e.target.value.toUpperCase() })} /></div>
+              <div className="space-y-1"><Label>Empresa</Label><Input value={editingTecnico.nome_empresa} onChange={e => setEditingTecnico({ ...editingTecnico, nome_empresa: e.target.value.toUpperCase() })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>Supervisor</Label><Input value={editingTecnico.supervisor} onChange={e => setEditingTecnico({ ...editingTecnico, supervisor: e.target.value.toUpperCase() })} /></div>
+                <div className="space-y-1"><Label>Coordenador</Label><Input value={editingTecnico.coordenador} onChange={e => setEditingTecnico({ ...editingTecnico, coordenador: e.target.value.toUpperCase() })} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>Telefone</Label><Input value={editingTecnico.telefone} onChange={e => setEditingTecnico({ ...editingTecnico, telefone: e.target.value })} /></div>
+                <div className="space-y-1"><Label>Cidade</Label><Input value={editingTecnico.cidade_residencia} onChange={e => setEditingTecnico({ ...editingTecnico, cidade_residencia: e.target.value.toUpperCase() })} /></div>
+              </div>
+              <DialogFooter><Button onClick={handleSaveTecnico}>Salvar Alterações</Button></DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Material Dialog */}
+      <Dialog open={!!editingMaterial} onOpenChange={() => setEditingMaterial(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Material</DialogTitle></DialogHeader>
+          {editingMaterial && (
+            <div className="space-y-4 pt-4">
+              <div className="space-y-1"><Label>Código</Label><Input value={editingMaterial.codigo} readOnly className="bg-muted" /></div>
+              <div className="space-y-1"><Label>Nome do Material</Label><Input value={editingMaterial.nome_material} onChange={e => setEditingMaterial({ ...editingMaterial, nome_material: e.target.value.toUpperCase() })} /></div>
+              <DialogFooter><Button onClick={handleSaveMaterial}>Salvar Alterações</Button></DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* View detail dialog */}
       <Dialog open={!!viewColeta} onOpenChange={() => setViewColeta(null)}>
