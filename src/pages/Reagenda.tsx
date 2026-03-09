@@ -620,11 +620,12 @@ Fico no aguardo!`;
                                 <div className="space-y-2">
                                     <p className="font-semibold text-primary">💬 Mensagem via Chat:</p>
                                     <p>O ícone de enviar WhatsApp copia as informações do cliente baseadas na operadora e preenche o convite de reagendamento direto no WebApp.</p>
-                                </div >
-                                <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
-                                    Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
                                 </div>
-                        </CardContent >
+                            </div>
+                            <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
+                                Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
+                            </div>
+                        </CardContent>
                     </Card >
                 )}
 
@@ -728,9 +729,9 @@ Fico no aguardo!`;
                                                         <TableCell>
                                                             <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
                                                                 <SelectTrigger className={`h-8 text-[11px] font-bold uppercase border-2 ${item.status === "Pendente" ? "border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300" :
-                                                                        item.status === "Contatado" ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/40 dark:text-emerald-300" :
-                                                                            item.status === "Aguardando retorno" ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-300" :
-                                                                                item.status === "Sem Contato" ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/40 dark:text-red-300" : ""
+                                                                    item.status === "Contatado" ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/40 dark:text-emerald-300" :
+                                                                        item.status === "Aguardando retorno" ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-300" :
+                                                                            item.status === "Sem Contato" ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/40 dark:text-red-300" : ""
                                                                     }`}>
                                                                     <SelectValue />
                                                                 </SelectTrigger>
