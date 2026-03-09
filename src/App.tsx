@@ -12,6 +12,7 @@ import PowerBI from "./pages/PowerBI";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
+import Reagenda from "./pages/Reagenda";
 import MaterialColeta from "./pages/MaterialColeta";
 import Reagenda from "./pages/Reagenda";
 import NotFound from "./pages/NotFound";

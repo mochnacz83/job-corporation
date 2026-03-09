@@ -9,9 +9,8 @@ import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
-  TooltipTrigger
-} from
-  "@/components/ui/tooltip";
+  TooltipTrigger } from
+"@/components/ui/tooltip";
 
 interface PowerBILink {
   id: string;
@@ -61,14 +60,14 @@ const Dashboard = () => {
       user_id: user.id,
       action: "page_view",
       page: "/dashboard"
-    }).then(() => { });
+    }).then(() => {});
 
     // Update presence
     supabase.from("user_presence").upsert({
       user_id: user.id,
       last_seen_at: new Date().toISOString(),
       current_page: "/dashboard"
-    }).then(() => { });
+    }).then(() => {});
 
     // Heartbeat every 30s
     const interval = setInterval(() => {
@@ -76,7 +75,7 @@ const Dashboard = () => {
         user_id: user.id,
         last_seen_at: new Date().toISOString(),
         current_page: window.location.pathname
-      }).then(() => { });
+      }).then(() => {});
     }, 30000);
 
     return () => clearInterval(interval);
@@ -132,7 +131,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Power BI Section */}
           {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("powerbi")) &&
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/powerbi")}>
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/powerbi")}>
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                   <BarChart3 className="w-6 h-6 text-primary" />
@@ -144,15 +143,15 @@ const Dashboard = () => {
                   Acesse os dashboards e relatórios de análise de dados.
                 </p>
                 {links.length > 0 &&
-                  <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
-                }
+              <p className="text-xs text-primary mt-2 font-medium">{links.length} relatório(s) disponível(is)</p>
+              }
               </CardContent>
             </Card>
           }
 
           {/* Reagenda Section */}
           {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("reagenda")) &&
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/reagenda")}>
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/reagenda")}>
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                   <CalendarDays className="w-6 h-6 text-primary" />
@@ -169,7 +168,7 @@ const Dashboard = () => {
 
           {/* Material Coleta Section */}
           {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("material_coleta")) &&
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/material-coleta")}>
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/material-coleta")}>
               <CardHeader className="pb-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
                   <ClipboardList className="w-6 h-6 text-primary" />
@@ -186,7 +185,7 @@ const Dashboard = () => {
 
           {/* Admin Section */}
           {isAdmin &&
-            <>
+          <>
               <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer border-primary/20" onClick={() => navigate("/admin/usuarios")}>
                 <CardHeader className="pb-3">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
@@ -218,8 +217,8 @@ const Dashboard = () => {
           }
         </div>
       </main>
-    </div>
-  );
+    </div>);
+
 };
 
 export default Dashboard;
