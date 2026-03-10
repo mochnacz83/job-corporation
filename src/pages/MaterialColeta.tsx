@@ -1128,7 +1128,7 @@ const MaterialColeta = () => {
                     </div>
                   )}
 
-                  {(classificacaoCenario === "LADO A COMPARTILHADO" || classificacaoCenario === "LADO B COMPARTILHADO") && (
+                  {(classificacaoCenario === "CLIENTE COMPARTILHADO" || classificacaoCenario === "ESTAÇÃO COMPARTILHADO") && (
                     <div className="space-y-1.5">
                       <Label>Circuito Compartilhado *</Label>
                       <Input
