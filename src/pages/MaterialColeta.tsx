@@ -56,6 +56,10 @@ interface ColetaRecord {
   ba: string | null;
   data_execucao: string | null;
   created_at: string;
+  pdf_url: string | null;
+  foto_url: string | null;
+  assinatura_colaborador: string | null;
+  assinatura_almoxarifado: string | null;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number; unidade: string; serial: string | null }[];
 }
 
@@ -124,8 +128,10 @@ const MaterialColeta = () => {
   const [searchBa, setSearchBa] = useState("");
   const [searchCircuito, setSearchCircuito] = useState("");
   const [searchTecnico, setSearchTecnico] = useState("");
+  const [allColetas, setAllColetas] = useState<ColetaRecord[]>([]);
   const [coletas, setColetas] = useState<ColetaRecord[]>([]);
   const [searching, setSearching] = useState(false);
+  const [coletasLoaded, setColetasLoaded] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
 
@@ -664,7 +670,10 @@ const MaterialColeta = () => {
     doc.setTextColor(150, 150, 150);
     doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
 
+    // Return blob for upload
+    const pdfBlob = doc.output("blob");
     doc.save(`material_reversa_${coletaData.ba || "sem_ba"}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    return pdfBlob;
   };
 
   // Submit form
@@ -798,7 +807,7 @@ const MaterialColeta = () => {
       toast.success("Salvo com sucesso!");
 
       if (isReversa) {
-        generatePDF({
+        const pdfBlob = generatePDF({
           matriculaTt,
           nomeTecnico,
           telefoneTecnico,
@@ -819,7 +828,19 @@ const MaterialColeta = () => {
           opcoes_adicionais: opcoesAdicionais,
           tipo_aplicacao: tipoAplicacao,
         });
+
+        // Upload PDF to storage and save URL
+        if (pdfBlob) {
+          const pdfPath = `${user.id}/${(coleta as any).id}.pdf`;
+          const { error: pdfUpErr } = await supabase.storage.from("material-fotos").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
+          if (!pdfUpErr) {
+            const { data: pdfUrlData } = supabase.storage.from("material-fotos").getPublicUrl(pdfPath);
+            await (supabase.from("material_coletas").update({ pdf_url: pdfUrlData.publicUrl } as any).eq("id", (coleta as any).id) as any);
+          }
+        }
       }
+
+      setColetasLoaded(false); // force reload on next tab visit
 
       // Reset form
       setMatriculaTt("");
@@ -846,22 +867,48 @@ const MaterialColeta = () => {
     }
   };
 
-  // Search / Consultation
-  const handleSearch = async () => {
+  // Load all coletas
+  const loadAllColetas = async () => {
     setSearching(true);
     try {
-      let query = supabase.from("material_coletas").select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
-      if (searchBa) query = query.ilike("ba", `%${searchBa}%`);
-      if (searchCircuito) query = query.ilike("circuito", `%${searchCircuito}%`);
-      if (searchTecnico) query = query.ilike("nome_tecnico", `%${searchTecnico}%`);
-      const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
+      const { data, error } = await (supabase
+        .from("material_coletas")
+        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+        .order("created_at", { ascending: false })
+        .limit(500) as any);
       if (error) throw error;
-      setColetas((data || []) as ColetaRecord[]);
+      const records = (data || []) as unknown as ColetaRecord[];
+      setAllColetas(records);
+      setColetas(records);
+      setColetasLoaded(true);
     } catch (err: any) {
-      toast.error("Erro na consulta: " + err.message);
+      toast.error("Erro ao carregar coletas: " + err.message);
     } finally {
       setSearching(false);
     }
+  };
+
+  // Auto-load when switching to consulta tab
+  useEffect(() => {
+    if (activeTab === "consulta" && !coletasLoaded) {
+      loadAllColetas();
+    }
+  }, [activeTab, coletasLoaded]);
+
+  // Search / Filter coletas locally
+  const handleSearch = () => {
+    let filtered = allColetas;
+    if (searchBa) filtered = filtered.filter(c => (c.ba || "").toUpperCase().includes(searchBa));
+    if (searchCircuito) filtered = filtered.filter(c => (c.circuito || "").toUpperCase().includes(searchCircuito));
+    if (searchTecnico) filtered = filtered.filter(c => c.nome_tecnico.toUpperCase().includes(searchTecnico));
+    setColetas(filtered);
+  };
+
+  const handleClearFilters = () => {
+    setSearchBa("");
+    setSearchCircuito("");
+    setSearchTecnico("");
+    setColetas(allColetas);
   };
 
   // Cadastro Management Functions
@@ -915,6 +962,7 @@ const MaterialColeta = () => {
     try {
       await supabase.from("material_coleta_items").delete().eq("coleta_id", deleteId);
       await supabase.from("material_coletas").delete().eq("id", deleteId);
+      setAllColetas((prev) => prev.filter((c) => c.id !== deleteId));
       setColetas((prev) => prev.filter((c) => c.id !== deleteId));
       toast.success("Registro excluído");
     } catch (err: any) {
@@ -1505,20 +1553,26 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">BA</Label>
-                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="BUSCAR BA" className="uppercase" />
+                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="FILTRAR BA" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Circuito</Label>
-                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="BUSCAR CIRCUITO" className="uppercase" />
+                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="FILTRAR CIRCUITO" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Técnico</Label>
-                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="BUSCAR TÉCNICO" className="uppercase" />
+                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="FILTRAR TÉCNICO" className="uppercase" />
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <Button onClick={handleSearch} disabled={searching}>
-                    <Search className="w-4 h-4 mr-1" /> {searching ? "Buscando..." : "Consultar"}
+                    <Search className="w-4 h-4 mr-1" /> {searching ? "Carregando..." : "Filtrar"}
+                  </Button>
+                  <Button variant="ghost" onClick={handleClearFilters}>
+                    Limpar Filtros
+                  </Button>
+                  <Button variant="outline" onClick={() => loadAllColetas()}>
+                    <Download className="w-4 h-4 mr-1" /> Recarregar
                   </Button>
                   <Button variant="outline" onClick={() => handleExport("xlsx")}>
                     <Download className="w-4 h-4 mr-1" /> Exportar Excel
@@ -1527,13 +1581,18 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Exportar CSV
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
+                </p>
               </CardContent>
             </Card>
 
-            {coletas.length > 0 && (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-auto max-h-[60vh]">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-auto max-h-[60vh]">
+                  {searching ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">Carregando coletas...</p>
+                  ) : coletas.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1568,6 +1627,11 @@ const MaterialColeta = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
                                   <Eye className="w-3.5 h-3.5" />
                                 </Button>
+                                {c.pdf_url && (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
+                                    <FileText className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -1577,10 +1641,12 @@ const MaterialColeta = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhuma coleta encontrada.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
@@ -1710,6 +1776,45 @@ const MaterialColeta = () => {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="flex gap-2 pt-3 border-t">
+                {viewColeta.pdf_url && (
+                  <Button size="sm" variant="outline" onClick={() => window.open(viewColeta.pdf_url!, "_blank")}>
+                    <FileText className="w-4 h-4 mr-1" /> Doc Logística (PDF)
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => {
+                  // Regenerate PDF from coleta data
+                  const items: MaterialItem[] = viewColeta.material_coleta_items.map((item, i) => ({
+                    id: String(i),
+                    codigo_material: item.codigo_material,
+                    nome_material: item.nome_material,
+                    quantidade: item.quantidade,
+                    unidade: item.unidade,
+                    serial: item.serial || "",
+                    seriais: [],
+                    askSeriais: false,
+                  }));
+                  generatePDF({
+                    matriculaTt: viewColeta.matricula_tt || "",
+                    nomeTecnico: viewColeta.nome_tecnico,
+                    telefoneTecnico: "",
+                    cidade: viewColeta.cidade || "",
+                    siglaCidade: viewColeta.sigla_cidade || "",
+                    uf: viewColeta.uf || "",
+                    atividade: viewColeta.atividade,
+                    ba: viewColeta.ba || "",
+                    circuito: viewColeta.circuito || "",
+                    dataExecucao: viewColeta.data_execucao || "",
+                    materiais: items,
+                    assinaturaColaborador: viewColeta.assinatura_colaborador || "",
+                    assinaturaAlmoxarifado: viewColeta.assinatura_almoxarifado || "",
+                    fotoDataUrl: viewColeta.foto_url || null,
+                    tipo_aplicacao: viewColeta.tipo_aplicacao,
+                  });
+                }}>
+                  <Download className="w-4 h-4 mr-1" /> Gerar PDF
+                </Button>
               </div>
             </div>
           )}

@@ -147,6 +147,7 @@ export type Database = {
           id: string
           matricula_tt: string | null
           nome_tecnico: string
+          pdf_url: string | null
           sigla_cidade: string | null
           tipo_aplicacao: string
           uf: string | null
@@ -166,6 +167,7 @@ export type Database = {
           id?: string
           matricula_tt?: string | null
           nome_tecnico: string
+          pdf_url?: string | null
           sigla_cidade?: string | null
           tipo_aplicacao: string
           uf?: string | null
@@ -185,6 +187,7 @@ export type Database = {
           id?: string
           matricula_tt?: string | null
           nome_tecnico?: string
+          pdf_url?: string | null
           sigla_cidade?: string | null
           tipo_aplicacao?: string
           uf?: string | null
