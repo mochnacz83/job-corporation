@@ -51,10 +51,9 @@ const Dashboard = () => {
         return combined;
       });
     });
-  });
-}, []);
+  }, []);
 
-useAccessTracking("/dashboard");
+  useAccessTracking("/dashboard");
 
 const handleSignOut = async () => {
   await signOut();
