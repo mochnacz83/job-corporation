@@ -1034,7 +1034,7 @@ const MaterialColeta = () => {
         );
 
         if (filteredColetas.length === 0) {
-          toast({ title: "Atenção", description: "Nenhum registro encontrado para essa data com as atividades válidas.", variant: "destructive" });
+          toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
           return;
         }
 
