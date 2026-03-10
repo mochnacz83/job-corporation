@@ -1015,7 +1015,10 @@ const MaterialColeta = () => {
       XLSX.writeFile(wb, `${filename}.csv`, { bookType: "csv" });
     } else {
       XLSX.writeFile(wb, `${filename}.xlsx`);
-      // Export Gestech
+    }
+  };
+
+  // Export Gestech
       const handleGestechExport = () => {
         if (!gestechExportDate) {
           toast.error("Por favor, selecione uma data.");
