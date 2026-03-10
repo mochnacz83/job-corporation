@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PowerBILink {
