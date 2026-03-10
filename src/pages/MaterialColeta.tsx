@@ -1113,7 +1113,7 @@ const MaterialColeta = () => {
                     </Select>
                   </div>
 
-                  {(localRetirada === "SO ESTACAO" || localRetirada === "SO CLIENTE") && (
+                  {localRetirada === "SO CLIENTE" && (
                     <div className="space-y-1.5">
                       <Label>Classificação do Cenário *</Label>
                       <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
