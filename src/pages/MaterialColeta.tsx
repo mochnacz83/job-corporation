@@ -2011,6 +2011,20 @@ const MaterialColeta = () => {
               )}
             </DialogContent>
           </Dialog >
+
+          {/* Scanner Dialog */}
+          <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Leitor de Código</DialogTitle>
+                <DialogDescription>Aponte a câmera para o código de barras ou QR Code</DialogDescription>
+              </DialogHeader>
+              <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
+              <DialogFooter>
+                <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div >
       );
     };
