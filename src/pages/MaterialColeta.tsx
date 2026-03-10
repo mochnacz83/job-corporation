@@ -56,6 +56,10 @@ interface ColetaRecord {
   ba: string | null;
   data_execucao: string | null;
   created_at: string;
+  pdf_url: string | null;
+  foto_url: string | null;
+  assinatura_colaborador: string | null;
+  assinatura_almoxarifado: string | null;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number; unidade: string; serial: string | null }[];
 }
 
