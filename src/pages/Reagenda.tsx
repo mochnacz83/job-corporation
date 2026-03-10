@@ -629,7 +629,7 @@ Fico no aguardo!`;
                     </Card>
                 )}
 
-                <header className="w-full max-w-full mb-2 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 flex-wrap shrink-0 px-1">
+                <header className="w-full max-w-[1600px] mx-auto mb-2 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 flex-wrap shrink-0 px-1">
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                         <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="shrink-0">
                             <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Voltar</span>
@@ -659,7 +659,7 @@ Fico no aguardo!`;
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto space-y-4 sm:space-y-6 px-1">
+                <main className="flex-1 w-full max-w-[1600px] mx-auto overflow-y-auto space-y-4 sm:space-y-6 px-1">
                     <Card className="glass-card">
                         <CardHeader>
                             <CardTitle className="text-lg">Painel de Importação</CardTitle>
@@ -729,9 +729,9 @@ Fico no aguardo!`;
                                                         <TableCell>
                                                             <Select value={item.status} onValueChange={(v: any) => updateStatus(item.id, v)}>
                                                                 <SelectTrigger className={`h-8 text-[11px] font-bold uppercase border-2 ${item.status === "Pendente" ? "border-gray-300 bg-gray-50 text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300" :
-                                                                        item.status === "Contatado" ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/40 dark:text-emerald-300" :
-                                                                            item.status === "Aguardando retorno" ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-300" :
-                                                                                item.status === "Sem Contato" ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/40 dark:text-red-300" : ""
+                                                                    item.status === "Contatado" ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-500 dark:bg-emerald-900/40 dark:text-emerald-300" :
+                                                                        item.status === "Aguardando retorno" ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-300" :
+                                                                            item.status === "Sem Contato" ? "border-red-400 bg-red-50 text-red-700 dark:border-red-500 dark:bg-red-900/40 dark:text-red-300" : ""
                                                                     }`}>
                                                                     <SelectValue />
                                                                 </SelectTrigger>

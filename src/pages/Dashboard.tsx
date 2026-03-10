@@ -90,7 +90,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="w-full max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-1 bg-transparent w-12 h-12 flex items-center justify-center overflow-hidden">
               <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
@@ -121,7 +121,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="w-full max-w-[1600px] mx-auto px-4 py-8 space-y-8">
         <div>
           <h2 className="text-2xl font-bold text-foreground">
             Olá, {profile?.nome?.split(" ")[0]}! 👋
@@ -218,7 +218,7 @@ const Dashboard = () => {
           }
         </div>
       </main>
-    </div>);
+    </div >);
 
 };
 
