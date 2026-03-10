@@ -141,12 +141,17 @@ export type Database = {
           ba: string | null
           cidade: string | null
           circuito: string | null
+          circuito_compartilhado: string | null
+          classificacao_cenario: string | null
           created_at: string
           data_execucao: string
           foto_url: string | null
           id: string
+          local_retirada: string | null
           matricula_tt: string | null
           nome_tecnico: string
+          opcoes_adicionais: string | null
+          pdf_url: string | null
           sigla_cidade: string | null
           tipo_aplicacao: string
           uf: string | null
@@ -160,12 +165,17 @@ export type Database = {
           ba?: string | null
           cidade?: string | null
           circuito?: string | null
+          circuito_compartilhado?: string | null
+          classificacao_cenario?: string | null
           created_at?: string
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico: string
+          opcoes_adicionais?: string | null
+          pdf_url?: string | null
           sigla_cidade?: string | null
           tipo_aplicacao: string
           uf?: string | null
@@ -179,12 +189,17 @@ export type Database = {
           ba?: string | null
           cidade?: string | null
           circuito?: string | null
+          circuito_compartilhado?: string | null
+          classificacao_cenario?: string | null
           created_at?: string
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico?: string
+          opcoes_adicionais?: string | null
+          pdf_url?: string | null
           sigla_cidade?: string | null
           tipo_aplicacao?: string
           uf?: string | null

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PowerBILink {
@@ -33,6 +33,7 @@ const AVAILABLE_MODULES = [
     { id: "dashboard", label: "Dashboard Principal", icon: LayoutDashboard },
     { id: "powerbi", label: "Relatórios Power BI", icon: BarChart3 },
     { id: "reagenda", label: "Sistema de Reagendamento", icon: CalendarDays },
+    { id: "material_coleta", label: "Coleta Material Dados", icon: ClipboardList },
 ];
 
 const AdminPermissions = () => {
