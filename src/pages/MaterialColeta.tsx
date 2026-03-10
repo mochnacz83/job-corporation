@@ -856,13 +856,13 @@ const MaterialColeta = () => {
   const loadAllColetas = async () => {
     setSearching(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from("material_coletas")
-        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)" as any)
+        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(500) as any);
       if (error) throw error;
-      const records = (data || []) as ColetaRecord[];
+      const records = (data || []) as unknown as ColetaRecord[];
       setAllColetas(records);
       setColetas(records);
       setColetasLoaded(true);
