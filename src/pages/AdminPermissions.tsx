@@ -33,6 +33,7 @@ const AVAILABLE_MODULES = [
     { id: "dashboard", label: "Dashboard Principal", icon: LayoutDashboard },
     { id: "powerbi", label: "Relatórios Power BI", icon: BarChart3 },
     { id: "reagenda", label: "Sistema de Reagendamento", icon: CalendarDays },
+    { id: "material_coleta", label: "Coleta Material Dados", icon: ClipboardList },
 ];
 
 const AdminPermissions = () => {
