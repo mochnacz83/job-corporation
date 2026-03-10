@@ -510,7 +510,8 @@ const MaterialColeta = () => {
     // Header
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("MATERIAL DE REVERSA", pageW / 2, y + 7, { align: "center" });
+    const pdfTitle = coletaData.tipo_aplicacao === "REVERSA" ? "MATERIAL DE REVERSA" : "MATERIAL DE APLICAÇÃO";
+    doc.text(pdfTitle, pageW / 2, y + 7, { align: "center" });
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.text(`Data: ${coletaData.dataExecucao ? new Date(coletaData.dataExecucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}`, pageW - margin, y + 4, { align: "right" });
