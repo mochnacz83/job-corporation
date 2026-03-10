@@ -128,8 +128,10 @@ const MaterialColeta = () => {
   const [searchBa, setSearchBa] = useState("");
   const [searchCircuito, setSearchCircuito] = useState("");
   const [searchTecnico, setSearchTecnico] = useState("");
+  const [allColetas, setAllColetas] = useState<ColetaRecord[]>([]);
   const [coletas, setColetas] = useState<ColetaRecord[]>([]);
   const [searching, setSearching] = useState(false);
+  const [coletasLoaded, setColetasLoaded] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
 
