@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface MaterialItem {
   id: string;
@@ -135,12 +136,69 @@ const MaterialColeta = () => {
   const [coletasLoaded, setColetasLoaded] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
+  const [gestechExportOpen, setGestechExportOpen] = useState(false);
+  const [gestechExportDate, setGestechExportDate] = useState("");
 
   // Edit states
   const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
   const [editingMaterial, setEditingMaterial] = useState<MaterialCadastro | null>(null);
   const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
   const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
+
+  // Scanner state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerCallback, setScannerCallback] = useState<((code: string) => void) | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const openScanner = (onScan: (code: string) => void) => {
+    setScannerCallback(() => onScan);
+    setScannerOpen(true);
+  };
+
+  const closeScanner = async () => {
+    try {
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    } catch (_) {}
+    setScannerOpen(false);
+    setScannerCallback(null);
+  };
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+    let cancelled = false;
+    const startScanner = async () => {
+      try {
+        const html5Qr = new Html5Qrcode("barcode-scanner-container");
+        scannerRef.current = html5Qr;
+        await html5Qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 150 } },
+          (decodedText) => {
+            if (!cancelled && scannerCallback) {
+              scannerCallback(decodedText.toUpperCase());
+              closeScanner();
+            }
+          },
+          () => {}
+        );
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Não foi possível acessar a câmera. Verifique as permissões.");
+          closeScanner();
+        }
+      }
+    };
+    // Small delay to ensure the DOM element is mounted
+    const timer = setTimeout(startScanner, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [scannerOpen]);
 
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
@@ -1015,7 +1073,10 @@ const MaterialColeta = () => {
       XLSX.writeFile(wb, `${filename}.csv`, { bookType: "csv" });
     } else {
       XLSX.writeFile(wb, `${filename}.xlsx`);
-      // Export Gestech
+    }
+  };
+
+  // Export Gestech
       const handleGestechExport = () => {
         if (!gestechExportDate) {
           toast.error("Por favor, selecione uma data.");
@@ -1028,8 +1089,17 @@ const MaterialColeta = () => {
           ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase())
         );
 
-        if (filteredColetas.length === 0) {
-          toast({ title: "Atenção", description: "Nenhum registro encontrado para essa data com as atividades válidas.", variant: "destructive" });
+        // Deduplica por BA — mantém apenas o primeiro registro de cada BA
+        const seenBAs = new Set<string>();
+        const uniqueColetas = filteredColetas.filter(c => {
+          const ba = (c.ba || "").trim().toUpperCase();
+          if (!ba || seenBAs.has(ba)) return false;
+          seenBAs.add(ba);
+          return true;
+        });
+
+        if (uniqueColetas.length === 0) {
+          toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
           return;
         }
 
@@ -1038,8 +1108,8 @@ const MaterialColeta = () => {
         const horaAtual = agora.getHours();
         const turno = horaAtual < 12 ? "MANHÃ" : "TARDE";
 
-        // Map 1 row per Coleta (BA/Circuito), not per material
-        const rows = filteredColetas.map(c => {
+        // Map 1 row per Coleta (BA único)
+        const rows = uniqueColetas.map(c => {
           const isAtivacao = c.atividade.toUpperCase() === "ATIVAÇÃO";
           const isReparo = c.atividade.toUpperCase() === "REPARO";
           const isPreventiva = c.atividade.toUpperCase() === "PREVENTIVA";
@@ -1049,10 +1119,12 @@ const MaterialColeta = () => {
           else if (isReparo) servico = "REPDADOS";
           else if (isPreventiva) servico = "PREVDADOS";
 
-          const nrba = [c.matricula_tt, c.circuito, c.ba].filter(Boolean).join("-");
+          const cctoClean = (c.circuito || "").replace(/\s/g, "");
+          const ttClean = (c.matricula_tt || "").replace(/\s/g, "");
+          const baClean = (c.ba || "").replace(/\s/g, "");
+          const nrba = [ttClean, cctoClean, baClean].filter(Boolean).join("-");
 
           return {
-            "COLUNA": "",
             "EMPRESA": "ABILITY",
             "NRBA": nrba,
             "DATACRIACAO": dataAtual,
@@ -1354,7 +1426,7 @@ const MaterialColeta = () => {
                                       placeholder="SERIAL"
                                       className="flex-1 uppercase"
                                     />
-                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
+                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
                                       <ScanBarcode className="w-4 h-4" />
                                     </Button>
                                   </div>
@@ -1386,7 +1458,7 @@ const MaterialColeta = () => {
                                         placeholder={`SERIAL ${i + 1} *`}
                                         className="flex-1 uppercase"
                                       />
-                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
+                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
                                         <ScanBarcode className="w-4 h-4" />
                                       </Button>
                                     </div>
@@ -1941,6 +2013,20 @@ const MaterialColeta = () => {
               )}
             </DialogContent>
           </Dialog >
+
+          {/* Scanner Dialog */}
+          <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Leitor de Código</DialogTitle>
+                <DialogDescription>Aponte a câmera para o código de barras ou QR Code</DialogDescription>
+              </DialogHeader>
+              <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
+              <DialogFooter>
+                <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div >
       );
     };
