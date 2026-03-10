@@ -135,7 +135,7 @@ const MaterialColeta = () => {
   const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
   const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
 
-  const isReversa = tipoAplicacao === "REVERSA";
+  const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
 
   // Load catalogs
@@ -557,61 +557,67 @@ const MaterialColeta = () => {
     });
     y += 18;
 
-    // Materials table
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setFillColor(0, 90, 160);
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, y, pageW - 2 * margin, 5, "F");
-    const cols = [margin + 1, margin + 22, margin + 75, margin + 90, margin + 108, margin + 128];
-    doc.text("CÓDIGO", cols[0], y + 3.5);
-    doc.text("NOME MATERIAL", cols[1], y + 3.5);
-    doc.text("QTDE", cols[2], y + 3.5);
-    doc.text("UN/METRO", cols[3], y + 3.5);
-    doc.text("SERIAL", cols[4], y + 3.5);
-    y += 5;
+    // Materials table - Skip if SEM MATERIAL
+    const isSemMaterialPDF = coletaData.tipo_aplicacao === "SEM MATERIAL";
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
+    if (!isSemMaterialPDF) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setFillColor(0, 90, 160);
+      doc.setTextColor(255, 255, 255);
+      doc.rect(margin, y, pageW - 2 * margin, 5, "F");
+      const cols = [margin + 1, margin + 22, margin + 75, margin + 90, margin + 108, margin + 128];
+      doc.text("CÓDIGO", cols[0], y + 3.5);
+      doc.text("NOME MATERIAL", cols[1], y + 3.5);
+      doc.text("QTDE", cols[2], y + 3.5);
+      doc.text("UN/METRO", cols[3], y + 3.5);
+      doc.text("SERIAL", cols[4], y + 3.5);
+      y += 5;
 
-    // Flatten materials with seriais
-    const flatItems: { codigo: string; nome: string; qtde: string; un: string; serial: string }[] = [];
-    coletaData.materiais.forEach((m) => {
-      if (m.seriais.length > 0) {
-        m.seriais.forEach((s, i) => {
-          flatItems.push({
-            codigo: i === 0 ? m.codigo_material : "",
-            nome: i === 0 ? m.nome_material : "",
-            qtde: i === 0 ? String(m.quantidade) : "",
-            un: i === 0 ? m.unidade : "",
-            serial: s || "-",
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+
+      // Flatten materials with seriais
+      const flatItems: { codigo: string; nome: string; qtde: string; un: string; serial: string }[] = [];
+      coletaData.materiais.forEach((m) => {
+        if (m.seriais.length > 0) {
+          m.seriais.forEach((s, i) => {
+            flatItems.push({
+              codigo: i === 0 ? m.codigo_material : "",
+              nome: i === 0 ? m.nome_material : "",
+              qtde: i === 0 ? String(m.quantidade) : "",
+              un: i === 0 ? m.unidade : "",
+              serial: s || "-",
+            });
           });
-        });
-      } else {
-        flatItems.push({
-          codigo: m.codigo_material,
-          nome: m.nome_material,
-          qtde: String(m.quantidade),
-          un: m.unidade,
-          serial: m.serial || "-",
-        });
-      }
-    });
+        } else {
+          flatItems.push({
+            codigo: m.codigo_material,
+            nome: m.nome_material,
+            qtde: String(m.quantidade),
+            un: m.unidade,
+            serial: m.serial || "-",
+          });
+        }
+      });
 
-    flatItems.forEach((item, i) => {
-      const bg = i % 2 === 0 ? 245 : 255;
-      doc.setFillColor(bg, bg, bg);
-      doc.rect(margin, y, pageW - 2 * margin, 4, "F");
-      doc.text(item.codigo, cols[0], y + 3);
-      doc.text(item.nome.substring(0, 28), cols[1], y + 3);
-      doc.text(item.qtde, cols[2], y + 3);
-      doc.text(item.un, cols[3], y + 3);
-      doc.text(item.serial.substring(0, 20), cols[4], y + 3);
+      flatItems.forEach((item, i) => {
+        const bg = i % 2 === 0 ? 245 : 255;
+        doc.setFillColor(bg, bg, bg);
+        doc.rect(margin, y, pageW - 2 * margin, 4, "F");
+        doc.text(item.codigo, cols[0], y + 3);
+        doc.text(item.nome.substring(0, 28), cols[1], y + 3);
+        doc.text(item.qtde, cols[2], y + 3);
+        doc.text(item.un, cols[3], y + 3);
+        doc.text(item.serial.substring(0, 20), cols[4], y + 3);
+        y += 4;
+      });
+      y += 3;
+    } else {
+      // Just a small spacer if no materials
       y += 4;
-    });
-
-    y += 3;
+    }
 
     // Frase padrão
     doc.setFontSize(6);
@@ -768,32 +774,36 @@ const MaterialColeta = () => {
 
       // Flatten seriais into individual items
       const items: any[] = [];
-      materiais.forEach((m) => {
-        if (m.seriais.length > 0) {
-          m.seriais.forEach((s) => {
+      if (!isSemMaterial) {
+        materiais.forEach((m) => {
+          if (m.seriais.length > 0) {
+            m.seriais.forEach((s) => {
+              items.push({
+                coleta_id: (coleta as any).id,
+                codigo_material: m.codigo_material,
+                nome_material: m.nome_material,
+                quantidade: 1,
+                unidade: m.unidade,
+                serial: s || null,
+              });
+            });
+          } else {
             items.push({
               coleta_id: (coleta as any).id,
               codigo_material: m.codigo_material,
               nome_material: m.nome_material,
-              quantidade: 1,
+              quantidade: m.quantidade,
               unidade: m.unidade,
-              serial: s || null,
+              serial: m.serial || null,
             });
-          });
-        } else {
-          items.push({
-            coleta_id: (coleta as any).id,
-            codigo_material: m.codigo_material,
-            nome_material: m.nome_material,
-            quantidade: m.quantidade,
-            unidade: m.unidade,
-            serial: m.serial || null,
-          });
-        }
-      });
+          }
+        });
 
-      const { error: itemsError } = await supabase.from("material_coleta_items").insert(items as any);
-      if (itemsError) throw itemsError;
+        if (items.length > 0) {
+          const { error: itemsError } = await supabase.from("material_coleta_items").insert(items as any);
+          if (itemsError) throw itemsError;
+        }
+      }
 
       toast.success("Salvo com sucesso!");
 
@@ -968,7 +978,7 @@ const MaterialColeta = () => {
           <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
             <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-base font-bold text-foreground">Formulário de Coleta Material Dados</h1>
+          <h1 className="text-base font-bold text-foreground">Formulário de Controle Materiais Dados</h1>
         </div>
       </header>
 
@@ -1021,6 +1031,10 @@ const MaterialColeta = () => {
                 {/* Row: Cidade + Sigla + UF */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
+                    <Label>Sigla da Estação *</Label>
+                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>Cidade *</Label>
                     <Input
                       value={cidade}
@@ -1032,10 +1046,6 @@ const MaterialColeta = () => {
                     <datalist id="cidades-sc">
                       {CIDADES_SC.map(c => <option key={c} value={c} />)}
                     </datalist>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Sigla da Estação *</Label>
-                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>UF *</Label>
@@ -1095,8 +1105,8 @@ const MaterialColeta = () => {
               </CardContent>
             </Card>
 
-            {/* RETIRADA Checkpoints */}
-            {atividade === "RETIRADA" && !isSemMaterial && (
+            {/* RETIRADA/REVERSA Checkpoints */}
+            {isReversa && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
