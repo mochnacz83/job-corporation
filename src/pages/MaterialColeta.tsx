@@ -1108,7 +1108,6 @@ const MaterialColeta = () => {
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
-                        <SelectItem value="SO ESTACAO">SÓ ESTAÇÃO</SelectItem>
                         <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
                       </SelectContent>
                     </Select>
