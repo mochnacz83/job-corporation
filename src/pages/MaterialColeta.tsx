@@ -145,6 +145,61 @@ const MaterialColeta = () => {
   const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
   const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
 
+  // Scanner state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerCallback, setScannerCallback] = useState<((code: string) => void) | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const openScanner = (onScan: (code: string) => void) => {
+    setScannerCallback(() => onScan);
+    setScannerOpen(true);
+  };
+
+  const closeScanner = async () => {
+    try {
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    } catch (_) {}
+    setScannerOpen(false);
+    setScannerCallback(null);
+  };
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+    let cancelled = false;
+    const startScanner = async () => {
+      try {
+        const html5Qr = new Html5Qrcode("barcode-scanner-container");
+        scannerRef.current = html5Qr;
+        await html5Qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 150 } },
+          (decodedText) => {
+            if (!cancelled && scannerCallback) {
+              scannerCallback(decodedText.toUpperCase());
+              closeScanner();
+            }
+          },
+          () => {}
+        );
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Não foi possível acessar a câmera. Verifique as permissões.");
+          closeScanner();
+        }
+      }
+    };
+    // Small delay to ensure the DOM element is mounted
+    const timer = setTimeout(startScanner, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [scannerOpen]);
+
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
 
