@@ -1391,8 +1391,8 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Baixar Modelo
                   </Button>
                 </div>
-                {tecnicos.length > 0 && (
-                  <div className="max-h-48 overflow-auto border rounded">
+                <div className="max-h-48 overflow-auto border rounded">
+                  {tecnicos.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
