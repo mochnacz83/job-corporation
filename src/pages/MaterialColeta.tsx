@@ -1432,8 +1432,10 @@ const MaterialColeta = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
