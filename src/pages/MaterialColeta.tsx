@@ -1646,11 +1646,6 @@ const MaterialColeta = () => {
                 </div>
               </CardContent>
             </Card>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
         </Tabs>
       </main>
