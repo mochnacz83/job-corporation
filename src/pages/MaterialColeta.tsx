@@ -962,6 +962,7 @@ const MaterialColeta = () => {
     try {
       await supabase.from("material_coleta_items").delete().eq("coleta_id", deleteId);
       await supabase.from("material_coletas").delete().eq("id", deleteId);
+      setAllColetas((prev) => prev.filter((c) => c.id !== deleteId));
       setColetas((prev) => prev.filter((c) => c.id !== deleteId));
       toast.success("Registro excluído");
     } catch (err: any) {
