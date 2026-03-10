@@ -852,22 +852,48 @@ const MaterialColeta = () => {
     }
   };
 
-  // Search / Consultation
-  const handleSearch = async () => {
+  // Load all coletas
+  const loadAllColetas = async () => {
     setSearching(true);
     try {
-      let query = supabase.from("material_coletas").select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)") as any;
-      if (searchBa) query = query.ilike("ba", `%${searchBa}%`);
-      if (searchCircuito) query = query.ilike("circuito", `%${searchCircuito}%`);
-      if (searchTecnico) query = query.ilike("nome_tecnico", `%${searchTecnico}%`);
-      const { data, error } = await query.order("created_at", { ascending: false }).limit(100);
+      const { data, error } = await supabase
+        .from("material_coletas")
+        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)" as any)
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
-      setColetas((data || []) as ColetaRecord[]);
+      const records = (data || []) as ColetaRecord[];
+      setAllColetas(records);
+      setColetas(records);
+      setColetasLoaded(true);
     } catch (err: any) {
-      toast.error("Erro na consulta: " + err.message);
+      toast.error("Erro ao carregar coletas: " + err.message);
     } finally {
       setSearching(false);
     }
+  };
+
+  // Auto-load when switching to consulta tab
+  useEffect(() => {
+    if (activeTab === "consulta" && !coletasLoaded) {
+      loadAllColetas();
+    }
+  }, [activeTab, coletasLoaded]);
+
+  // Search / Filter coletas locally
+  const handleSearch = () => {
+    let filtered = allColetas;
+    if (searchBa) filtered = filtered.filter(c => (c.ba || "").toUpperCase().includes(searchBa));
+    if (searchCircuito) filtered = filtered.filter(c => (c.circuito || "").toUpperCase().includes(searchCircuito));
+    if (searchTecnico) filtered = filtered.filter(c => c.nome_tecnico.toUpperCase().includes(searchTecnico));
+    setColetas(filtered);
+  };
+
+  const handleClearFilters = () => {
+    setSearchBa("");
+    setSearchCircuito("");
+    setSearchTecnico("");
+    setColetas(allColetas);
   };
 
   // Cadastro Management Functions
