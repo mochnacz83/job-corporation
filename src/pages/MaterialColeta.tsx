@@ -807,7 +807,7 @@ const MaterialColeta = () => {
       toast.success("Salvo com sucesso!");
 
       if (isReversa) {
-        generatePDF({
+        const pdfBlob = generatePDF({
           matriculaTt,
           nomeTecnico,
           telefoneTecnico,
@@ -828,7 +828,19 @@ const MaterialColeta = () => {
           opcoes_adicionais: opcoesAdicionais,
           tipo_aplicacao: tipoAplicacao,
         });
+
+        // Upload PDF to storage and save URL
+        if (pdfBlob) {
+          const pdfPath = `${user.id}/${(coleta as any).id}.pdf`;
+          const { error: pdfUpErr } = await supabase.storage.from("material-fotos").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
+          if (!pdfUpErr) {
+            const { data: pdfUrlData } = supabase.storage.from("material-fotos").getPublicUrl(pdfPath);
+            await (supabase.from("material_coletas").update({ pdf_url: pdfUrlData.publicUrl } as any).eq("id", (coleta as any).id) as any);
+          }
+        }
       }
+
+      setColetasLoaded(false); // force reload on next tab visit
 
       // Reset form
       setMatriculaTt("");
