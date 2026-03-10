@@ -1573,15 +1573,24 @@ const MaterialColeta = () => {
                   <Button variant="ghost" onClick={handleClearFilters}>
                     Limpar Filtros
                   </Button>
-                  <Button variant="outline" onClick={() => loadAllColetas()}>
-                    <Download className="w-4 h-4 mr-1" /> Recarregar
+                  <Button variant="outline" size="icon" onClick={() => loadAllColetas()} title="Recarregar">
+                    <RefreshCw className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" onClick={() => handleExport("xlsx")}>
-                    <Download className="w-4 h-4 mr-1" /> Exportar Excel
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExport("csv")}>
-                    <Download className="w-4 h-4 mr-1" /> Exportar CSV
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" title="Exportar">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                        Exportar Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("csv")}>
+                        Exportar CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
