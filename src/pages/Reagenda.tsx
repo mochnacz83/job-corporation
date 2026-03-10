@@ -609,23 +609,16 @@ Fico no aguardo!`;
                                 <p>A coluna Data na tabela modelo baixada agora possui o formato nativo de data no sistema DD/MM/AAAA. Ao subir uma planilha nossa engine extrai essas datas do Excel com sucesso.</p>
                             </div>
                             <div className="space-y-2">
-<<<<<<< HEAD
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">⏱️ Temporizador de Status:</p>
-                                    <p>Ao clicar no <strong>WhatsApp</strong> ou <strong>Telegram</strong>, o sistema inicia automaticamente o cronômetro. Após 5 min → Aguardando retorno. Após 10 min → Sem Contato. Se você mudar o status manualmente, o temporizador para.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">🎨 Cores de Status:</p>
-                                    <p><span className="bg-blue-100 px-1 rounded">Contatado</span> = Azul &nbsp; <span className="bg-amber-100 px-1 rounded">Aguardando</span> = Laranja &nbsp; <span className="bg-red-100 px-1 rounded opacity-75">Sem Contato</span> = Vermelho</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">💬 Mensagem via Chat:</p>
-                                    <p>O ícone de enviar WhatsApp copia as informações do cliente baseadas na operadora e preenche o convite de reagendamento direto no WebApp.</p>
-                                </div>
-=======
+                                <p className="font-semibold text-primary">⏱️ Temporizador de Status:</p>
+                                <p>Ao clicar no <strong>WhatsApp</strong> ou <strong>Telegram</strong>, o sistema inicia automaticamente o cronômetro. Após 5 min → Aguardando retorno. Após 10 min → Sem Contato. Se você mudar o status manualmente, o temporizador para.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">🎨 Cores de Status:</p>
+                                <p><span className="bg-blue-100 px-1 rounded">Contatado</span> = Azul &nbsp; <span className="bg-amber-100 px-1 rounded">Aguardando</span> = Laranja &nbsp; <span className="bg-red-100 px-1 rounded opacity-75">Sem Contato</span> = Vermelho</p>
+                            </div>
+                            <div className="space-y-2">
                                 <p className="font-semibold text-primary">💬 Mensagem via Chat:</p>
                                 <p>O ícone de enviar WhatsApp copia as informações do cliente baseadas na operadora e preenche o convite de reagendamento direto no WebApp.</p>
->>>>>>> 809eb16d733de84290bc656037f65f28aad9d784
                             </div>
                             <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
                                 Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
