@@ -1552,20 +1552,26 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">BA</Label>
-                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="BUSCAR BA" className="uppercase" />
+                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="FILTRAR BA" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Circuito</Label>
-                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="BUSCAR CIRCUITO" className="uppercase" />
+                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="FILTRAR CIRCUITO" className="uppercase" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Técnico</Label>
-                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="BUSCAR TÉCNICO" className="uppercase" />
+                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="FILTRAR TÉCNICO" className="uppercase" />
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <Button onClick={handleSearch} disabled={searching}>
-                    <Search className="w-4 h-4 mr-1" /> {searching ? "Buscando..." : "Consultar"}
+                    <Search className="w-4 h-4 mr-1" /> {searching ? "Carregando..." : "Filtrar"}
+                  </Button>
+                  <Button variant="ghost" onClick={handleClearFilters}>
+                    Limpar Filtros
+                  </Button>
+                  <Button variant="outline" onClick={() => loadAllColetas()}>
+                    <Download className="w-4 h-4 mr-1" /> Recarregar
                   </Button>
                   <Button variant="outline" onClick={() => handleExport("xlsx")}>
                     <Download className="w-4 h-4 mr-1" /> Exportar Excel
@@ -1574,13 +1580,18 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Exportar CSV
                   </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
+                </p>
               </CardContent>
             </Card>
 
-            {coletas.length > 0 && (
-              <Card>
-                <CardContent className="p-0">
-                  <div className="overflow-auto max-h-[60vh]">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-auto max-h-[60vh]">
+                  {searching ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">Carregando coletas...</p>
+                  ) : coletas.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1615,6 +1626,11 @@ const MaterialColeta = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
                                   <Eye className="w-3.5 h-3.5" />
                                 </Button>
+                                {c.pdf_url && (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
+                                    <FileText className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -1623,6 +1639,13 @@ const MaterialColeta = () => {
                           </TableRow>
                         ))}
                       </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhuma coleta encontrada.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
                     </Table>
                   </div>
                 </CardContent>
