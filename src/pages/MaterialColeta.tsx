@@ -135,6 +135,8 @@ const MaterialColeta = () => {
   const [coletasLoaded, setColetasLoaded] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
+  const [gestechExportOpen, setGestechExportOpen] = useState(false);
+  const [gestechExportDate, setGestechExportDate] = useState("");
 
   // Edit states
   const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
@@ -1015,7 +1017,10 @@ const MaterialColeta = () => {
       XLSX.writeFile(wb, `${filename}.csv`, { bookType: "csv" });
     } else {
       XLSX.writeFile(wb, `${filename}.xlsx`);
-      // Export Gestech
+    }
+  };
+
+  // Export Gestech
       const handleGestechExport = () => {
         if (!gestechExportDate) {
           toast.error("Por favor, selecione uma data.");
@@ -1029,7 +1034,7 @@ const MaterialColeta = () => {
         );
 
         if (filteredColetas.length === 0) {
-          toast({ title: "Atenção", description: "Nenhum registro encontrado para essa data com as atividades válidas.", variant: "destructive" });
+          toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
           return;
         }
 
