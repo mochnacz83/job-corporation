@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface MaterialItem {
   id: string;
