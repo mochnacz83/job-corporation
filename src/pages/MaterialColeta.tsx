@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -162,7 +162,7 @@ const MaterialColeta = () => {
         scannerRef.current.clear();
         scannerRef.current = null;
       }
-    } catch (_) {}
+    } catch (_) { }
     setScannerOpen(false);
     setScannerCallback(null);
   };
@@ -183,7 +183,7 @@ const MaterialColeta = () => {
               closeScanner();
             }
           },
-          () => {}
+          () => { }
         );
       } catch (err) {
         if (!cancelled) {
@@ -1077,958 +1077,958 @@ const MaterialColeta = () => {
   };
 
   // Export Gestech
-      const handleGestechExport = () => {
-        if (!gestechExportDate) {
-          toast.error("Por favor, selecione uma data.");
-          return;
-        }
+  const handleGestechExport = () => {
+    if (!gestechExportDate) {
+      toast.error("Por favor, selecione uma data.");
+      return;
+    }
 
-        // Filtrar pela data de execução e pelas atividades permitidas
-        const filteredColetas = allColetas.filter(c =>
-          c.data_execucao === gestechExportDate &&
-          ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase())
-        );
+    // Filtrar pela data de execução e pelas atividades permitidas
+    const filteredColetas = allColetas.filter(c =>
+      c.data_execucao === gestechExportDate &&
+      ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase())
+    );
 
-        // Deduplica por BA — mantém apenas o primeiro registro de cada BA
-        const seenBAs = new Set<string>();
-        const uniqueColetas = filteredColetas.filter(c => {
-          const ba = (c.ba || "").trim().toUpperCase();
-          if (!ba || seenBAs.has(ba)) return false;
-          seenBAs.add(ba);
-          return true;
-        });
+    // Deduplica por BA — mantém apenas o primeiro registro de cada BA
+    const seenBAs = new Set<string>();
+    const uniqueColetas = filteredColetas.filter(c => {
+      const ba = (c.ba || "").trim().toUpperCase();
+      if (!ba || seenBAs.has(ba)) return false;
+      seenBAs.add(ba);
+      return true;
+    });
 
-        if (uniqueColetas.length === 0) {
-          toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
-          return;
-        }
+    if (uniqueColetas.length === 0) {
+      toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
+      return;
+    }
 
-        const agora = new Date();
-        const dataAtual = agora.toLocaleDateString("pt-BR");
-        const horaAtual = agora.getHours();
-        const turno = horaAtual < 12 ? "MANHÃ" : "TARDE";
+    const agora = new Date();
+    const dataAtual = agora.toLocaleDateString("pt-BR");
+    const horaAtual = agora.getHours();
+    const turno = horaAtual < 12 ? "MANHÃ" : "TARDE";
 
-        // Map 1 row per Coleta (BA único)
-        const rows = uniqueColetas.map(c => {
-          const isAtivacao = c.atividade.toUpperCase() === "ATIVAÇÃO";
-          const isReparo = c.atividade.toUpperCase() === "REPARO";
-          const isPreventiva = c.atividade.toUpperCase() === "PREVENTIVA";
+    // Map 1 row per Coleta (BA único)
+    const rows = uniqueColetas.map(c => {
+      const isAtivacao = c.atividade.toUpperCase() === "ATIVAÇÃO";
+      const isReparo = c.atividade.toUpperCase() === "REPARO";
+      const isPreventiva = c.atividade.toUpperCase() === "PREVENTIVA";
 
-          let servico = "";
-          if (isAtivacao) servico = "INSTDADOS";
-          else if (isReparo) servico = "REPDADOS";
-          else if (isPreventiva) servico = "PREVDADOS";
+      let servico = "";
+      if (isAtivacao) servico = "INSTDADOS";
+      else if (isReparo) servico = "REPDADOS";
+      else if (isPreventiva) servico = "PREVDADOS";
 
-          const cctoClean = (c.circuito || "").replace(/\s/g, "");
-          const ttClean = (c.matricula_tt || "").replace(/\s/g, "");
-          const baClean = (c.ba || "").replace(/\s/g, "");
-          const nrba = [ttClean, cctoClean, baClean].filter(Boolean).join("-");
+      const cctoClean = (c.circuito || "").replace(/\s/g, "");
+      const ttClean = (c.matricula_tt || "").replace(/\s/g, "");
+      const baClean = (c.ba || "").replace(/\s/g, "");
+      const nrba = [ttClean, cctoClean, baClean].filter(Boolean).join("-");
 
-          return {
-            "EMPRESA": "ABILITY",
-            "NRBA": nrba,
-            "DATACRIACAO": dataAtual,
-            "DATAAGENDAMENTO": dataAtual,
-            "MATRICULATECNICO": c.matricula_tt || "",
-            "TECNICO": c.nome_tecnico || "",
-            "SERVICO": servico,
-            "MACROATIVIDADE": servico,
-            "ATIVIDADE": servico,
-            "CPF": "",
-            "NOMECLIENTE": "",
-            "EXCLUIDO": "",
-            "INCLUIDO": "",
-            "ESTACAO": c.sigla_cidade || "",
-            "ENDERECO": c.sigla_cidade || "",
-            "RECLAMACAO": "",
-            "RESIDENCIA": "",
-            "HORARIO": turno,
-            "OBS": servico,
-            "NUMPEDIDOREPARO": "",
-            "STATUS": "",
-            "NOTASSTATUS": "",
-            "PENDENCIAS": "",
-            "CRITICA": "",
-            "SETOR": "",
-            "COMPANYID": "VTAL",
-            "SUBSCRIBERID": ""
-          };
-        });
-
-        const ws = XLSX.utils.json_to_sheet(rows);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Gestech");
-        const filename = `Exportar_Aplicacao_Gestech_${gestechExportDate.replace(/-/g, "")}`;
-        XLSX.writeFile(wb, `${filename}.xlsx`);
-
-        setGestechExportOpen(false);
-        toast.success("Exportação Gestech concluída com sucesso!");
+      return {
+        "EMPRESA": "ABILITY",
+        "NRBA": nrba,
+        "DATACRIACAO": dataAtual,
+        "DATAAGENDAMENTO": dataAtual,
+        "MATRICULATECNICO": c.matricula_tt || "",
+        "TECNICO": c.nome_tecnico || "",
+        "SERVICO": servico,
+        "MACROATIVIDADE": servico,
+        "ATIVIDADE": servico,
+        "CPF": "",
+        "NOMECLIENTE": "",
+        "EXCLUIDO": "",
+        "INCLUIDO": "",
+        "ESTACAO": c.sigla_cidade || "",
+        "ENDERECO": c.sigla_cidade || "",
+        "RECLAMACAO": "",
+        "RESIDENCIA": "",
+        "HORARIO": turno,
+        "OBS": servico,
+        "NUMPEDIDOREPARO": "",
+        "STATUS": "",
+        "NOTASSTATUS": "",
+        "PENDENCIAS": "",
+        "CRITICA": "",
+        "SETOR": "",
+        "COMPANYID": "VTAL",
+        "SUBSCRIBERID": ""
       };
+    });
 
-      return (
-        <div className="min-h-screen bg-background flex flex-col">
-          <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-            <div className="w-full max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
-                <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
-              </div>
-              <h1 className="text-base font-bold text-foreground">Formulário de Controle Materiais Dados</h1>
-            </div>
-          </header>
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Gestech");
+    const filename = `Exportar_Aplicacao_Gestech_${gestechExportDate.replace(/-/g, "")}`;
+    XLSX.writeFile(wb, `${filename}.xlsx`);
 
-          <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-4 overflow-auto">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-4">
-                <TabsTrigger value="formulario">Formulário</TabsTrigger>
-                <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
-                <TabsTrigger value="consulta">Consulta / Exportar</TabsTrigger>
-              </TabsList>
+    setGestechExportOpen(false);
+    toast.success("Exportação Gestech concluída com sucesso!");
+  };
 
-              {/* ── TAB: FORMULÁRIO ── */}
-              <TabsContent value="formulario" className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Dados da Coleta</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Row: Matrícula + Nome + Telefone */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>Matrícula (TT) *</Label>
-                        <Input
-                          value={matriculaTt}
-                          onChange={(e) => handleMatriculaTtChange(e.target.value)}
-                          placeholder="EX: TT12345"
-                          list="tt-list"
-                          className="uppercase"
-                        />
-                        <datalist id="tt-list">
-                          {tecnicos.filter((t) => t.tt).map((t, i) => (
-                            <option key={i} value={t.tt}>{t.nome_tecnico}</option>
-                          ))}
-                        </datalist>
-                        {ttError && <p className="text-xs text-destructive font-medium">{ttError}</p>}
-                        {tecnicos.length === 0 && (
-                          <p className="text-xs text-muted-foreground">Importe a planilha de técnicos na aba "Cadastros"</p>
-                        )}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Nome do Técnico *</Label>
-                        <Input value={nomeTecnico} readOnly placeholder="Preenchido automaticamente pela TT" className="bg-muted/50 uppercase" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Telefone do Técnico</Label>
-                        <Input value={telefoneTecnico} readOnly placeholder="Preenchido automaticamente" className="bg-muted/50" />
-                      </div>
-                    </div>
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="w-full max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
+            <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
+          </div>
+          <h1 className="text-base font-bold text-foreground">Formulário de Controle Materiais Dados</h1>
+        </div>
+      </header>
 
-                    {/* Row: Cidade + Sigla + UF */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>Sigla da Estação *</Label>
-                        <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Cidade *</Label>
-                        <Input
-                          value={cidade}
-                          onChange={(e) => handleCidadeChange(e.target.value)}
-                          placeholder="NOME DA CIDADE"
-                          className="uppercase"
-                          list="cidades-sc"
-                        />
-                        <datalist id="cidades-sc">
-                          {CIDADES_SC.map(c => <option key={c} value={c} />)}
-                        </datalist>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>UF *</Label>
-                        <Select value={uf} onValueChange={setUf}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            {UF_LIST.map((s) => (
-                              <SelectItem key={s} value={s}>{s}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-4 overflow-auto">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="formulario">Formulário</TabsTrigger>
+            <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+            <TabsTrigger value="consulta">Consulta / Exportar</TabsTrigger>
+          </TabsList>
 
-                    {/* Row: Atividade + Tipo Aplicação + Data Execução */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>Atividade *</Label>
-                        <Select value={atividade} onValueChange={setAtividade}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ATIVAÇÃO">ATIVAÇÃO</SelectItem>
-                            <SelectItem value="RETIRADA">RETIRADA</SelectItem>
-                            <SelectItem value="REPARO">REPARO</SelectItem>
-                            <SelectItem value="PREVENTIVA">PREVENTIVA</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Tipo Aplicação *</Label>
-                        <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
-                            <SelectItem value="REVERSA">REVERSA</SelectItem>
-                            <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Data de Execução *</Label>
-                        <Input type="date" value={dataExecucao} onChange={(e) => setDataExecucao(e.target.value)} />
-                      </div>
-                    </div>
-
-                    {/* Row: BA + Circuito */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label>BA *</Label>
-                        <Input value={ba} onChange={(e) => setBa(toUpper(e.target.value))} placeholder="NÚMERO DO BA" className="uppercase" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Circuito *</Label>
-                        <Input value={circuito} onChange={(e) => setCircuito(toUpper(e.target.value))} placeholder="CIRCUITO" className="uppercase" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* RETIRADA/REVERSA Checkpoints */}
-                {isReversa && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label>Local de retirada do material *</Label>
-                        <Select value={localRetirada} onValueChange={setLocalRetirada}>
-                          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
-                            <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {localRetirada === "SO CLIENTE" && (
-                        <div className="space-y-1.5">
-                          <Label>Classificação do Cenário *</Label>
-                          <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
-                            <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="SEM MATERIAL ESTAÇÃO">SEM MATERIAL ESTAÇÃO</SelectItem>
-                              <SelectItem value="CLIENTE COMPARTILHADO">CLIENTE COMPARTILHADO</SelectItem>
-                              <SelectItem value="ESTAÇÃO COMPARTILHADO">ESTAÇÃO COMPARTILHADO</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {(classificacaoCenario === "CLIENTE COMPARTILHADO" || classificacaoCenario === "ESTAÇÃO COMPARTILHADO") && (
-                        <div className="space-y-1.5">
-                          <Label>Circuito Compartilhado *</Label>
-                          <Input
-                            value={circuitoCompartilhado}
-                            onChange={(e) => setCircuitoCompartilhado(toUpper(e.target.value))}
-                            placeholder="IDENTIFIQUE O CIRCUITO"
-                            className="uppercase"
-                          />
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Materials - Hide if SEM MATERIAL */}
-                {!isSemMaterial && (
-                  <Card>
-                    <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">Materiais Aplicados</CardTitle>
-                      <Button size="sm" variant="outline" onClick={addMaterial}>
-                        <Plus className="w-4 h-4 mr-1" /> Adicionar
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {materiais.map((mat, idx) => {
-                        const matError = getMaterialError(mat);
-                        return (
-                          <div key={mat.id} className="border rounded-lg p-3 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
-                              {materiais.length > 1 && (
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                              <div className="space-y-1">
-                                <Label className="text-xs">Código *</Label>
-                                <Input
-                                  value={mat.codigo_material}
-                                  onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
-                                  placeholder="CÓDIGO"
-                                  list={`materiais-list-${mat.id}`}
-                                  className="uppercase"
-                                />
-                                <datalist id={`materiais-list-${mat.id}`}>
-                                  {materiaisCadastro.map((mc) => (
-                                    <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
-                                  ))}
-                                </datalist>
-                                {matError && <p className="text-xs text-destructive font-medium">{matError}</p>}
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs">Nome Material *</Label>
-                                <Input
-                                  value={mat.nome_material}
-                                  readOnly
-                                  placeholder="PREENCHIDO AUTOMATICAMENTE"
-                                  className="bg-muted/50 uppercase"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs">Qtde *</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={mat.quantidade}
-                                  onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs">Un/Metro *</Label>
-                                <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Un">Un</SelectItem>
-                                    <SelectItem value="Metro">Metro</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {mat.seriais.length === 0 && (
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Serial</Label>
-                                  <div className="flex gap-1">
-                                    <Input
-                                      value={mat.serial}
-                                      onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
-                                      placeholder="SERIAL"
-                                      className="flex-1 uppercase"
-                                    />
-                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
-                                      <ScanBarcode className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Ask seriais dialog inline */}
-                            {mat.askSeriais && mat.quantidade > 1 && (
-                              <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
-                                <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
-                                <div className="flex gap-2">
-                                  <Button size="sm" onClick={() => handleAskSeriaisResponse(mat.id, true)}>Sim</Button>
-                                  <Button size="sm" variant="outline" onClick={() => handleAskSeriaisResponse(mat.id, false)}>Não</Button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Multiple serial fields */}
-                            {mat.seriais.length > 0 && !mat.askSeriais && (
-                              <div className="space-y-2 border-t pt-2">
-                                <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                  {mat.seriais.map((s, i) => (
-                                    <div key={i} className="flex gap-1">
-                                      <Input
-                                        value={s}
-                                        onChange={(e) => updateSerial(mat.id, i, e.target.value)}
-                                        placeholder={`SERIAL ${i + 1} *`}
-                                        className="flex-1 uppercase"
-                                      />
-                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
-                                        <ScanBarcode className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* ── REVERSA: Photo, Signatures, Frase ── */}
-                {isReversa && (
-                  <>
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <ImageIcon className="w-5 h-5" /> Registro Fotográfico dos Materiais *
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
-                        <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                          <ImageIcon className="w-4 h-4" /> Capturar / Selecionar Foto
-                          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
-                        </label>
-                        {fotoPreview && (
-                          <div className="mt-2">
-                            <img src={fotoPreview} alt="Foto materiais" className="max-w-xs rounded border" />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent className="pt-4">
-                        <p className="text-xs text-muted-foreground italic leading-relaxed">{FRASE_REVERSA}</p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Assinatura do Colaborador *</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
-                          <canvas
-                            ref={sigColabCanvasRef}
-                            className="w-full cursor-crosshair"
-                            style={{ height: 120 }}
-                            onMouseDown={(e) => startDraw(sigColabCanvasRef.current, e, setIsDrawingColab)}
-                            onMouseMove={(e) => draw(sigColabCanvasRef.current, e, isDrawingColab)}
-                            onMouseUp={() => endDraw(setIsDrawingColab)}
-                            onMouseLeave={() => endDraw(setIsDrawingColab)}
-                            onTouchStart={(e) => { e.preventDefault(); startDraw(sigColabCanvasRef.current, e, setIsDrawingColab); }}
-                            onTouchMove={(e) => { e.preventDefault(); draw(sigColabCanvasRef.current, e, isDrawingColab); }}
-                            onTouchEnd={() => endDraw(setIsDrawingColab)}
-                          />
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => clearCanvas(sigColabCanvasRef.current)}>Limpar Assinatura</Button>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Assinatura Almoxarifado/Logística <span className="text-xs text-muted-foreground font-normal">(opcional)</span></CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-2">
-                        <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
-                          <canvas
-                            ref={sigAlmoxCanvasRef}
-                            className="w-full cursor-crosshair"
-                            style={{ height: 120 }}
-                            onMouseDown={(e) => startDraw(sigAlmoxCanvasRef.current, e, setIsDrawingAlmox)}
-                            onMouseMove={(e) => draw(sigAlmoxCanvasRef.current, e, isDrawingAlmox)}
-                            onMouseUp={() => endDraw(setIsDrawingAlmox)}
-                            onMouseLeave={() => endDraw(setIsDrawingAlmox)}
-                            onTouchStart={(e) => { e.preventDefault(); startDraw(sigAlmoxCanvasRef.current, e, setIsDrawingAlmox); }}
-                            onTouchMove={(e) => { e.preventDefault(); draw(sigAlmoxCanvasRef.current, e, isDrawingAlmox); }}
-                            onTouchEnd={() => endDraw(setIsDrawingAlmox)}
-                          />
-                        </div>
-                        <Button size="sm" variant="outline" onClick={() => clearCanvas(sigAlmoxCanvasRef.current)}>Limpar Assinatura</Button>
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Opções Adicionais</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <textarea
-                      className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Observações complementares da atividade..."
-                      value={opcoesAdicionais}
-                      onChange={(e) => setOpcoesAdicionais(e.target.value)}
+          {/* ── TAB: FORMULÁRIO ── */}
+          <TabsContent value="formulario" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Dados da Coleta</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Row: Matrícula + Nome + Telefone */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Matrícula (TT) *</Label>
+                    <Input
+                      value={matriculaTt}
+                      onChange={(e) => handleMatriculaTtChange(e.target.value)}
+                      placeholder="EX: TT12345"
+                      list="tt-list"
+                      className="uppercase"
                     />
-                  </CardContent>
-                </Card>
+                    <datalist id="tt-list">
+                      {tecnicos.filter((t) => t.tt).map((t, i) => (
+                        <option key={i} value={t.tt}>{t.nome_tecnico}</option>
+                      ))}
+                    </datalist>
+                    {ttError && <p className="text-xs text-destructive font-medium">{ttError}</p>}
+                    {tecnicos.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Importe a planilha de técnicos na aba "Cadastros"</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Nome do Técnico *</Label>
+                    <Input value={nomeTecnico} readOnly placeholder="Preenchido automaticamente pela TT" className="bg-muted/50 uppercase" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Telefone do Técnico</Label>
+                    <Input value={telefoneTecnico} readOnly placeholder="Preenchido automaticamente" className="bg-muted/50" />
+                  </div>
+                </div>
 
-                <div className="flex gap-3 flex-wrap">
-                  <Button onClick={handleSubmit} disabled={submitting} className="w-full md:w-auto">
-                    {submitting ? "Salvando..." : "Salvar"}
-                  </Button>
-                  {isReversa && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <FileText className="w-4 h-4" />
-                      <span>O PDF será gerado automaticamente após salvar</span>
+                {/* Row: Cidade + Sigla + UF */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Sigla da Estação *</Label>
+                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Cidade *</Label>
+                    <Input
+                      value={cidade}
+                      onChange={(e) => handleCidadeChange(e.target.value)}
+                      placeholder="NOME DA CIDADE"
+                      className="uppercase"
+                      list="cidades-sc"
+                    />
+                    <datalist id="cidades-sc">
+                      {CIDADES_SC.map(c => <option key={c} value={c} />)}
+                    </datalist>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>UF *</Label>
+                    <Select value={uf} onValueChange={setUf}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        {UF_LIST.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Row: Atividade + Tipo Aplicação + Data Execução */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Atividade *</Label>
+                    <Select value={atividade} onValueChange={setAtividade}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ATIVAÇÃO">ATIVAÇÃO</SelectItem>
+                        <SelectItem value="RETIRADA">RETIRADA</SelectItem>
+                        <SelectItem value="REPARO">REPARO</SelectItem>
+                        <SelectItem value="PREVENTIVA">PREVENTIVA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tipo Aplicação *</Label>
+                    <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
+                        <SelectItem value="REVERSA">REVERSA</SelectItem>
+                        <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Data de Execução *</Label>
+                    <Input type="date" value={dataExecucao} onChange={(e) => setDataExecucao(e.target.value)} />
+                  </div>
+                </div>
+
+                {/* Row: BA + Circuito */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>BA *</Label>
+                    <Input value={ba} onChange={(e) => setBa(toUpper(e.target.value))} placeholder="NÚMERO DO BA" className="uppercase" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Circuito *</Label>
+                    <Input value={circuito} onChange={(e) => setCircuito(toUpper(e.target.value))} placeholder="CIRCUITO" className="uppercase" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* RETIRADA/REVERSA Checkpoints */}
+            {isReversa && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>Local de retirada do material *</Label>
+                    <Select value={localRetirada} onValueChange={setLocalRetirada}>
+                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
+                        <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {localRetirada === "SO CLIENTE" && (
+                    <div className="space-y-1.5">
+                      <Label>Classificação do Cenário *</Label>
+                      <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SEM MATERIAL ESTAÇÃO">SEM MATERIAL ESTAÇÃO</SelectItem>
+                          <SelectItem value="CLIENTE COMPARTILHADO">CLIENTE COMPARTILHADO</SelectItem>
+                          <SelectItem value="ESTAÇÃO COMPARTILHADO">ESTAÇÃO COMPARTILHADO</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
-                </div>
-              </TabsContent>
 
-              {/* ── TAB: CADASTROS ── */}
-              <TabsContent value="cadastros" className="space-y-6">
+                  {(classificacaoCenario === "CLIENTE COMPARTILHADO" || classificacaoCenario === "ESTAÇÃO COMPARTILHADO") && (
+                    <div className="space-y-1.5">
+                      <Label>Circuito Compartilhado *</Label>
+                      <Input
+                        value={circuitoCompartilhado}
+                        onChange={(e) => setCircuitoCompartilhado(toUpper(e.target.value))}
+                        placeholder="IDENTIFIQUE O CIRCUITO"
+                        className="uppercase"
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Materials - Hide if SEM MATERIAL */}
+            {!isSemMaterial && (
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Materiais Aplicados</CardTitle>
+                  <Button size="sm" variant="outline" onClick={addMaterial}>
+                    <Plus className="w-4 h-4 mr-1" /> Adicionar
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {materiais.map((mat, idx) => {
+                    const matError = getMaterialError(mat);
+                    return (
+                      <div key={mat.id} className="border rounded-lg p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-muted-foreground">Material {idx + 1}</span>
+                          {materiais.length > 1 && (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeMaterial(mat.id)}>
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Código *</Label>
+                            <Input
+                              value={mat.codigo_material}
+                              onChange={(e) => handleCodigoChange(mat.id, e.target.value)}
+                              placeholder="CÓDIGO"
+                              list={`materiais-list-${mat.id}`}
+                              className="uppercase"
+                            />
+                            <datalist id={`materiais-list-${mat.id}`}>
+                              {materiaisCadastro.map((mc) => (
+                                <option key={mc.codigo} value={mc.codigo}>{mc.nome_material}</option>
+                              ))}
+                            </datalist>
+                            {matError && <p className="text-xs text-destructive font-medium">{matError}</p>}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nome Material *</Label>
+                            <Input
+                              value={mat.nome_material}
+                              readOnly
+                              placeholder="PREENCHIDO AUTOMATICAMENTE"
+                              className="bg-muted/50 uppercase"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Qtde *</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={mat.quantidade}
+                              onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Un/Metro *</Label>
+                            <Select value={mat.unidade} onValueChange={(v) => updateMaterial(mat.id, "unidade", v)}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Un">Un</SelectItem>
+                                <SelectItem value="Metro">Metro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {mat.seriais.length === 0 && (
+                            <div className="space-y-1">
+                              <Label className="text-xs">Serial</Label>
+                              <div className="flex gap-1">
+                                <Input
+                                  value={mat.serial}
+                                  onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
+                                  placeholder="SERIAL"
+                                  className="flex-1 uppercase"
+                                />
+                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
+                                  <ScanBarcode className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ask seriais dialog inline */}
+                        {mat.askSeriais && mat.quantidade > 1 && (
+                          <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
+                            <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleAskSeriaisResponse(mat.id, true)}>Sim</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleAskSeriaisResponse(mat.id, false)}>Não</Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Multiple serial fields */}
+                        {mat.seriais.length > 0 && !mat.askSeriais && (
+                          <div className="space-y-2 border-t pt-2">
+                            <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                              {mat.seriais.map((s, i) => (
+                                <div key={i} className="flex gap-1">
+                                  <Input
+                                    value={s}
+                                    onChange={(e) => updateSerial(mat.id, i, e.target.value)}
+                                    placeholder={`SERIAL ${i + 1} *`}
+                                    className="flex-1 uppercase"
+                                  />
+                                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
+                                    <ScanBarcode className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── REVERSA: Photo, Signatures, Frase ── */}
+            {isReversa && (
+              <>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5" /> Planilha de Técnicos
+                      <ImageIcon className="w-5 h-5" /> Registro Fotográfico dos Materiais *
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador, Telefone, Cidade</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                        <Upload className="w-4 h-4" /> Importar Planilha
-                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleTecnicoUpload} />
-                      </label>
-                      <Button variant="outline" size="sm" onClick={downloadTemplateTecnicos}>
-                        <Download className="w-4 h-4 mr-1" /> Baixar Modelo
-                      </Button>
-                    </div>
-                    <div className="max-h-48 overflow-auto border rounded">
-                      {tecnicos.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs">TR</TableHead>
-                              <TableHead className="text-xs">TT</TableHead>
-                              <TableHead className="text-xs">Empresa</TableHead>
-                              <TableHead className="text-xs">Técnico</TableHead>
-                              <TableHead className="text-xs">Supervisor</TableHead>
-                              <TableHead className="text-xs">Coordenador</TableHead>
-                              <TableHead className="text-xs">Telefone</TableHead>
-                              <TableHead className="text-xs">Cidade</TableHead>
-                              <TableHead className="text-xs">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {tecnicos.slice(0, 50).map((t, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-xs">{t.tr}</TableCell>
-                                <TableCell className="text-xs">{t.tt}</TableCell>
-                                <TableCell className="text-xs">{t.nome_empresa}</TableCell>
-                                <TableCell className="text-xs">{t.nome_tecnico}</TableCell>
-                                <TableCell className="text-xs">{t.supervisor}</TableCell>
-                                <TableCell className="text-xs">{t.coordenador}</TableCell>
-                                <TableCell className="text-xs">{t.telefone}</TableCell>
-                                <TableCell className="text-xs">{t.cidade_residencia}</TableCell>
-                                <TableCell className="text-xs">
-                                  <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditTecnico(t)} title="Editar">
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteTecnico(t)} title="Excluir">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado. Importe uma planilha para começar.</p>
-                      )}
-                    </div>
+                    <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
+                    <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                      <ImageIcon className="w-4 h-4" /> Capturar / Selecionar Foto
+                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
+                    </label>
+                    {fotoPreview && (
+                      <div className="mt-2">
+                        <img src={fotoPreview} alt="Foto materiais" className="max-w-xs rounded border" />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-xs text-muted-foreground italic leading-relaxed">{FRASE_REVERSA}</p>
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5" /> Planilha de Materiais
-                    </CardTitle>
+                    <CardTitle className="text-base">Assinatura do Colaborador *</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Colunas esperadas: <strong>Codigo, Nome Material</strong>
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                        <Upload className="w-4 h-4" /> Importar Planilha
-                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleMaterialUpload} />
-                      </label>
-                      <Button variant="outline" size="sm" onClick={downloadTemplateMateriais}>
-                        <Download className="w-4 h-4 mr-1" /> Baixar Modelo
-                      </Button>
+                  <CardContent className="space-y-2">
+                    <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
+                      <canvas
+                        ref={sigColabCanvasRef}
+                        className="w-full cursor-crosshair"
+                        style={{ height: 120 }}
+                        onMouseDown={(e) => startDraw(sigColabCanvasRef.current, e, setIsDrawingColab)}
+                        onMouseMove={(e) => draw(sigColabCanvasRef.current, e, isDrawingColab)}
+                        onMouseUp={() => endDraw(setIsDrawingColab)}
+                        onMouseLeave={() => endDraw(setIsDrawingColab)}
+                        onTouchStart={(e) => { e.preventDefault(); startDraw(sigColabCanvasRef.current, e, setIsDrawingColab); }}
+                        onTouchMove={(e) => { e.preventDefault(); draw(sigColabCanvasRef.current, e, isDrawingColab); }}
+                        onTouchEnd={() => endDraw(setIsDrawingColab)}
+                      />
                     </div>
-                    <div className="max-h-48 overflow-auto border rounded">
-                      {materiaisCadastro.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs">Código</TableHead>
-                              <TableHead className="text-xs">Nome Material</TableHead>
-                              <TableHead className="text-xs">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {materiaisCadastro.slice(0, 50).map((m, i) => (
-                              <TableRow key={i}>
-                                <TableCell className="text-xs">{m.codigo}</TableCell>
-                                <TableCell className="text-xs">{m.nome_material}</TableCell>
-                                <TableCell className="text-xs">
-                                  <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditMaterial(m)} title="Editar">
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteMaterial(m)} title="Excluir">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado. Importe uma planilha para começar.</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* ── TAB: CONSULTA ── */}
-              <TabsContent value="consulta" className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Consultar Coletas</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">BA</Label>
-                        <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="FILTRAR BA" className="uppercase" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Circuito</Label>
-                        <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="FILTRAR CIRCUITO" className="uppercase" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Técnico</Label>
-                        <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="FILTRAR TÉCNICO" className="uppercase" />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button onClick={handleSearch} disabled={searching}>
-                        <Search className="w-4 h-4 mr-1" /> {searching ? "Carregando..." : "Filtrar"}
-                      </Button>
-                      <Button variant="ghost" onClick={handleClearFilters}>
-                        Limpar Filtros
-                      </Button>
-                      <Button variant="outline" size="icon" onClick={() => loadAllColetas()} title="Recarregar">
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="icon" title="Exportar">
-                            <FileSpreadsheet className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => setGestechExportOpen(true)}>
-                            Exportar para Aplicação Gestech
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleExport("xlsx")}>
-                            Exportar Excel
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleExport("csv")}>
-                            Exportar CSV
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
-                    </p>
+                    <Button size="sm" variant="outline" onClick={() => clearCanvas(sigColabCanvasRef.current)}>Limpar Assinatura</Button>
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-auto max-h-[60vh]">
-                      {searching ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">Carregando coletas...</p>
-                      ) : coletas.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs">Data Execução</TableHead>
-                              <TableHead className="text-xs">BA</TableHead>
-                              <TableHead className="text-xs">Circuito</TableHead>
-                              <TableHead className="text-xs">Técnico</TableHead>
-                              <TableHead className="text-xs">Atividade</TableHead>
-                              <TableHead className="text-xs">Tipo</TableHead>
-                              <TableHead className="text-xs">Materiais</TableHead>
-                              <TableHead className="text-xs">Ações</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {coletas.map((c) => (
-                              <TableRow key={c.id}>
-                                <TableCell className="text-xs">
-                                  {c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : new Date(c.created_at).toLocaleDateString("pt-BR")}
-                                </TableCell>
-                                <TableCell className="text-xs">{c.ba || "-"}</TableCell>
-                                <TableCell className="text-xs">{c.circuito || "-"}</TableCell>
-                                <TableCell className="text-xs">{c.nome_tecnico}</TableCell>
-                                <TableCell className="text-xs">{c.atividade}</TableCell>
-                                <TableCell className="text-xs">{c.tipo_aplicacao}</TableCell>
-                                <TableCell className="text-xs">
-                                  {c.material_coleta_items.map((item, i) => (
-                                    <div key={i}>{item.codigo_material} - {item.nome_material} (x{item.quantidade})</div>
-                                  ))}
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </Button>
-                                    {c.pdf_url && (
-                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
-                                        <FileText className="w-3.5 h-3.5" />
-                                      </Button>
-                                    )}
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-8">Nenhuma coleta encontrada.</p>
-                      )}
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Assinatura Almoxarifado/Logística <span className="text-xs text-muted-foreground font-normal">(opcional)</span></CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
+                      <canvas
+                        ref={sigAlmoxCanvasRef}
+                        className="w-full cursor-crosshair"
+                        style={{ height: 120 }}
+                        onMouseDown={(e) => startDraw(sigAlmoxCanvasRef.current, e, setIsDrawingAlmox)}
+                        onMouseMove={(e) => draw(sigAlmoxCanvasRef.current, e, isDrawingAlmox)}
+                        onMouseUp={() => endDraw(setIsDrawingAlmox)}
+                        onMouseLeave={() => endDraw(setIsDrawingAlmox)}
+                        onTouchStart={(e) => { e.preventDefault(); startDraw(sigAlmoxCanvasRef.current, e, setIsDrawingAlmox); }}
+                        onTouchMove={(e) => { e.preventDefault(); draw(sigAlmoxCanvasRef.current, e, isDrawingAlmox); }}
+                        onTouchEnd={() => endDraw(setIsDrawingAlmox)}
+                      />
                     </div>
+                    <Button size="sm" variant="outline" onClick={() => clearCanvas(sigAlmoxCanvasRef.current)}>Limpar Assinatura</Button>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            </Tabs>
-          </main>
+              </>
+            )}
 
-          {/* Delete confirmation (Coleta) */}
-          <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
-                <AlertDialogDescription>Esta ação não pode ser desfeita. O registro e todos os materiais associados serão removidos.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Opções Adicionais</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <textarea
+                  className="w-full min-h-[100px] p-3 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Observações complementares da atividade..."
+                  value={opcoesAdicionais}
+                  onChange={(e) => setOpcoesAdicionais(e.target.value)}
+                />
+              </CardContent>
+            </Card>
 
-          {/* Delete confirmation (Técnico) */}
-          <AlertDialog open={!!deleteTecnico} onOpenChange={() => setDeleteTecnico(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir Técnico?</AlertDialogTitle>
-                <AlertDialogDescription>Deseja remover {deleteTecnico?.nome_tecnico} da base?</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDeleteTecnico} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Delete confirmation (Material) */}
-          <AlertDialog open={!!deleteMaterial} onOpenChange={() => setDeleteMaterial(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir Material?</AlertDialogTitle>
-                <AlertDialogDescription>Deseja remover o material {deleteMaterial?.nome_material} da base?</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDeleteMaterial} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Edit Técnico Dialog */}
-          <Dialog open={!!editingTecnico} onOpenChange={() => setEditingTecnico(null)}>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Editar Técnico</DialogTitle></DialogHeader>
-              {editingTecnico && (
-                <div className="space-y-4 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><Label>TT</Label><Input value={editingTecnico.tt} readOnly className="bg-muted" /></div>
-                    <div className="space-y-1"><Label>TR</Label><Input value={editingTecnico.tr} readOnly className="bg-muted" /></div>
-                  </div>
-                  <div className="space-y-1"><Label>Nome Técnico</Label><Input value={editingTecnico.nome_tecnico} onChange={e => setEditingTecnico({ ...editingTecnico, nome_tecnico: e.target.value.toUpperCase() })} /></div>
-                  <div className="space-y-1"><Label>Empresa</Label><Input value={editingTecnico.nome_empresa} onChange={e => setEditingTecnico({ ...editingTecnico, nome_empresa: e.target.value.toUpperCase() })} /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><Label>Supervisor</Label><Input value={editingTecnico.supervisor} onChange={e => setEditingTecnico({ ...editingTecnico, supervisor: e.target.value.toUpperCase() })} /></div>
-                    <div className="space-y-1"><Label>Coordenador</Label><Input value={editingTecnico.coordenador} onChange={e => setEditingTecnico({ ...editingTecnico, coordenador: e.target.value.toUpperCase() })} /></div>
-                  </div>
-                  <Button onClick={handleSaveTecnico} className="w-full">Salvar</Button>
+            <div className="flex gap-3 flex-wrap">
+              <Button onClick={handleSubmit} disabled={submitting} className="w-full md:w-auto">
+                {submitting ? "Salvando..." : "Salvar"}
+              </Button>
+              {isReversa && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <FileText className="w-4 h-4" />
+                  <span>O PDF será gerado automaticamente após salvar</span>
                 </div>
               )}
-            </DialogContent>
-          </Dialog>
+            </div>
+          </TabsContent>
 
-          {/* Gestech Export Dialog */}
-          <Dialog open={gestechExportOpen} onOpenChange={setGestechExportOpen}>
-            <DialogContent className="max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Exportar para Gestech</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
+          {/* ── TAB: CADASTROS ── */}
+          <TabsContent value="cadastros" className="space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5" /> Planilha de Técnicos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Selecione a Data de Execução para gerar o relatório Gestech. Apenas atividades de ATIVAÇÃO, REPARO e PREVENTIVA serão exportadas.
+                  Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador, Telefone, Cidade</strong>
                 </p>
-                <div className="space-y-1">
-                  <Label>Data de Execução *</Label>
-                  <Input
-                    type="date"
-                    value={gestechExportDate}
-                    onChange={(e) => setGestechExportDate(e.target.value)}
-                  />
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                    <Upload className="w-4 h-4" /> Importar Planilha
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleTecnicoUpload} />
+                  </label>
+                  <Button variant="outline" size="sm" onClick={downloadTemplateTecnicos}>
+                    <Download className="w-4 h-4 mr-1" /> Baixar Modelo
+                  </Button>
                 </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={() => setGestechExportOpen(false)}>Cancelar</Button>
-                  <Button onClick={handleGestechExport}>Exportar Gestech</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Material Dialog */}
-          < Dialog open={!!editingMaterial} onOpenChange={() => setEditingMaterial(null)}>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Editar Material</DialogTitle></DialogHeader>
-              {editingMaterial && (
-                <div className="space-y-4 pt-4">
-                  <div className="space-y-1"><Label>Código</Label><Input value={editingMaterial.codigo} readOnly className="bg-muted" /></div>
-                  <div className="space-y-1"><Label>Nome do Material</Label><Input value={editingMaterial.nome_material} onChange={e => setEditingMaterial({ ...editingMaterial, nome_material: e.target.value.toUpperCase() })} /></div>
-                  <DialogFooter><Button onClick={handleSaveMaterial}>Salvar Alterações</Button></DialogFooter>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog >
-
-          {/* View detail dialog */}
-          < Dialog open={!!viewColeta} onOpenChange={() => setViewColeta(null)}>
-            <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
-              <DialogHeader>
-                <DialogTitle>Detalhes da Coleta</DialogTitle>
-                <DialogDescription>Registro completo da coleta de materiais</DialogDescription>
-              </DialogHeader>
-              {viewColeta && (
-                <div className="space-y-3 text-sm">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div><strong>TT:</strong> {viewColeta.matricula_tt || "-"}</div>
-                    <div><strong>Técnico:</strong> {viewColeta.nome_tecnico}</div>
-                    <div><strong>Cidade:</strong> {viewColeta.cidade || "-"} ({viewColeta.sigla_cidade || ""}) - {viewColeta.uf || ""}</div>
-                    <div><strong>BA:</strong> {viewColeta.ba || "-"}</div>
-                    <div><strong>Circuito:</strong> {viewColeta.circuito || "-"}</div>
-                    <div><strong>Atividade:</strong> {viewColeta.atividade}</div>
-                    <div><strong>Tipo:</strong> {viewColeta.tipo_aplicacao}</div>
-                    <div><strong>Data:</strong> {viewColeta.data_execucao ? new Date(viewColeta.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}</div>
-                  </div>
-                  <div>
-                    <strong>Materiais:</strong>
+                <div className="max-h-48 overflow-auto border rounded">
+                  {tecnicos.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">Código</TableHead>
-                          <TableHead className="text-xs">Nome</TableHead>
-                          <TableHead className="text-xs">Qtde</TableHead>
-                          <TableHead className="text-xs">Un</TableHead>
-                          <TableHead className="text-xs">Serial</TableHead>
+                          <TableHead className="text-xs">TR</TableHead>
+                          <TableHead className="text-xs">TT</TableHead>
+                          <TableHead className="text-xs">Empresa</TableHead>
+                          <TableHead className="text-xs">Técnico</TableHead>
+                          <TableHead className="text-xs">Supervisor</TableHead>
+                          <TableHead className="text-xs">Coordenador</TableHead>
+                          <TableHead className="text-xs">Telefone</TableHead>
+                          <TableHead className="text-xs">Cidade</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewColeta.material_coleta_items.map((item, i) => (
+                        {tecnicos.slice(0, 50).map((t, i) => (
                           <TableRow key={i}>
-                            <TableCell className="text-xs">{item.codigo_material}</TableCell>
-                            <TableCell className="text-xs">{item.nome_material}</TableCell>
-                            <TableCell className="text-xs">{item.quantidade}</TableCell>
-                            <TableCell className="text-xs">{item.unidade}</TableCell>
-                            <TableCell className="text-xs">{item.serial || "-"}</TableCell>
+                            <TableCell className="text-xs">{t.tr}</TableCell>
+                            <TableCell className="text-xs">{t.tt}</TableCell>
+                            <TableCell className="text-xs">{t.nome_empresa}</TableCell>
+                            <TableCell className="text-xs">{t.nome_tecnico}</TableCell>
+                            <TableCell className="text-xs">{t.supervisor}</TableCell>
+                            <TableCell className="text-xs">{t.coordenador}</TableCell>
+                            <TableCell className="text-xs">{t.telefone}</TableCell>
+                            <TableCell className="text-xs">{t.cidade_residencia}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditTecnico(t)} title="Editar">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteTecnico(t)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5" /> Planilha de Materiais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Colunas esperadas: <strong>Codigo, Nome Material</strong>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                    <Upload className="w-4 h-4" /> Importar Planilha
+                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleMaterialUpload} />
+                  </label>
+                  <Button variant="outline" size="sm" onClick={downloadTemplateMateriais}>
+                    <Download className="w-4 h-4 mr-1" /> Baixar Modelo
+                  </Button>
+                </div>
+                <div className="max-h-48 overflow-auto border rounded">
+                  {materiaisCadastro.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Código</TableHead>
+                          <TableHead className="text-xs">Nome Material</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {materiaisCadastro.slice(0, 50).map((m, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs">{m.codigo}</TableCell>
+                            <TableCell className="text-xs">{m.nome_material}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleEditMaterial(m)} title="Editar">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteMaterial(m)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ── TAB: CONSULTA ── */}
+          <TabsContent value="consulta" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Consultar Coletas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">BA</Label>
+                    <Input value={searchBa} onChange={(e) => setSearchBa(toUpper(e.target.value))} placeholder="FILTRAR BA" className="uppercase" />
                   </div>
-                  <div className="flex gap-2 pt-3 border-t">
-                    {viewColeta.pdf_url && (
-                      <Button size="sm" variant="outline" onClick={() => window.open(viewColeta.pdf_url!, "_blank")}>
-                        <FileText className="w-4 h-4 mr-1" /> Doc Logística (PDF)
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" onClick={() => {
-                      // Regenerate PDF from coleta data
-                      const items: MaterialItem[] = viewColeta.material_coleta_items.map((item, i) => ({
-                        id: String(i),
-                        codigo_material: item.codigo_material,
-                        nome_material: item.nome_material,
-                        quantidade: item.quantidade,
-                        unidade: item.unidade,
-                        serial: item.serial || "",
-                        seriais: [],
-                        askSeriais: false,
-                      }));
-                      generatePDF({
-                        matriculaTt: viewColeta.matricula_tt || "",
-                        nomeTecnico: viewColeta.nome_tecnico,
-                        telefoneTecnico: "",
-                        cidade: viewColeta.cidade || "",
-                        siglaCidade: viewColeta.sigla_cidade || "",
-                        uf: viewColeta.uf || "",
-                        atividade: viewColeta.atividade,
-                        ba: viewColeta.ba || "",
-                        circuito: viewColeta.circuito || "",
-                        dataExecucao: viewColeta.data_execucao || "",
-                        materiais: items,
-                        assinaturaColaborador: viewColeta.assinatura_colaborador || "",
-                        assinaturaAlmoxarifado: viewColeta.assinatura_almoxarifado || "",
-                        fotoDataUrl: viewColeta.foto_url || null,
-                        tipo_aplicacao: viewColeta.tipo_aplicacao,
-                      });
-                    }}>
-                      <Download className="w-4 h-4 mr-1" /> Gerar PDF
-                    </Button>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Circuito</Label>
+                    <Input value={searchCircuito} onChange={(e) => setSearchCircuito(toUpper(e.target.value))} placeholder="FILTRAR CIRCUITO" className="uppercase" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Técnico</Label>
+                    <Input value={searchTecnico} onChange={(e) => setSearchTecnico(toUpper(e.target.value))} placeholder="FILTRAR TÉCNICO" className="uppercase" />
                   </div>
                 </div>
-              )}
-            </DialogContent>
-          </Dialog >
+                <div className="flex gap-2 flex-wrap">
+                  <Button onClick={handleSearch} disabled={searching}>
+                    <Search className="w-4 h-4 mr-1" /> {searching ? "Carregando..." : "Filtrar"}
+                  </Button>
+                  <Button variant="ghost" onClick={handleClearFilters}>
+                    Limpar Filtros
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => loadAllColetas()} title="Recarregar">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" title="Exportar">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => setGestechExportOpen(true)}>
+                        Exportar para Aplicação Gestech
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                        Exportar Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("csv")}>
+                        Exportar CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
+                </p>
+              </CardContent>
+            </Card>
 
-          {/* Scanner Dialog */}
-          <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Leitor de Código</DialogTitle>
-                <DialogDescription>Aponte a câmera para o código de barras ou QR Code</DialogDescription>
-              </DialogHeader>
-              <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
-              <DialogFooter>
-                <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div >
-      );
-    };
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-auto max-h-[60vh]">
+                  {searching ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">Carregando coletas...</p>
+                  ) : coletas.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Data Execução</TableHead>
+                          <TableHead className="text-xs">BA</TableHead>
+                          <TableHead className="text-xs">Circuito</TableHead>
+                          <TableHead className="text-xs">Técnico</TableHead>
+                          <TableHead className="text-xs">Atividade</TableHead>
+                          <TableHead className="text-xs">Tipo</TableHead>
+                          <TableHead className="text-xs">Materiais</TableHead>
+                          <TableHead className="text-xs">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {coletas.map((c) => (
+                          <TableRow key={c.id}>
+                            <TableCell className="text-xs">
+                              {c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : new Date(c.created_at).toLocaleDateString("pt-BR")}
+                            </TableCell>
+                            <TableCell className="text-xs">{c.ba || "-"}</TableCell>
+                            <TableCell className="text-xs">{c.circuito || "-"}</TableCell>
+                            <TableCell className="text-xs">{c.nome_tecnico}</TableCell>
+                            <TableCell className="text-xs">{c.atividade}</TableCell>
+                            <TableCell className="text-xs">{c.tipo_aplicacao}</TableCell>
+                            <TableCell className="text-xs">
+                              {c.material_coleta_items.map((item, i) => (
+                                <div key={i}>{item.codigo_material} - {item.nome_material} (x{item.quantidade})</div>
+                              ))}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                                {c.pdf_url && (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
+                                    <FileText className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhuma coleta encontrada.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
 
-    export default MaterialColeta;
+      {/* Delete confirmation (Coleta) */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita. O registro e todos os materiais associados serão removidos.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation (Técnico) */}
+      <AlertDialog open={!!deleteTecnico} onOpenChange={() => setDeleteTecnico(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Técnico?</AlertDialogTitle>
+            <AlertDialogDescription>Deseja remover {deleteTecnico?.nome_tecnico} da base?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTecnico} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation (Material) */}
+      <AlertDialog open={!!deleteMaterial} onOpenChange={() => setDeleteMaterial(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Material?</AlertDialogTitle>
+            <AlertDialogDescription>Deseja remover o material {deleteMaterial?.nome_material} da base?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteMaterial} className="bg-destructive text-destructive-foreground">Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Técnico Dialog */}
+      <Dialog open={!!editingTecnico} onOpenChange={() => setEditingTecnico(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Técnico</DialogTitle></DialogHeader>
+          {editingTecnico && (
+            <div className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>TT</Label><Input value={editingTecnico.tt} readOnly className="bg-muted" /></div>
+                <div className="space-y-1"><Label>TR</Label><Input value={editingTecnico.tr} readOnly className="bg-muted" /></div>
+              </div>
+              <div className="space-y-1"><Label>Nome Técnico</Label><Input value={editingTecnico.nome_tecnico} onChange={e => setEditingTecnico({ ...editingTecnico, nome_tecnico: e.target.value.toUpperCase() })} /></div>
+              <div className="space-y-1"><Label>Empresa</Label><Input value={editingTecnico.nome_empresa} onChange={e => setEditingTecnico({ ...editingTecnico, nome_empresa: e.target.value.toUpperCase() })} /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1"><Label>Supervisor</Label><Input value={editingTecnico.supervisor} onChange={e => setEditingTecnico({ ...editingTecnico, supervisor: e.target.value.toUpperCase() })} /></div>
+                <div className="space-y-1"><Label>Coordenador</Label><Input value={editingTecnico.coordenador} onChange={e => setEditingTecnico({ ...editingTecnico, coordenador: e.target.value.toUpperCase() })} /></div>
+              </div>
+              <Button onClick={handleSaveTecnico} className="w-full">Salvar</Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Gestech Export Dialog */}
+      <Dialog open={gestechExportOpen} onOpenChange={setGestechExportOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Exportar para Gestech</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Selecione a Data de Execução para gerar o relatório Gestech. Apenas atividades de ATIVAÇÃO, REPARO e PREVENTIVA serão exportadas.
+            </p>
+            <div className="space-y-1">
+              <Label>Data de Execução *</Label>
+              <Input
+                type="date"
+                value={gestechExportDate}
+                onChange={(e) => setGestechExportDate(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setGestechExportOpen(false)}>Cancelar</Button>
+              <Button onClick={handleGestechExport}>Exportar Gestech</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Material Dialog */}
+      < Dialog open={!!editingMaterial} onOpenChange={() => setEditingMaterial(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar Material</DialogTitle></DialogHeader>
+          {editingMaterial && (
+            <div className="space-y-4 pt-4">
+              <div className="space-y-1"><Label>Código</Label><Input value={editingMaterial.codigo} readOnly className="bg-muted" /></div>
+              <div className="space-y-1"><Label>Nome do Material</Label><Input value={editingMaterial.nome_material} onChange={e => setEditingMaterial({ ...editingMaterial, nome_material: e.target.value.toUpperCase() })} /></div>
+              <DialogFooter><Button onClick={handleSaveMaterial}>Salvar Alterações</Button></DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog >
+
+      {/* View detail dialog */}
+      < Dialog open={!!viewColeta} onOpenChange={() => setViewColeta(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Coleta</DialogTitle>
+            <DialogDescription>Registro completo da coleta de materiais</DialogDescription>
+          </DialogHeader>
+          {viewColeta && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div><strong>TT:</strong> {viewColeta.matricula_tt || "-"}</div>
+                <div><strong>Técnico:</strong> {viewColeta.nome_tecnico}</div>
+                <div><strong>Cidade:</strong> {viewColeta.cidade || "-"} ({viewColeta.sigla_cidade || ""}) - {viewColeta.uf || ""}</div>
+                <div><strong>BA:</strong> {viewColeta.ba || "-"}</div>
+                <div><strong>Circuito:</strong> {viewColeta.circuito || "-"}</div>
+                <div><strong>Atividade:</strong> {viewColeta.atividade}</div>
+                <div><strong>Tipo:</strong> {viewColeta.tipo_aplicacao}</div>
+                <div><strong>Data:</strong> {viewColeta.data_execucao ? new Date(viewColeta.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}</div>
+              </div>
+              <div>
+                <strong>Materiais:</strong>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Código</TableHead>
+                      <TableHead className="text-xs">Nome</TableHead>
+                      <TableHead className="text-xs">Qtde</TableHead>
+                      <TableHead className="text-xs">Un</TableHead>
+                      <TableHead className="text-xs">Serial</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewColeta.material_coleta_items.map((item, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs">{item.codigo_material}</TableCell>
+                        <TableCell className="text-xs">{item.nome_material}</TableCell>
+                        <TableCell className="text-xs">{item.quantidade}</TableCell>
+                        <TableCell className="text-xs">{item.unidade}</TableCell>
+                        <TableCell className="text-xs">{item.serial || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex gap-2 pt-3 border-t">
+                {viewColeta.pdf_url && (
+                  <Button size="sm" variant="outline" onClick={() => window.open(viewColeta.pdf_url!, "_blank")}>
+                    <FileText className="w-4 h-4 mr-1" /> Doc Logística (PDF)
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => {
+                  // Regenerate PDF from coleta data
+                  const items: MaterialItem[] = viewColeta.material_coleta_items.map((item, i) => ({
+                    id: String(i),
+                    codigo_material: item.codigo_material,
+                    nome_material: item.nome_material,
+                    quantidade: item.quantidade,
+                    unidade: item.unidade,
+                    serial: item.serial || "",
+                    seriais: [],
+                    askSeriais: false,
+                  }));
+                  generatePDF({
+                    matriculaTt: viewColeta.matricula_tt || "",
+                    nomeTecnico: viewColeta.nome_tecnico,
+                    telefoneTecnico: "",
+                    cidade: viewColeta.cidade || "",
+                    siglaCidade: viewColeta.sigla_cidade || "",
+                    uf: viewColeta.uf || "",
+                    atividade: viewColeta.atividade,
+                    ba: viewColeta.ba || "",
+                    circuito: viewColeta.circuito || "",
+                    dataExecucao: viewColeta.data_execucao || "",
+                    materiais: items,
+                    assinaturaColaborador: viewColeta.assinatura_colaborador || "",
+                    assinaturaAlmoxarifado: viewColeta.assinatura_almoxarifado || "",
+                    fotoDataUrl: viewColeta.foto_url || null,
+                    tipo_aplicacao: viewColeta.tipo_aplicacao,
+                  });
+                }}>
+                  <Download className="w-4 h-4 mr-1" /> Gerar PDF
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog >
+
+      {/* Scanner Dialog */}
+      <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leitor de Código</DialogTitle>
+            <DialogDescription>Aponte a câmera para o código de barras ou QR Code</DialogDescription>
+          </DialogHeader>
+          <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
+          <DialogFooter>
+            <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
+  );
+};
+
+export default MaterialColeta;
