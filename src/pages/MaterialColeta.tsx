@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -510,7 +511,8 @@ const MaterialColeta = () => {
     // Header
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("MATERIAL DE REVERSA", pageW / 2, y + 7, { align: "center" });
+    const pdfTitle = coletaData.tipo_aplicacao === "REVERSA" ? "MATERIAL DE REVERSA" : "MATERIAL DE APLICAÇÃO";
+    doc.text(pdfTitle, pageW / 2, y + 7, { align: "center" });
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.text(`Data: ${coletaData.dataExecucao ? new Date(coletaData.dataExecucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}`, pageW - margin, y + 4, { align: "right" });
@@ -1571,15 +1573,24 @@ const MaterialColeta = () => {
                   <Button variant="ghost" onClick={handleClearFilters}>
                     Limpar Filtros
                   </Button>
-                  <Button variant="outline" onClick={() => loadAllColetas()}>
-                    <Download className="w-4 h-4 mr-1" /> Recarregar
+                  <Button variant="outline" size="icon" onClick={() => loadAllColetas()} title="Recarregar">
+                    <RefreshCw className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" onClick={() => handleExport("xlsx")}>
-                    <Download className="w-4 h-4 mr-1" /> Exportar Excel
-                  </Button>
-                  <Button variant="outline" onClick={() => handleExport("csv")}>
-                    <Download className="w-4 h-4 mr-1" /> Exportar CSV
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" title="Exportar">
+                        <FileSpreadsheet className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                        Exportar Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("csv")}>
+                        Exportar CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
