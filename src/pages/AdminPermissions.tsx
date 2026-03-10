@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,6 +42,7 @@ const AdminPermissions = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const hasFetched = useRef(false);
+    useAccessTracking("/admin/perfis");
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

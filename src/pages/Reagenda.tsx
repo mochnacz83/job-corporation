@@ -7,6 +7,7 @@ import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Se
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
 import {
@@ -55,6 +56,7 @@ const Reagenda = () => {
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const navigate = useNavigate();
     const { toast } = useToast();
+    const { trackAction } = useAccessTracking("/reagenda");
 
     // Permission guard
     useEffect(() => {

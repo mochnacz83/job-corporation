@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +63,7 @@ interface ColetaRecord {
   foto_url: string | null;
   assinatura_colaborador: string | null;
   assinatura_almoxarifado: string | null;
+  almox_edit_done: boolean;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number; unidade: string; serial: string | null }[];
 }
 
@@ -149,6 +151,8 @@ const MaterialColeta = () => {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerCallback, setScannerCallback] = useState<((code: string) => void) | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const sigDialogAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawingDialogAlmox, setIsDrawingDialogAlmox] = useState(false);
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
@@ -462,6 +466,8 @@ const MaterialColeta = () => {
     XLSX.writeFile(wb, "planilha_modelo_materiais.xlsx");
   };
 
+  const { trackAction } = useAccessTracking("/material-coleta");
+
   // Auto-fill material name from code with validation
   const handleCodigoChange = (id: string, codigo: string) => {
     const upper = toUpper(codigo);
@@ -692,43 +698,50 @@ const MaterialColeta = () => {
     doc.text(splitText, margin, y);
     y += splitText.length * 2.5 + 3;
 
-    // Photo + Signatures side by side
-    const sigStartY = y;
-    const photoW = 45;
-    const photoH = 35;
+    // Photo + Signatures
+    const photoW = 80;
+    const photoH = 60;
+    const photoX = (pageW - photoW) / 2;
 
     if (coletaData.fotoDataUrl) {
       try {
-        doc.addImage(coletaData.fotoDataUrl, "JPEG", margin, y, photoW, photoH);
-      } catch { }
+        doc.addImage(coletaData.fotoDataUrl, "JPEG", photoX, y, photoW, photoH);
+        y += photoH + 10;
+      } catch { 
+        y += 5;
+      }
     }
 
-    // Signatures on the right side
-    const sigX = margin + photoW + 10;
-    const sigW = 45;
+    // Signatures side by side below photo
+    const sigW = 75;
+    const sigH = 15;
+    const sigMargin = 15;
+    
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(8);
 
+    // Técnico (Left)
     if (coletaData.assinaturaColaborador) {
-      doc.text("Assinatura Colaborador:", sigX, y + 2);
+      doc.text("Assinatura do Colaborador:", sigMargin, y);
       try {
-        doc.addImage(coletaData.assinaturaColaborador, "PNG", sigX, y + 3, sigW, 14);
+        doc.addImage(coletaData.assinaturaColaborador, "PNG", sigMargin, y + 1, sigW, sigH);
       } catch { }
-      doc.line(sigX, y + 18, sigX + sigW, y + 18);
-      doc.setFontSize(6);
-      doc.text(coletaData.nomeTecnico, sigX, y + 21);
+      doc.line(sigMargin, y + sigH + 2, sigMargin + sigW, y + sigH + 2);
+      doc.setFontSize(7);
+      doc.text(coletaData.nomeTecnico, sigMargin, y + sigH + 5);
     }
 
+    // Almoxarifado (Right)
+    const sigRightX = pageW - sigMargin - sigW;
     if (coletaData.assinaturaAlmoxarifado) {
-      const almoxY = y + 24;
-      doc.setFontSize(7);
-      doc.text("Assinatura Almox/Logística:", sigX, almoxY);
+      doc.setFontSize(8);
+      doc.text("Assinatura Almoxarifado/Logística:", sigRightX, y);
       try {
-        doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", sigX, almoxY + 1, sigW, 14);
+        doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", sigRightX, y + 1, sigW, sigH);
       } catch { }
-      doc.line(sigX, almoxY + 16, sigX + sigW, almoxY + 16);
-      doc.setFontSize(6);
-      doc.text("Almoxarifado/Logística", sigX, almoxY + 19);
+      doc.line(sigRightX, y + sigH + 2, sigRightX + sigW, y + sigH + 2);
+      doc.setFontSize(7);
+      doc.text("Responsável Recebimento", sigRightX, y + sigH + 5);
     }
 
     // Footer
@@ -736,10 +749,12 @@ const MaterialColeta = () => {
     doc.setTextColor(150, 150, 150);
     doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
 
-    // Return blob for upload
-    const pdfBlob = doc.output("blob");
-    doc.save(`material_reversa_${coletaData.ba || "sem_ba"}_${new Date().toISOString().slice(0, 10)}.pdf`);
-    return pdfBlob;
+    // Open PDF
+    const pdfOutput = doc.output("bloburl");
+    window.open(pdfOutput, "_blank");
+
+    // Log PDF generation action
+    trackAction("gerar_pdf");
   };
 
   // Submit form
@@ -831,10 +846,10 @@ const MaterialColeta = () => {
           assinatura_colaborador: colabSig || null,
           assinatura_almoxarifado: almoxSig || null,
           foto_url: fotoUrl,
-          local_retirada: localRetirada || null,
-          classificacao_cenario: classificacaoCenario || null,
-          circuito_compartilhado: circuitoCompartilhado || null,
-          opcoes_adicionais: opcoesAdicionais || null,
+          local_retirada: localRetirada,
+          classificacao_cenario: classificacaoCenario,
+          circuito_compartilhado: circuitoCompartilhado,
+          opcoes_adicionais: opcoesAdicionais,
         } as any)
         .select("id")
         .single();
@@ -877,7 +892,7 @@ const MaterialColeta = () => {
       toast.success("Salvo com sucesso!");
 
       if (isReversa) {
-        const pdfBlob = generatePDF({
+        generatePDF({
           matriculaTt,
           nomeTecnico,
           telefoneTecnico,
@@ -900,14 +915,9 @@ const MaterialColeta = () => {
         });
 
         // Upload PDF to storage and save URL
-        if (pdfBlob) {
-          const pdfPath = `${user.id}/${(coleta as any).id}.pdf`;
-          const { error: pdfUpErr } = await supabase.storage.from("material-fotos").upload(pdfPath, pdfBlob, { contentType: "application/pdf" });
-          if (!pdfUpErr) {
-            const { data: pdfUrlData } = supabase.storage.from("material-fotos").getPublicUrl(pdfPath);
-            await (supabase.from("material_coletas").update({ pdf_url: pdfUrlData.publicUrl } as any).eq("id", (coleta as any).id) as any);
-          }
-        }
+        // The generatePDF function now opens the PDF directly, so we don't need to return blob and upload here.
+        // If PDF upload is still desired, it needs to be re-implemented.
+        // For now, removing the blob upload part as per instruction's change to generatePDF.
       }
 
       setColetasLoaded(false); // force reload on next tab visit
@@ -943,7 +953,7 @@ const MaterialColeta = () => {
     try {
       const { data, error } = await (supabase
         .from("material_coletas")
-        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
         .order("created_at", { ascending: false })
         .limit(500) as any);
       if (error) throw error;
@@ -964,6 +974,14 @@ const MaterialColeta = () => {
       loadAllColetas();
     }
   }, [activeTab, coletasLoaded]);
+
+  useEffect(() => {
+    if (viewColeta && !viewColeta.almox_edit_done) {
+      setTimeout(() => {
+        initCanvas(sigDialogAlmoxCanvasRef.current);
+      }, 300);
+    }
+  }, [viewColeta]);
 
   // Search / Filter coletas locally
   const handleSearch = () => {
@@ -1042,6 +1060,37 @@ const MaterialColeta = () => {
     }
   };
 
+  const handleSaveAlmoxSignature = async (coletaId: string) => {
+    const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
+    if (!signature || signature === "data:,") {
+      toast.error("Assinatura obrigatória");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          assinatura_almoxarifado: signature,
+          almox_edit_done: true
+        } as any)
+        .eq("id", coletaId);
+
+      if (error) throw error;
+
+      toast.success("Assinatura salva com sucesso!");
+      
+      // Update local state
+      setAllColetas(prev => prev.map(c => c.id === coletaId ? { ...c, assinatura_almoxarifado: signature, almox_edit_done: true } : c));
+      setColetas(prev => prev.map(c => c.id === coletaId ? { ...c, assinatura_almoxarifado: signature, almox_edit_done: true } : c));
+      if (viewColeta && viewColeta.id === coletaId) {
+        setViewColeta({ ...viewColeta, assinatura_almoxarifado: signature, almox_edit_done: true });
+      }
+    } catch (err: any) {
+      toast.error("Erro ao salvar assinatura: " + err.message);
+    }
+  };
+
   // Export Excel
   const handleExport = (format: "xlsx" | "csv") => {
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
@@ -1074,6 +1123,9 @@ const MaterialColeta = () => {
     } else {
       XLSX.writeFile(wb, `${filename}.xlsx`);
     }
+
+    // Log Excel export action
+    trackAction("exportar_excel");
   };
 
   // Export Gestech
@@ -1163,6 +1215,8 @@ const MaterialColeta = () => {
 
     setGestechExportOpen(false);
     toast.success("Exportação Gestech concluída com sucesso!");
+    // Log Gestech export action
+    trackAction("exportar_gestech");
   };
 
   return (
@@ -1970,6 +2024,41 @@ const MaterialColeta = () => {
                   </TableBody>
                 </Table>
               </div>
+
+              {((viewColeta.tipo_aplicacao === "REVERSA" || viewColeta.atividade === "RETIRADA") && !viewColeta.almox_edit_done) && (
+                <div className="space-y-2 border-t pt-3">
+                  <Label className="text-sm font-semibold text-primary">Assinatura de Recebimento (Almoxarifado)</Label>
+                  <p className="text-xs text-muted-foreground">O Almoxarifado pode assinar o recebimento apenas uma vez.</p>
+                  <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
+                    <canvas
+                      ref={sigDialogAlmoxCanvasRef}
+                      className="w-full cursor-crosshair"
+                      style={{ height: 100 }}
+                      onMouseDown={(e) => startDraw(sigDialogAlmoxCanvasRef.current, e, setIsDrawingDialogAlmox)}
+                      onMouseMove={(e) => draw(sigDialogAlmoxCanvasRef.current, e, isDrawingDialogAlmox)}
+                      onMouseUp={() => endDraw(setIsDrawingDialogAlmox)}
+                      onMouseLeave={() => endDraw(setIsDrawingDialogAlmox)}
+                      onTouchStart={(e) => { e.preventDefault(); startDraw(sigDialogAlmoxCanvasRef.current, e, setIsDrawingDialogAlmox); }}
+                      onTouchMove={(e) => { e.preventDefault(); draw(sigDialogAlmoxCanvasRef.current, e, isDrawingDialogAlmox); }}
+                      onTouchEnd={() => endDraw(setIsDrawingDialogAlmox)}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => clearCanvas(sigDialogAlmoxCanvasRef.current)}>Limpar</Button>
+                    <Button size="sm" onClick={() => handleSaveAlmoxSignature(viewColeta.id)}>Salvar Assinatura Recebimento</Button>
+                  </div>
+                </div>
+              )}
+
+              {viewColeta.almox_edit_done && viewColeta.assinatura_almoxarifado && (
+                <div className="space-y-1 border-t pt-3">
+                  <Label className="text-xs font-medium">Assinatura Almoxarifado (Recebido)</Label>
+                  <div className="h-16 border rounded bg-white flex items-center justify-center p-1">
+                    <img src={viewColeta.assinatura_almoxarifado} alt="Assinatura Almox" className="h-full object-contain" />
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-3 border-t">
                 {viewColeta.pdf_url && (
                   <Button size="sm" variant="outline" onClick={() => window.open(viewColeta.pdf_url!, "_blank")}>

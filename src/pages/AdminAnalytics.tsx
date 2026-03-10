@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +42,8 @@ const AdminAnalytics = () => {
   const [chartData, setChartData] = useState<{ date: string; acessos: number }[]>([]);
   const [areaDistData, setAreaDistData] = useState<{ name: string; value: number }[]>([]);
   const [areaAccessData, setAreaAccessData] = useState<{ name: string; acessos: number }[]>([]);
+
+  useAccessTracking("/admin/analytics");
 
   useEffect(() => {
     if (!user) return;

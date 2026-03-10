@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BarChart3, Loader2 } from "lucide-react";
@@ -26,6 +27,8 @@ const PowerBI = () => {
   const navigate = useNavigate();
 
   const hasFetched = useRef(false);
+
+  useAccessTracking("/powerbi");
 
   useEffect(() => {
     if (hasFetched.current) return;
