@@ -135,6 +135,8 @@ const MaterialColeta = () => {
   const [coletasLoaded, setColetasLoaded] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
+  const [gestechExportOpen, setGestechExportOpen] = useState(false);
+  const [gestechExportDate, setGestechExportDate] = useState("");
 
   // Edit states
   const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
