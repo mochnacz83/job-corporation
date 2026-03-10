@@ -1120,10 +1120,9 @@ const MaterialColeta = () => {
                       <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
                         <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="SEM MATERIAL LADO A">SEM MATERIAL LADO A</SelectItem>
-                          <SelectItem value="SEM MATERIAL LADO B">SEM MATERIAL LADO B</SelectItem>
-                          <SelectItem value="LADO A COMPARTILHADO">LADO A COMPARTILHADO</SelectItem>
-                          <SelectItem value="LADO B COMPARTILHADO">LADO B COMPARTILHADO</SelectItem>
+                          <SelectItem value="SEM MATERIAL ESTAÇÃO">SEM MATERIAL ESTAÇÃO</SelectItem>
+                          <SelectItem value="CLIENTE COMPARTILHADO">CLIENTE COMPARTILHADO</SelectItem>
+                          <SelectItem value="ESTAÇÃO COMPARTILHADO">ESTAÇÃO COMPARTILHADO</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
