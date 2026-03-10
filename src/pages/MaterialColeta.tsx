@@ -1458,8 +1458,8 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Baixar Modelo
                   </Button>
                 </div>
-                {materiaisCadastro.length > 0 && (
-                  <div className="max-h-48 overflow-auto border rounded">
+                <div className="max-h-48 overflow-auto border rounded">
+                  {materiaisCadastro.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1487,8 +1487,10 @@ const MaterialColeta = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
