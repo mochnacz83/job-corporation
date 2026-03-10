@@ -1456,7 +1456,7 @@ const MaterialColeta = () => {
                                         placeholder={`SERIAL ${i + 1} *`}
                                         className="flex-1 uppercase"
                                       />
-                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
+                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
                                         <ScanBarcode className="w-4 h-4" />
                                       </Button>
                                     </div>
