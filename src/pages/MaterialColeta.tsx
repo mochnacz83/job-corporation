@@ -1776,6 +1776,45 @@ const MaterialColeta = () => {
                   </TableBody>
                 </Table>
               </div>
+              <div className="flex gap-2 pt-3 border-t">
+                {viewColeta.pdf_url && (
+                  <Button size="sm" variant="outline" onClick={() => window.open(viewColeta.pdf_url!, "_blank")}>
+                    <FileText className="w-4 h-4 mr-1" /> Doc Logística (PDF)
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={() => {
+                  // Regenerate PDF from coleta data
+                  const items: MaterialItem[] = viewColeta.material_coleta_items.map((item, i) => ({
+                    id: String(i),
+                    codigo_material: item.codigo_material,
+                    nome_material: item.nome_material,
+                    quantidade: item.quantidade,
+                    unidade: item.unidade,
+                    serial: item.serial || "",
+                    seriais: [],
+                    askSeriais: false,
+                  }));
+                  generatePDF({
+                    matriculaTt: viewColeta.matricula_tt || "",
+                    nomeTecnico: viewColeta.nome_tecnico,
+                    telefoneTecnico: "",
+                    cidade: viewColeta.cidade || "",
+                    siglaCidade: viewColeta.sigla_cidade || "",
+                    uf: viewColeta.uf || "",
+                    atividade: viewColeta.atividade,
+                    ba: viewColeta.ba || "",
+                    circuito: viewColeta.circuito || "",
+                    dataExecucao: viewColeta.data_execucao || "",
+                    materiais: items,
+                    assinaturaColaborador: viewColeta.assinatura_colaborador || "",
+                    assinaturaAlmoxarifado: viewColeta.assinatura_almoxarifado || "",
+                    fotoDataUrl: viewColeta.foto_url || null,
+                    tipo_aplicacao: viewColeta.tipo_aplicacao,
+                  });
+                }}>
+                  <Download className="w-4 h-4 mr-1" /> Gerar PDF
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
