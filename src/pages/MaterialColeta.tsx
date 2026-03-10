@@ -1033,7 +1033,16 @@ const MaterialColeta = () => {
           ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase())
         );
 
-        if (filteredColetas.length === 0) {
+        // Deduplica por BA — mantém apenas o primeiro registro de cada BA
+        const seenBAs = new Set<string>();
+        const uniqueColetas = filteredColetas.filter(c => {
+          const ba = (c.ba || "").trim().toUpperCase();
+          if (!ba || seenBAs.has(ba)) return false;
+          seenBAs.add(ba);
+          return true;
+        });
+
+        if (uniqueColetas.length === 0) {
           toast.error("Nenhum registro encontrado para essa data com as atividades válidas.");
           return;
         }
@@ -1043,8 +1052,8 @@ const MaterialColeta = () => {
         const horaAtual = agora.getHours();
         const turno = horaAtual < 12 ? "MANHÃ" : "TARDE";
 
-        // Map 1 row per Coleta (BA/Circuito), not per material
-        const rows = filteredColetas.map(c => {
+        // Map 1 row per Coleta (BA único)
+        const rows = uniqueColetas.map(c => {
           const isAtivacao = c.atividade.toUpperCase() === "ATIVAÇÃO";
           const isReparo = c.atividade.toUpperCase() === "REPARO";
           const isPreventiva = c.atividade.toUpperCase() === "PREVENTIVA";
