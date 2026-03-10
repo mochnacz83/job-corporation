@@ -1119,10 +1119,12 @@ const MaterialColeta = () => {
           else if (isReparo) servico = "REPDADOS";
           else if (isPreventiva) servico = "PREVDADOS";
 
-          const nrba = [c.matricula_tt, c.circuito, c.ba].filter(Boolean).join("-");
+          const cctoClean = (c.circuito || "").replace(/\s/g, "");
+          const ttClean = (c.matricula_tt || "").replace(/\s/g, "");
+          const baClean = (c.ba || "").replace(/\s/g, "");
+          const nrba = [ttClean, cctoClean, baClean].filter(Boolean).join("-");
 
           return {
-            "COLUNA": "",
             "EMPRESA": "ABILITY",
             "NRBA": nrba,
             "DATACRIACAO": dataAtual,
