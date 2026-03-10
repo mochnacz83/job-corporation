@@ -624,11 +624,7 @@ Fico no aguardo!`;
                                 Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
                             </div>
                         </CardContent>
-<<<<<<< HEAD
-                    </Card >
-=======
                     </Card>
->>>>>>> 809eb16d733de84290bc656037f65f28aad9d784
                 )}
 
                 <header className="w-full max-w-full mb-2 sm:mb-4 flex items-center justify-between gap-2 sm:gap-4 flex-wrap shrink-0 px-1">
