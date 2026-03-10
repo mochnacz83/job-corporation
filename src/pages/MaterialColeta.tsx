@@ -1424,7 +1424,7 @@ const MaterialColeta = () => {
                                       placeholder="SERIAL"
                                       className="flex-1 uppercase"
                                     />
-                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
+                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
                                       <ScanBarcode className="w-4 h-4" />
                                     </Button>
                                   </div>
