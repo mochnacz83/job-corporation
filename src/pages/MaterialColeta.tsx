@@ -1108,13 +1108,12 @@ const MaterialColeta = () => {
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
-                        <SelectItem value="SO ESTACAO">SÓ ESTAÇÃO</SelectItem>
                         <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {(localRetirada === "SO ESTACAO" || localRetirada === "SO CLIENTE") && (
+                  {localRetirada === "SO CLIENTE" && (
                     <div className="space-y-1.5">
                       <Label>Classificação do Cenário *</Label>
                       <Select value={classificacaoCenario} onValueChange={setClassificacaoCenario}>
@@ -1392,8 +1391,8 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Baixar Modelo
                   </Button>
                 </div>
-                {tecnicos.length > 0 && (
-                  <div className="max-h-48 overflow-auto border rounded">
+                <div className="max-h-48 overflow-auto border rounded">
+                  {tecnicos.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1433,8 +1432,10 @@ const MaterialColeta = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
@@ -1457,8 +1458,8 @@ const MaterialColeta = () => {
                     <Download className="w-4 h-4 mr-1" /> Baixar Modelo
                   </Button>
                 </div>
-                {materiaisCadastro.length > 0 && (
-                  <div className="max-h-48 overflow-auto border rounded">
+                <div className="max-h-48 overflow-auto border rounded">
+                  {materiaisCadastro.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1486,8 +1487,10 @@ const MaterialColeta = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado. Importe uma planilha para começar.</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
