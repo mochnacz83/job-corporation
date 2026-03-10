@@ -670,7 +670,10 @@ const MaterialColeta = () => {
     doc.setTextColor(150, 150, 150);
     doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
 
+    // Return blob for upload
+    const pdfBlob = doc.output("blob");
     doc.save(`material_reversa_${coletaData.ba || "sem_ba"}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    return pdfBlob;
   };
 
   // Submit form
