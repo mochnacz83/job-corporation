@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
+import { Html5Qrcode } from "html5-qrcode";
 
 interface MaterialItem {
   id: string;
@@ -143,6 +144,61 @@ const MaterialColeta = () => {
   const [editingMaterial, setEditingMaterial] = useState<MaterialCadastro | null>(null);
   const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
   const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
+
+  // Scanner state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerCallback, setScannerCallback] = useState<((code: string) => void) | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const openScanner = (onScan: (code: string) => void) => {
+    setScannerCallback(() => onScan);
+    setScannerOpen(true);
+  };
+
+  const closeScanner = async () => {
+    try {
+      if (scannerRef.current) {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    } catch (_) {}
+    setScannerOpen(false);
+    setScannerCallback(null);
+  };
+
+  useEffect(() => {
+    if (!scannerOpen) return;
+    let cancelled = false;
+    const startScanner = async () => {
+      try {
+        const html5Qr = new Html5Qrcode("barcode-scanner-container");
+        scannerRef.current = html5Qr;
+        await html5Qr.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 150 } },
+          (decodedText) => {
+            if (!cancelled && scannerCallback) {
+              scannerCallback(decodedText.toUpperCase());
+              closeScanner();
+            }
+          },
+          () => {}
+        );
+      } catch (err) {
+        if (!cancelled) {
+          toast.error("Não foi possível acessar a câmera. Verifique as permissões.");
+          closeScanner();
+        }
+      }
+    };
+    // Small delay to ensure the DOM element is mounted
+    const timer = setTimeout(startScanner, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [scannerOpen]);
 
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
@@ -1368,7 +1424,7 @@ const MaterialColeta = () => {
                                       placeholder="SERIAL"
                                       className="flex-1 uppercase"
                                     />
-                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code">
+                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
                                       <ScanBarcode className="w-4 h-4" />
                                     </Button>
                                   </div>
@@ -1400,7 +1456,7 @@ const MaterialColeta = () => {
                                         placeholder={`SERIAL ${i + 1} *`}
                                         className="flex-1 uppercase"
                                       />
-                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código">
+                                      <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
                                         <ScanBarcode className="w-4 h-4" />
                                       </Button>
                                     </div>
@@ -1955,6 +2011,20 @@ const MaterialColeta = () => {
               )}
             </DialogContent>
           </Dialog >
+
+          {/* Scanner Dialog */}
+          <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Leitor de Código</DialogTitle>
+                <DialogDescription>Aponte a câmera para o código de barras ou QR Code</DialogDescription>
+              </DialogHeader>
+              <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
+              <DialogFooter>
+                <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div >
       );
     };
