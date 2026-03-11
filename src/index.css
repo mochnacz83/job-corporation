@@ -139,3 +139,11 @@
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
   }
 }
+
+/* Hide Lovable branding */
+[class*="lovable"], [id*="lovable"], .lovable-badge, #lovable-badge {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

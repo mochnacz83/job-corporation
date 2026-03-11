@@ -1566,13 +1566,32 @@ const MaterialColeta = () => {
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
                     <div className="flex flex-wrap gap-2">
-                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                      <label 
+                        htmlFor="camera-capture-input"
+                        className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors"
+                      >
                         <Camera className="w-4 h-4 text-primary" /> Abrir Câmera
-                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
+                        <input 
+                          id="camera-capture-input"
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          className="hidden" 
+                          onChange={handleFotoChange} 
+                        />
                       </label>
-                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                      <label 
+                        htmlFor="gallery-select-input"
+                        className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors"
+                      >
                         <ImageIcon className="w-4 h-4 text-primary" /> Galeria / Arquivos
-                        <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} />
+                        <input 
+                          id="gallery-select-input"
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleFotoChange} 
+                        />
                       </label>
                     </div>
                     {fotoPreview && (
