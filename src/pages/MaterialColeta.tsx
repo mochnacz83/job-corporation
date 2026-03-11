@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -23,7 +23,7 @@ interface MaterialItem {
   id: string;
   codigo_material: string;
   nome_material: string;
-  quantidade: number;
+  quantidade: number | "";
   unidade: string;
   serial: string;
   seriais: string[];
@@ -64,7 +64,7 @@ interface ColetaRecord {
   assinatura_colaborador: string | null;
   assinatura_almoxarifado: string | null;
   almox_edit_done: boolean;
-  material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number; unidade: string; serial: string | null }[];
+  material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
 
 const FRASE_REVERSA = "Declaro que os materiais apresentados neste documento foram devidamente retirados no local da atividade e separados para devolução, conforme registro realizado nesta data. A imagem anexada comprova visualmente os itens coletados, estando todos visíveis para conferência. O colaborador responsável confirma a veracidade das informações registradas e a correta separação dos materiais para encaminhamento ao Almoxarifado/Logística da Ability Tecnologia, ficando sujeitos à validação e conferência no ato da entrega.";
@@ -497,19 +497,26 @@ const MaterialColeta = () => {
     setMateriais((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
 
-  const handleQuantidadeChange = (id: string, qty: number) => {
+  const handleQuantidadeChange = (id: string, qty: number | "") => {
     setMateriais((prev) =>
       prev.map((m) => {
         if (m.id !== id) return m;
-        if (qty > 1 && !m.askSeriais) {
-          return { ...m, quantidade: qty, askSeriais: true, seriais: Array(qty).fill("") };
+
+        // If it's an empty string, just update the value to allow typing
+        if (qty === "") {
+          return { ...m, quantidade: "" };
         }
-        if (qty <= 1) {
-          return { ...m, quantidade: qty, askSeriais: false, seriais: [] };
+
+        const numQty = Number(qty);
+        if (numQty > 1 && !m.askSeriais) {
+          return { ...m, quantidade: numQty, askSeriais: true, seriais: Array(numQty).fill("") };
+        }
+        if (numQty <= 1) {
+          return { ...m, quantidade: numQty, askSeriais: false, seriais: [] };
         }
         // qty changed but already asked
-        const newSeriais = Array(qty).fill("").map((_, i) => m.seriais[i] || "");
-        return { ...m, quantidade: qty, seriais: newSeriais };
+        const newSeriais = Array(numQty).fill("").map((_, i) => m.seriais[i] || "");
+        return { ...m, quantidade: numQty, seriais: newSeriais };
       })
     );
   };
@@ -1472,7 +1479,12 @@ const MaterialColeta = () => {
                               type="number"
                               min={1}
                               value={mat.quantidade}
-                              onChange={(e) => handleQuantidadeChange(mat.id, Math.max(1, Number(e.target.value)))}
+                              onChange={(e) => handleQuantidadeChange(mat.id, e.target.value === "" ? "" : Number(e.target.value))}
+                              onBlur={(e) => {
+                                if (e.target.value === "" || Number(e.target.value) < 1) {
+                                  handleQuantidadeChange(mat.id, 1);
+                                }
+                              }}
                             />
                           </div>
                           <div className="space-y-1">
@@ -1555,11 +1567,11 @@ const MaterialColeta = () => {
                     <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
                     <div className="flex flex-wrap gap-2">
                       <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                        <ScanBarcode className="w-4 h-4" /> Abrir Câmera
+                        <Camera className="w-4 h-4 text-primary" /> Abrir Câmera
                         <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
                       </label>
                       <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                        <ImageIcon className="w-4 h-4" /> Galeria / Arquivos
+                        <ImageIcon className="w-4 h-4 text-primary" /> Galeria / Arquivos
                         <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} />
                       </label>
                     </div>
