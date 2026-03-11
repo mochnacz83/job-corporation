@@ -92,6 +92,8 @@ const newMaterial = (): MaterialItem => ({
 
 const MaterialColeta = () => {
   const { user } = useAuth();
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("formulario");
 
@@ -1565,34 +1567,49 @@ const MaterialColeta = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
-                    <div className="flex flex-wrap gap-2">
-                      <label 
-                        htmlFor="camera-capture-input"
-                        className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors"
+                     <div className="flex flex-wrap gap-2">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          cameraInputRef.current?.click();
+                        }}
                       >
                         <Camera className="w-4 h-4 text-primary" /> Abrir Câmera
-                        <input 
-                          id="camera-capture-input"
-                          type="file" 
-                          accept="image/*" 
-                          capture="environment" 
-                          className="hidden" 
-                          onChange={handleFotoChange} 
-                        />
-                      </label>
-                      <label 
-                        htmlFor="gallery-select-input"
-                        className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors"
+                      </Button>
+                      <input 
+                        id="camera-capture-input"
+                        ref={cameraInputRef}
+                        type="file" 
+                        accept="image/*" 
+                        capture
+                        className="hidden" 
+                        onChange={handleFotoChange} 
+                      />
+
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        className="flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          galleryInputRef.current?.click();
+                        }}
                       >
                         <ImageIcon className="w-4 h-4 text-primary" /> Galeria / Arquivos
-                        <input 
-                          id="gallery-select-input"
-                          type="file" 
-                          accept="image/*" 
-                          className="hidden" 
-                          onChange={handleFotoChange} 
-                        />
-                      </label>
+                      </Button>
+                      <input 
+                        id="gallery-select-input"
+                        ref={galleryInputRef}
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleFotoChange} 
+                      />
                     </div>
                     {fotoPreview && (
                       <div className="mt-2">

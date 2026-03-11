@@ -140,8 +140,11 @@
   }
 }
 
-/* Hide Lovable branding */
-[class*="lovable"], [id*="lovable"], .lovable-badge, #lovable-badge {
+/* Hide Lovable branding and other automated badges */
+[class*="lovable"], [id*="lovable"], 
+.lovable-badge, #lovable-badge,
+iframe[src*="lovable"],
+[style*="lovable"] {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
