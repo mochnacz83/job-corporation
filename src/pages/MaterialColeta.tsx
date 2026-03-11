@@ -1110,6 +1110,7 @@ const MaterialColeta = () => {
 
   // Export Excel
   const handleExport = (format: "xlsx" | "csv") => {
+    // Gestech Sync Trigger: 2026-03-11 17:25
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
     const rows = coletas.flatMap((c) =>
       c.material_coleta_items.map((item) => ({
