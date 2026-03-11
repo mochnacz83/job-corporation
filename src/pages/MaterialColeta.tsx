@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -64,6 +64,7 @@ interface ColetaRecord {
   assinatura_colaborador: string | null;
   assinatura_almoxarifado: string | null;
   almox_edit_done: boolean;
+  last_exported_at: string | null;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
 
@@ -141,7 +142,8 @@ const MaterialColeta = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [viewColeta, setViewColeta] = useState<ColetaRecord | null>(null);
   const [gestechExportOpen, setGestechExportOpen] = useState(false);
-  const [gestechExportDate, setGestechExportDate] = useState("");
+  const [gestechStartDate, setGestechStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [gestechEndDate, setGestechEndDate] = useState(new Date().toISOString().slice(0, 10));
 
   // Edit states
   const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
@@ -1144,17 +1146,23 @@ const MaterialColeta = () => {
   };
 
   // Export Gestech
-  const handleGestechExport = () => {
-    if (!gestechExportDate) {
-      toast.error("Por favor, selecione uma data.");
+  const handleGestechExport = async () => {
+    if (!gestechStartDate || !gestechEndDate) {
+      toast.error("Por favor, selecione as datas de início e fim.");
       return;
     }
 
-    // Filtrar pela data de execução e pelas atividades permitidas
-    const filteredColetas = allColetas.filter(c =>
-      c.data_execucao === gestechExportDate &&
-      ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase())
-    );
+    // Filtrar pela faixa de data de execução, atividades permitidas e não exportados
+    const filteredColetas = allColetas.filter(c => {
+      if (!c.data_execucao) return false;
+      const dataExec = c.data_execucao;
+      return (
+        dataExec >= gestechStartDate &&
+        dataExec <= gestechEndDate &&
+        ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase()) &&
+        !c.last_exported_at // Somente os não exportados
+      );
+    });
 
     // Deduplica por BA — mantém apenas o primeiro registro de cada BA
     const seenBAs = new Set<string>();
@@ -1218,20 +1226,43 @@ const MaterialColeta = () => {
         "CRITICA": "",
         "SETOR": "",
         "COMPANYID": "VTAL",
-        "SUBSCRIBERID": ""
+        "SUBSCRIBERID": "",
+        "DATA EXPORTAÇÃO ANTERIOR": c.last_exported_at ? new Date(c.last_exported_at).toLocaleString("pt-BR") : ""
       };
     });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Gestech");
-    const filename = `Exportar_Aplicacao_Gestech_${gestechExportDate.replace(/-/g, "")}`;
-    XLSX.writeFile(wb, `${filename}.xlsx`);
+    try {
+      // Atualizar no banco que foram exportados
+      const idsToUpdate = uniqueColetas.map(c => c.id);
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({ last_exported_at: agora.toISOString() })
+        .in("id", idsToUpdate);
 
-    setGestechExportOpen(false);
-    toast.success("Exportação Gestech concluída com sucesso!");
-    // Log Gestech export action
-    trackAction("exportar_gestech");
+      if (error) throw error;
+
+      // Gerar arquivo
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Gestech");
+      const filename = `gestech_export_${turno}_${new Date().toISOString().slice(0, 10)}`;
+      XLSX.writeFile(wb, `${filename}.xlsx`);
+
+      toast.success(`${uniqueColetas.length} registros exportados e marcados no sistema.`);
+      setGestechExportOpen(false);
+      
+      // Refresh local coletas state
+      setAllColetas(prev => prev.map(c => 
+        idsToUpdate.includes(c.id) ? { ...c, last_exported_at: agora.toISOString() } : c
+      ));
+      setColetas(prev => prev.map(c => 
+        idsToUpdate.includes(c.id) ? { ...c, last_exported_at: agora.toISOString() } : c
+      ));
+
+      trackAction("exportar_gestech");
+    } catch (err: any) {
+      toast.error("Erro ao atualizar registros: " + err.message);
+    }
   };
 
   return (
@@ -1897,7 +1928,8 @@ const MaterialColeta = () => {
                           <TableHead className="text-xs">Atividade</TableHead>
                           <TableHead className="text-xs">Tipo</TableHead>
                           <TableHead className="text-xs">Materiais</TableHead>
-                          <TableHead className="text-xs">Ações</TableHead>
+                          <TableHead className="text-xs text-center">Status</TableHead>
+                          <TableHead className="text-xs text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1915,6 +1947,21 @@ const MaterialColeta = () => {
                               {c.material_coleta_items.map((item, i) => (
                                 <div key={i}>{item.codigo_material} - {item.nome_material} (x{item.quantidade})</div>
                               ))}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {c.last_exported_at ? (
+                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" title="Exportado" />
+                              ) : (
+                                (() => {
+                                  const sevenDaysAgo = new Date();
+                                  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                                  const createdAt = new Date(c.created_at);
+                                  if (createdAt < sevenDaysAgo) {
+                                    return <AlertCircle className="w-5 h-5 text-destructive mx-auto" title="Fora do prazo" />;
+                                  }
+                                  return <AlertTriangle className="w-5 h-5 text-warning mx-auto" title="Novo" />;
+                                })()
+                              )}
                             </TableCell>
                             <TableCell className="text-xs">
                               <div className="flex gap-1">
@@ -2017,15 +2064,25 @@ const MaterialColeta = () => {
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              Selecione a Data de Execução para gerar o relatório Gestech. Apenas atividades de ATIVAÇÃO, REPARO e PREVENTIVA serão exportadas.
+              Selecione o período para gerar o relatório Gestech. Apenas registros não exportados de ATIVAÇÃO, REPARO e PREVENTIVA serão incluídos.
             </p>
-            <div className="space-y-1">
-              <Label>Data de Execução *</Label>
-              <Input
-                type="date"
-                value={gestechExportDate}
-                onChange={(e) => setGestechExportDate(e.target.value)}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Início *</Label>
+                <Input
+                  type="date"
+                  value={gestechStartDate}
+                  onChange={(e) => setGestechStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Fim *</Label>
+                <Input
+                  type="date"
+                  value={gestechEndDate}
+                  onChange={(e) => setGestechEndDate(e.target.value)}
+                />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setGestechExportOpen(false)}>Cancelar</Button>
@@ -2076,8 +2133,9 @@ const MaterialColeta = () => {
                       <TableHead className="text-xs">Código</TableHead>
                       <TableHead className="text-xs">Nome</TableHead>
                       <TableHead className="text-xs">Qtde</TableHead>
-                      <TableHead className="text-xs">Un</TableHead>
-                      <TableHead className="text-xs">Serial</TableHead>
+                      <TableHead>Activity</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
