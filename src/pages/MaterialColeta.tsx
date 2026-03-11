@@ -1227,8 +1227,7 @@ const MaterialColeta = () => {
         "CRITICA": "",
         "SETOR": "",
         "COMPANYID": "VTAL",
-        "SUBSCRIBERID": "",
-        "DATA EXPORTAÇÃO ANTERIOR": c.last_exported_at ? new Date(c.last_exported_at).toLocaleString("pt-BR") : ""
+        "SUBSCRIBERID": ""
       };
     });
 
