@@ -207,6 +207,13 @@ const MaterialColeta = () => {
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
 
+  // Force REVERSA if activity is RETIRADA and current type is APLICAR/BAIXAR
+  useEffect(() => {
+    if (atividade === "RETIRADA" && tipoAplicacao === "APLICAR/BAIXAR") {
+      setTipoAplicacao("REVERSA");
+    }
+  }, [atividade, tipoAplicacao]);
+
   // Load catalogs
   useEffect(() => {
     supabase.from("tecnicos_cadastro").select("tr, tt, nome_empresa, nome_tecnico, supervisor, coordenador, telefone, cidade_residencia").then(({ data }) => {
@@ -227,7 +234,6 @@ const MaterialColeta = () => {
       if (found) {
         setNomeTecnico(found.nome_tecnico.toUpperCase());
         setTelefoneTecnico(found.telefone || "");
-        if (found.cidade_residencia) setCidade(found.cidade_residencia.toUpperCase());
       } else {
         setTtError("TT informado não localizado no cadastro.");
         setNomeTecnico("");
@@ -1330,9 +1336,18 @@ const MaterialColeta = () => {
                     <Select value={tipoAplicacao} onValueChange={setTipoAplicacao}>
                       <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
-                        <SelectItem value="REVERSA">REVERSA</SelectItem>
-                        <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
+                        {atividade === "RETIRADA" ? (
+                          <>
+                            <SelectItem value="REVERSA">REVERSA</SelectItem>
+                            <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
+                          </>
+                        ) : (
+                          <>
+                            <SelectItem value="APLICAR/BAIXAR">APLICAR/BAIXAR</SelectItem>
+                            <SelectItem value="REVERSA">REVERSA</SelectItem>
+                            <SelectItem value="SEM MATERIAL">SEM MATERIAL</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1538,10 +1553,16 @@ const MaterialColeta = () => {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
-                    <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                      <ImageIcon className="w-4 h-4" /> Capturar / Selecionar Foto
-                      <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
-                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                        <ScanBarcode className="w-4 h-4" /> Abrir Câmera
+                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFotoChange} />
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                        <ImageIcon className="w-4 h-4" /> Galeria / Arquivos
+                        <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} />
+                      </label>
+                    </div>
                     {fotoPreview && (
                       <div className="mt-2">
                         <img src={fotoPreview} alt="Foto materiais" className="max-w-xs rounded border" />
