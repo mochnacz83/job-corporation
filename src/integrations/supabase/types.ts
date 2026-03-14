@@ -135,6 +135,7 @@ export type Database = {
       }
       material_coletas: {
         Row: {
+          almox_edit_done: boolean | null
           assinatura_almoxarifado: string | null
           assinatura_colaborador: string | null
           atividade: string
@@ -147,6 +148,7 @@ export type Database = {
           data_execucao: string
           foto_url: string | null
           id: string
+          last_exported_at: string | null
           local_retirada: string | null
           matricula_tt: string | null
           nome_tecnico: string
@@ -159,6 +161,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          almox_edit_done?: boolean | null
           assinatura_almoxarifado?: string | null
           assinatura_colaborador?: string | null
           atividade: string
@@ -171,6 +174,7 @@ export type Database = {
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          last_exported_at?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico: string
@@ -183,6 +187,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          almox_edit_done?: boolean | null
           assinatura_almoxarifado?: string | null
           assinatura_colaborador?: string | null
           atividade?: string
@@ -195,6 +200,7 @@ export type Database = {
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          last_exported_at?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico?: string
