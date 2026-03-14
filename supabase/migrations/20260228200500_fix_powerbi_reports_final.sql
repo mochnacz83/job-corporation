@@ -16,7 +16,7 @@ BEGIN
         VALUES (
             'Dashboard Operacional de Comunicação de Dados',
             'Monitoramento de comunicação de dados e métricas operacionais',
-            'https://app.powerbi.com/view?r=eyJrIjoiMmFmOWU0YWMtNzMyYy00MzczLTk1YTYtNjA5ZGY2ZjY2YjdiIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9',
+            'https://app.powerbi.com/view?r=eyJrIjoiYzUwMWVhZTItOWE4Yy00MDJjLWI0ZGMtZjU4MTM5MDllYWYxIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9',
             2,
             true
         );
