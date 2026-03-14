@@ -157,9 +157,15 @@ const Reagenda = () => {
                     };
                     setAdminMetrics(metrics);
                 }
+            } else {
+                setData([]);
+                setAdminMetrics({ total: 0, contatado: 0, aguardando: 0, semContato: 0, confirmada: 0, usuariosAtivos: 0 });
             }
         } catch (err) {
             console.error("Error loading history:", err);
+            toast({ title: "Erro ao carregar", description: "Falha na sincronização com o banco de dados.", variant: "destructive" });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -324,7 +330,7 @@ const Reagenda = () => {
 
         setLoading(true);
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             try {
                 const bstr = event.target?.result;
                 const workbook = XLSX.read(bstr, { type: "binary" });
@@ -332,7 +338,7 @@ const Reagenda = () => {
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
-                processJsonData(jsonData);
+                await processJsonData(jsonData);
             } catch (error) {
                 console.error("Erro ao ler planilha:", error);
                 toast({
@@ -364,14 +370,14 @@ const Reagenda = () => {
         if (file && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv"))) {
             const reader = new FileReader();
             setLoading(true);
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
                 try {
                     const bstr = event.target?.result;
                     const workbook = XLSX.read(bstr, { type: "binary" });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
                     const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
-                    processJsonData(jsonData);
+                    await processJsonData(jsonData);
                 } catch (error) {
                     toast({ title: "Erro", description: "Falha ao processar arquivo.", variant: "destructive" });
                 } finally {
@@ -534,7 +540,7 @@ Fico no aguardo!`;
             setLoading(true);
             try {
                 // Força delete físico para limpeza administrativa real
-                const { error } = await supabase.from("reagenda_history" as any).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                const { error } = await supabase.from("reagenda_history" as any).delete().not("id", "is", null);
                 if (error) throw error;
                 
                 setData([]);
