@@ -1599,7 +1599,7 @@ const MaterialColeta = () => {
                         </div>
 
                         {/* Ask seriais dialog inline */}
-                        {mat.askSeriais && mat.quantidade > 1 && (
+                        {mat.askSeriais && Number(mat.quantidade) > 1 && (
                           <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
                             <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
                             <div className="flex gap-2">
