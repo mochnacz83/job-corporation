@@ -97,6 +97,14 @@ const MaterialColeta = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // Refs para foco em validação
+  const matriculaTtRef = useRef<HTMLInputElement>(null);
+  const siglaCidadeRef = useRef<HTMLInputElement>(null);
+  const cidadeRef = useRef<HTMLInputElement>(null);
+  const baRef = useRef<HTMLInputElement>(null);
+  const circuitoRef = useRef<HTMLInputElement>(null);
+  const dataExecucaoRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState("formulario");
 
   // Form state
@@ -781,20 +789,55 @@ const MaterialColeta = () => {
   const handleSubmit = async () => {
     if (!user) return;
 
-    // Validate required fields
-    if (!matriculaTt || !nomeTecnico || !atividade || !tipoAplicacao || !ba || !circuito || !dataExecucao || !cidade || !siglaCidade || !uf) {
-      toast.error("Preencha todos os campos obrigatórios");
+    // Validate required fields com foco automático no faltante
+    if (!matriculaTt) {
+      toast.error("Preencha a Matrícula (TT)");
+      matriculaTtRef.current?.focus();
+      return;
+    }
+    if (!siglaCidade) {
+      toast.error("Preencha a Sigla da Estação");
+      siglaCidadeRef.current?.focus();
+      return;
+    }
+    if (!cidade) {
+      toast.error("Preencha a Cidade");
+      cidadeRef.current?.focus();
+      return;
+    }
+    if (!uf) {
+      toast.error("Selecione a UF");
+      return;
+    }
+    if (!atividade) {
+      toast.error("Selecione a Atividade");
+      return;
+    }
+    if (!tipoAplicacao) {
+      toast.error("Selecione o Tipo de Aplicação");
+      return;
+    }
+    if (!ba) {
+      toast.error("Preencha o número do BA");
+      baRef.current?.focus();
+      return;
+    }
+    if (!circuito) {
+      toast.error("Preencha o Circuito");
+      circuitoRef.current?.focus();
+      return;
+    }
+    if (!dataExecucao) {
+      toast.error("Preencha a Data de Execução");
+      dataExecucaoRef.current?.focus();
       return;
     }
 
     // Validate TT exists
-    if (ttError) {
-      toast.error("TT informado não localizado no cadastro.");
-      return;
-    }
     const ttExists = tecnicos.find((t) => t.tt?.toUpperCase() === matriculaTt.toUpperCase());
     if (!ttExists) {
       toast.error("TT informado não localizado no cadastro.");
+      matriculaTtRef.current?.focus();
       return;
     }
 
@@ -1349,6 +1392,7 @@ const MaterialColeta = () => {
                   <div className="space-y-1.5">
                     <Label>Matrícula (TT) *</Label>
                     <Input
+                      ref={matriculaTtRef}
                       value={matriculaTt}
                       onChange={(e) => handleMatriculaTtChange(e.target.value)}
                       placeholder="EX: TT12345"
@@ -1379,11 +1423,19 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Sigla da Estação *</Label>
-                    <Input value={siglaCidade} onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} placeholder="MÁX 4 CARACTERES" maxLength={4} className="uppercase" />
+                    <Input 
+                      ref={siglaCidadeRef}
+                      value={siglaCidade} 
+                      onChange={(e) => setSiglaCidade(toUpper(e.target.value).slice(0, 4))} 
+                      placeholder="MÁX 4 CARACTERES" 
+                      maxLength={4} 
+                      className="uppercase" 
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Cidade *</Label>
                     <Input
+                      ref={cidadeRef}
                       value={cidade}
                       onChange={(e) => handleCidadeChange(e.target.value)}
                       placeholder="NOME DA CIDADE"
@@ -1443,7 +1495,7 @@ const MaterialColeta = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Data de Execução *</Label>
-                    <Input type="date" value={dataExecucao} onChange={(e) => setDataExecucao(e.target.value)} />
+                    <Input ref={dataExecucaoRef} type="date" value={dataExecucao} onChange={(e) => setDataExecucao(e.target.value)} />
                   </div>
                 </div>
 
@@ -1451,11 +1503,11 @@ const MaterialColeta = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>BA *</Label>
-                    <Input value={ba} onChange={(e) => setBa(toUpper(e.target.value))} placeholder="NÚMERO DO BA" className="uppercase" />
+                    <Input ref={baRef} value={ba} onChange={(e) => setBa(toUpper(e.target.value))} placeholder="NÚMERO DO BA" className="uppercase" />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Circuito *</Label>
-                    <Input value={circuito} onChange={(e) => setCircuito(toUpper(e.target.value))} placeholder="CIRCUITO" className="uppercase" />
+                    <Input ref={circuitoRef} value={circuito} onChange={(e) => setCircuito(toUpper(e.target.value))} placeholder="CIRCUITO" className="uppercase" />
                   </div>
                 </div>
               </CardContent>
@@ -1643,46 +1695,44 @@ const MaterialColeta = () => {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5" /> Registro Fotográfico dos Materiais *
+                       <Camera className="w-5 h-5 text-primary" /> Registro Fotográfico dos Materiais *
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
-                     <div className="flex flex-wrap gap-2">
-                      <Button 
-                        type="button"
-                        variant="outline"
-                        className="flex items-center gap-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          cameraInputRef.current?.click();
-                        }}
-                      >
-                        <Camera className="w-4 h-4 text-primary" /> Abrir Câmera
-                      </Button>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button className="gap-2 shrink-0">
+                              <ImageIcon className="w-4 h-4 text-white" /> Coletar Foto
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-64">
+                            <DropdownMenuItem onClick={() => cameraInputRef.current?.click()}>
+                              <Camera className="w-4 h-4 mr-2" /> Usar Câmera (Direto)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              toast.warning("IMPORTANTE: Ao utilizar fotos da galeria, certifique-se de que a imagem esteja DATADA e de preferência com GEOLOCALIZAÇÃO.", {
+                                duration: 8000,
+                              });
+                              galleryInputRef.current?.click();
+                            }}>
+                              <ImageIcon className="w-4 h-4 mr-2" /> Escolher da Galeria
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
                       <input 
                         id="camera-capture-input"
                         ref={cameraInputRef}
                         type="file" 
                         accept="image/*" 
-                        capture
+                        capture="environment" 
                         className="hidden" 
                         onChange={handleFotoChange} 
                       />
-
-                      <Button 
-                        type="button"
-                        variant="outline"
-                        className="flex items-center gap-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          galleryInputRef.current?.click();
-                        }}
-                      >
-                        <ImageIcon className="w-4 h-4 text-primary" /> Galeria / Arquivos
-                      </Button>
                       <input 
                         id="gallery-select-input"
                         ref={galleryInputRef}
@@ -1691,12 +1741,21 @@ const MaterialColeta = () => {
                         className="hidden" 
                         onChange={handleFotoChange} 
                       />
+
+                      {fotoPreview && (
+                        <div className="relative mt-2 inline-block">
+                          <img src={fotoPreview} alt="Foto materiais" className="max-w-xs rounded border" />
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md"
+                            onClick={() => { setFotoPreview(null); setFotoFile(null); }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    {fotoPreview && (
-                      <div className="mt-2">
-                        <img src={fotoPreview} alt="Foto materiais" className="max-w-xs rounded border" />
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
