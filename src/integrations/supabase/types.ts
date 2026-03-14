@@ -135,6 +135,7 @@ export type Database = {
       }
       material_coletas: {
         Row: {
+          almox_edit_done: boolean | null
           assinatura_almoxarifado: string | null
           assinatura_colaborador: string | null
           atividade: string
@@ -147,6 +148,7 @@ export type Database = {
           data_execucao: string
           foto_url: string | null
           id: string
+          last_exported_at: string | null
           local_retirada: string | null
           matricula_tt: string | null
           nome_tecnico: string
@@ -159,6 +161,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          almox_edit_done?: boolean | null
           assinatura_almoxarifado?: string | null
           assinatura_colaborador?: string | null
           atividade: string
@@ -171,6 +174,7 @@ export type Database = {
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          last_exported_at?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico: string
@@ -183,6 +187,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          almox_edit_done?: boolean | null
           assinatura_almoxarifado?: string | null
           assinatura_colaborador?: string | null
           atividade?: string
@@ -195,6 +200,7 @@ export type Database = {
           data_execucao?: string
           foto_url?: string | null
           id?: string
+          last_exported_at?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico?: string
@@ -290,6 +296,78 @@ export type Database = {
           reset_password_pending?: boolean
           status?: string
           telefone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reagenda_history: {
+        Row: {
+          contato: string
+          created_at: string
+          data_agendamento: string | null
+          data_nova: string | null
+          data_original_formatada: string | null
+          decisao: string
+          deleted_by_user: boolean
+          horario: string
+          id: string
+          is_manual_status: boolean
+          last_contacted_at: string | null
+          nome: string
+          operadora: string | null
+          periodo: string
+          sa: string | null
+          selecionado: boolean
+          setor: string | null
+          status: string
+          tipo_atividade: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contato: string
+          created_at?: string
+          data_agendamento?: string | null
+          data_nova?: string | null
+          data_original_formatada?: string | null
+          decisao?: string
+          deleted_by_user?: boolean
+          horario?: string
+          id?: string
+          is_manual_status?: boolean
+          last_contacted_at?: string | null
+          nome: string
+          operadora?: string | null
+          periodo?: string
+          sa?: string | null
+          selecionado?: boolean
+          setor?: string | null
+          status?: string
+          tipo_atividade?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contato?: string
+          created_at?: string
+          data_agendamento?: string | null
+          data_nova?: string | null
+          data_original_formatada?: string | null
+          decisao?: string
+          deleted_by_user?: boolean
+          horario?: string
+          id?: string
+          is_manual_status?: boolean
+          last_contacted_at?: string | null
+          nome?: string
+          operadora?: string | null
+          periodo?: string
+          sa?: string | null
+          selecionado?: boolean
+          setor?: string | null
+          status?: string
+          tipo_atividade?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -103,7 +103,7 @@ const Reagenda = () => {
         try {
             let query = supabase
                 .from("reagenda_history" as any)
-                .select("*, profiles(nome)")
+                .select("*")
                 .order("created_at", { ascending: true });
 
             if (!isAdmin || !globalAdminView) {
@@ -117,8 +117,8 @@ const Reagenda = () => {
             const { data: historyData, error } = await query;
 
             if (error) {
-                console.error("Erro do supabase:", error);
-                return; // Fallback silent to avoid crashing if table not migrated yet
+                console.error("Erro do banco:", error);
+                return;
             }
 
             if (historyData) {
@@ -137,11 +137,12 @@ const Reagenda = () => {
                     isManualStatus: row.is_manual_status || false,
                     status: row.status as ReagendaData["status"],
                     decisao: row.decisao,
+                    periodo: row.periodo || "",
                     horario: row.horario || "",
                     selecionado: row.selecionado || false,
                     user_id: row.user_id,
                     deleted_by_user: row.deleted_by_user,
-                    user_nome: (Array.isArray(row.profiles) ? row.profiles[0]?.nome : row.profiles?.nome) || "Desconhecido"
+                    user_nome: row.user_nome || "Desconhecido"
                 }));
                 setData(mappedData);
                 
@@ -227,8 +228,9 @@ const Reagenda = () => {
                 .select("sa, contato")
                 .eq("user_id", uid);
 
-            const existingSAs = new Set(existingRecords?.map(r => r.sa) || []);
-            const existingContacts = new Set(existingRecords?.map(r => r.contato) || []);
+            const existingRows = (existingRecords ?? []) as Array<{ sa?: string | null; contato?: string | null }>;
+            const existingSAs = new Set(existingRows.map((r) => r.sa).filter((v): v is string => Boolean(v)));
+            const existingContacts = new Set(existingRows.map((r) => r.contato).filter((v): v is string => Boolean(v)));
 
             const newEntries: ReagendaData[] = jsonData.map((row) => {
                 const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";

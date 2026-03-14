@@ -532,7 +532,8 @@ const MaterialColeta = () => {
       prev.map((m) => {
         if (m.id !== id) return m;
         if (yes) {
-          return { ...m, askSeriais: false, seriais: Array(m.quantidade).fill("") };
+          const qty = typeof m.quantidade === "number" ? m.quantidade : Number(m.quantidade) || 0;
+          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => "") };
         }
         return { ...m, askSeriais: false, seriais: [] };
       })
@@ -1285,7 +1286,7 @@ const MaterialColeta = () => {
       const idsToUpdate = uniqueColetas.map(c => c.id);
       const { error } = await supabase
         .from("material_coletas")
-        .update({ last_exported_at: agora.toISOString() })
+        .update({ last_exported_at: agora.toISOString() } as any)
         .in("id", idsToUpdate);
 
       if (error) throw error;
@@ -1598,7 +1599,7 @@ const MaterialColeta = () => {
                         </div>
 
                         {/* Ask seriais dialog inline */}
-                        {mat.askSeriais && mat.quantidade > 1 && (
+                        {mat.askSeriais && Number(mat.quantidade) > 1 && (
                           <div className="border border-primary/30 rounded-md p-3 bg-primary/5 space-y-2">
                             <p className="text-sm font-medium">Necessita informar serial para cada equipamento? (Qtde: {mat.quantidade})</p>
                             <div className="flex gap-2">
@@ -2011,18 +2012,18 @@ const MaterialColeta = () => {
                             </TableCell>
                             <TableCell className="text-center">
                               {c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA" ? (
-                                <Truck className="w-5 h-5 text-primary mx-auto" title="Logística Reversa" />
+                                <Truck className="w-5 h-5 text-primary mx-auto" />
                               ) : c.last_exported_at ? (
-                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" title="Exportado" />
+                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                               ) : (
                                 (() => {
                                   const sevenDaysAgo = new Date();
                                   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                                   const createdAt = new Date(c.created_at);
                                   if (createdAt < sevenDaysAgo) {
-                                    return <AlertCircle className="w-5 h-5 text-destructive mx-auto" title="Fora do prazo" />;
+                                    return <AlertCircle className="w-5 h-5 text-destructive mx-auto" />;
                                   }
-                                  return <AlertTriangle className="w-5 h-5 text-warning mx-auto" title="Novo" />;
+                                  return <AlertTriangle className="w-5 h-5 text-warning mx-auto" />;
                                 })()
                               )}
                             </TableCell>
