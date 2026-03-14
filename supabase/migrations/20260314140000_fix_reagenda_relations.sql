@@ -5,7 +5,7 @@
 ALTER TABLE public.reagenda_history 
 DROP CONSTRAINT IF EXISTS reagenda_history_user_id_fkey,
 ADD CONSTRAINT reagenda_history_user_id_fkey 
-FOREIGN KEY (user_id) REFERENCES public.profiles(user_id) ON DELETE CASCADE;
+FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- 2. Atualiza políticas de profiles para permitir que Admins vejam nomes de outros usuários
 -- Isso é necessário para o join "profiles(nome)" na visão global admin

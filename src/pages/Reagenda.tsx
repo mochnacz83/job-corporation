@@ -141,7 +141,7 @@ const Reagenda = () => {
                     selecionado: row.selecionado || false,
                     user_id: row.user_id,
                     deleted_by_user: row.deleted_by_user,
-                    user_nome: row.profiles?.nome || "Desconhecido"
+                    user_nome: (Array.isArray(row.profiles) ? row.profiles[0]?.nome : row.profiles?.nome) || "Desconhecido"
                 }));
                 setData(mappedData);
                 
@@ -240,9 +240,15 @@ const Reagenda = () => {
                 }
 
                 const operadoraValue = String(row["OPERADORA"] || row["Operadora"] || "").trim().toUpperCase();
+                
+                // Safe UUID fallback for non-secure contexts
+                const generateSafeId = () => {
+                    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+                    return 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
+                };
 
                 return {
-                    id: crypto.randomUUID(),
+                    id: generateSafeId(),
                     sa: saValue,
                     setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
                     nome: row["NOME"] || row["Nome"] || "",
@@ -301,7 +307,7 @@ const Reagenda = () => {
                 
                 if (error) {
                     console.error("Supabase insert error:", error);
-                    toast({ title: "Erro ao salvar", description: "Não foi possível salvar os registros no banco.", variant: "destructive" });
+                    toast({ title: "Erro ao salvar", description: `Detalhe: ${error.message || "Falha desconhecida no banco de dados."}`, variant: "destructive" });
                 } else {
                     setData(prev => [...prev, ...uniqueNewEntries]);
                     toast({
