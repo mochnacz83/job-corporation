@@ -1286,7 +1286,7 @@ const MaterialColeta = () => {
       const idsToUpdate = uniqueColetas.map(c => c.id);
       const { error } = await supabase
         .from("material_coletas")
-        .update({ last_exported_at: agora.toISOString() })
+        .update({ last_exported_at: agora.toISOString() } as any)
         .in("id", idsToUpdate);
 
       if (error) throw error;
