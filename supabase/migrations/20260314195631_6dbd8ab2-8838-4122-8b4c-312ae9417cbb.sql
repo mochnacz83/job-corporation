@@ -1,0 +1,3 @@
+UPDATE powerbi_links SET url = 'https://app.powerbi.com/view?r=eyJrIjoiMmFmOWU0YWMtNzMyYy00MzczLTk1YTYtNjA5ZGY2ZjY2YjdiIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9' WHERE id = 'd7a4c9ef-ef58-4cfc-86f9-0d72a28bf1da';
+
+UPDATE powerbi_links SET url = 'https://app.powerbi.com/view?r=eyJrIjoiMzJhNzEzYTAtNTEzYi00MGYzLWFhYmYtOTdhZjA2YTRmZmQwIiwidCI6ImE4MzQzZTdlLWNkNDEtNDZiNC1hNTNhLTUwZmQzMGY2YjA0OCJ9' WHERE id = '56937e4b-eaa3-4e12-b694-5a0365b9435a';
