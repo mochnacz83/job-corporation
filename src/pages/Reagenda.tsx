@@ -3,13 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal, Users, BarChart3, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from "xlsx";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -43,6 +51,9 @@ interface ReagendaData {
     periodo: string;
     horario: string;
     selecionado: boolean;
+    user_id?: string;
+    deleted_by_user?: boolean;
+    user_nome?: string; // Para visão admin
 }
 
 const Reagenda = () => {
@@ -54,6 +65,19 @@ const Reagenda = () => {
     const [infoPosition, setInfoPosition] = useState({ x: 20, y: 80 });
     const [isDraggingInfo, setIsDraggingInfo] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    
+    // Admin & Metrics state
+    const [globalAdminView, setGlobalAdminView] = useState(false);
+    const [adminMetrics, setAdminMetrics] = useState({
+        total: 0,
+        contatado: 0,
+        aguardando: 0,
+        semContato: 0,
+        confirmada: 0,
+        usuariosAtivos: 0
+    });
+    const [exportDialogOpen, setExportDialogOpen] = useState(false);
+    
     const navigate = useNavigate();
     const { toast } = useToast();
     const { trackAction } = useAccessTracking("/reagenda");
@@ -75,13 +99,22 @@ const Reagenda = () => {
             }
         }
     }, [isAdmin, areaPermissions, authLoading, navigate, toast]);
-
     const loadHistory = async () => {
         try {
-            const { data: historyData, error } = await supabase
+            let query = supabase
                 .from("reagenda_history" as any)
-                .select("*")
+                .select("*, profiles(nome)")
                 .order("created_at", { ascending: true });
+
+            if (!isAdmin || !globalAdminView) {
+                // Usuário comum ou admin na visão pessoal: vê apenas seus próprios e não deletados
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (sessionData.session?.user.id) {
+                    query = query.eq("user_id", sessionData.session.user.id).eq("deleted_by_user", false);
+                }
+            }
+
+            const { data: historyData, error } = await query;
 
             if (error) {
                 console.error("Erro do supabase:", error);
@@ -104,11 +137,26 @@ const Reagenda = () => {
                     isManualStatus: row.is_manual_status || false,
                     status: row.status as ReagendaData["status"],
                     decisao: row.decisao,
-                    periodo: row.periodo || "",
                     horario: row.horario || "",
-                    selecionado: row.selecionado || false
+                    selecionado: row.selecionado || false,
+                    user_id: row.user_id,
+                    deleted_by_user: row.deleted_by_user,
+                    user_nome: row.profiles?.nome || "Desconhecido"
                 }));
                 setData(mappedData);
+                
+                if (isAdmin) {
+                    // Update metrics
+                    const metrics = {
+                        total: mappedData.length,
+                        contatado: mappedData.filter((i: any) => i.status === "Contatado").length,
+                        aguardando: mappedData.filter((i: any) => i.status === "Aguardando retorno").length,
+                        semContato: mappedData.filter((i: any) => i.status === "Sem Contato").length,
+                        confirmada: mappedData.filter((i: any) => i.decisao === "Confirmada").length,
+                        usuariosAtivos: new Set(mappedData.map((i: any) => i.user_id)).size
+                    };
+                    setAdminMetrics(metrics);
+                }
             }
         } catch (err) {
             console.error("Error loading history:", err);
@@ -117,7 +165,7 @@ const Reagenda = () => {
 
     useEffect(() => {
         loadHistory();
-    }, []);
+    }, [globalAdminView]);
 
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
@@ -155,77 +203,78 @@ const Reagenda = () => {
         return String(dateValue);
     };
 
-    const processJsonData = (jsonData: any[]) => {
-        const newEntries: ReagendaData[] = jsonData.map((row) => {
-            const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";
-            const formattedDate = formatDate(rawData);
-
-            let saValue = String(row["SA"] || row["sa"] || row["S.A"] || "").trim();
-            if (saValue && !/^SA-/i.test(saValue)) {
-                saValue = `SA-${saValue}`;
+    const processJsonData = async (jsonData: any[]) => {
+        setLoading(true);
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const uid = sessionData.session?.user.id;
+            
+            if (!uid) {
+                toast({ title: "Erro de sessão", description: "Não foi possível sincronizar.", variant: "destructive" });
+                setLoading(false);
+                return;
             }
 
-            const operadoraValue = String(row["OPERADORA"] || row["Operadora"] || "").trim().toUpperCase();
+            // Fetch all existing SA/Contacts for this user to ensure NO DUPLICATES (even hidden ones)
+            const { data: existingRecords } = await supabase
+                .from("reagenda_history" as any)
+                .select("sa, contato")
+                .eq("user_id", uid);
 
-            return {
-                id: crypto.randomUUID(),
-                sa: saValue,
-                setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
-                nome: row["NOME"] || row["Nome"] || "",
-                contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
-                operadora: operadoraValue,
-                tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
-                dataAgendamento: formattedDate,
-                dataOriginalFormatada: formattedDate,
-                dataNova: "",
-                lastContactedAt: undefined,
-                isManualStatus: false,
-                status: "Pendente",
-                decisao: "Pendente",
-                periodo: "",
-                horario: "",
-                selecionado: false,
-            };
-        });
+            const existingSAs = new Set(existingRecords?.map(r => r.sa) || []);
+            const existingContacts = new Set(existingRecords?.map(r => r.contato) || []);
 
-        const validNewEntries = newEntries.filter(item => item.nome && item.contato);
+            const newEntries: ReagendaData[] = jsonData.map((row) => {
+                const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";
+                const formattedDate = formatDate(rawData);
 
-        const uniqueNewEntries: ReagendaData[] = [];
-        let duplicatesCount = 0;
-
-        for (const newItem of validNewEntries) {
-            // Check if it already exists in the previous database state
-            const inData = data.some(existingItem =>
-                (newItem.sa && existingItem.sa && newItem.sa === existingItem.sa) ||
-                (newItem.contato === existingItem.contato)
-            );
-
-            // Check if we already processed it in this exact upload batch
-            const inBatch = uniqueNewEntries.some(addedItem =>
-                (newItem.sa && addedItem.sa && newItem.sa === addedItem.sa) ||
-                (newItem.contato === addedItem.contato)
-            );
-
-            if (inData || inBatch) {
-                duplicatesCount++;
-            } else {
-                uniqueNewEntries.push(newItem);
-            }
-        }
-
-        if (uniqueNewEntries.length > 0) {
-            setLoading(true);
-
-            // Resolve the current userId safely because supabase.auth.user is deprecated in some versions
-            supabase.auth.getSession().then(({ data }) => {
-                const uid = data.session?.user.id;
-                if (!uid) {
-                    toast({ title: "Erro de sessão", description: "Não foi possível sincronizar.", variant: "destructive" });
-                    setLoading(false);
-                    return;
+                let saValue = String(row["SA"] || row["sa"] || row["S.A"] || "").trim();
+                if (saValue && !/^SA-/i.test(saValue)) {
+                    saValue = `SA-${saValue}`;
                 }
 
-                // Sync to supabase
+                const operadoraValue = String(row["OPERADORA"] || row["Operadora"] || "").trim().toUpperCase();
+
+                return {
+                    id: crypto.randomUUID(),
+                    sa: saValue,
+                    setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
+                    nome: row["NOME"] || row["Nome"] || "",
+                    contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
+                    operadora: operadoraValue,
+                    tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
+                    dataAgendamento: formattedDate,
+                    dataOriginalFormatada: formattedDate,
+                    dataNova: "",
+                    lastContactedAt: undefined,
+                    isManualStatus: false,
+                    status: "Pendente",
+                    decisao: "Pendente",
+                    periodo: "",
+                    horario: "",
+                    selecionado: false,
+                };
+            });
+
+            const validNewEntries = newEntries.filter(item => item.nome && item.contato);
+            const uniqueNewEntries: ReagendaData[] = [];
+            let duplicatesCount = 0;
+
+            for (const newItem of validNewEntries) {
+                const isDuplicateInDB = (newItem.sa && existingSAs.has(newItem.sa)) || existingContacts.has(newItem.contato);
+                const isDuplicateInBatch = uniqueNewEntries.some(addedItem => 
+                    (newItem.sa && addedItem.sa && newItem.sa === addedItem.sa) || 
+                    (newItem.contato === addedItem.contato)
+                );
+
+                if (isDuplicateInDB || isDuplicateInBatch) {
+                    duplicatesCount++;
+                } else {
+                    uniqueNewEntries.push(newItem);
+                }
+            }
+
+            if (uniqueNewEntries.length > 0) {
                 const userHistoryPayload = uniqueNewEntries.map(entry => ({
                     id: entry.id,
                     user_id: uid,
@@ -237,36 +286,35 @@ const Reagenda = () => {
                     tipo_atividade: entry.tipoAtividade,
                     data_agendamento: entry.dataAgendamento,
                     data_original_formatada: entry.dataOriginalFormatada,
-                    data_nova: entry.dataNova,
-                    last_contacted_at: entry.lastContactedAt,
-                    is_manual_status: entry.isManualStatus,
                     status: entry.status,
                     decisao: entry.decisao,
-                    periodo: entry.periodo,
-                    horario: entry.horario,
                     selecionado: entry.selecionado
                 }));
 
-                supabase.from("reagenda_history" as any).insert(userHistoryPayload)
-                    .then(({ error }) => {
-                        setLoading(false);
-                        if (error) {
-                            console.error("Supabase insert error:", error);
-                            toast({ title: "Aviso", description: "Registros carregados localmente, mas a tabela no banco não foi migrada/encontrada ainda.", variant: "destructive" });
-                        }
-                        setData(prev => [...prev, ...uniqueNewEntries]);
-                        toast({
-                            title: "Planilha carregada",
-                            description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados excluídos.` : ""}`,
-                        });
+                const { error } = await supabase.from("reagenda_history" as any).insert(userHistoryPayload);
+                
+                if (error) {
+                    console.error("Supabase insert error:", error);
+                    toast({ title: "Erro ao salvar", description: "Não foi possível salvar os registros no banco.", variant: "destructive" });
+                } else {
+                    setData(prev => [...prev, ...uniqueNewEntries]);
+                    toast({
+                        title: "Planilha carregada",
+                        description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados ignorados.` : ""}`,
                     });
-            });
-        } else if (duplicatesCount > 0) {
-            toast({
-                title: "Nenhum registro novo",
-                description: `${duplicatesCount} registros duplicados foram ignorados/excluídos.`,
-                variant: "destructive"
-            });
+                }
+            } else if (duplicatesCount > 0) {
+                toast({
+                    title: "Nenhum registro novo",
+                    description: `${duplicatesCount} registros duplicados foram ignorados.`,
+                    variant: "destructive"
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({ title: "Erro", description: "Falha ao processar os dados.", variant: "destructive" });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -451,19 +499,53 @@ Fico no aguardo!`;
     const deleteEntry = async (id: string) => {
         setData(prev => prev.filter(item => item.id !== id));
         try {
-            await supabase.from("reagenda_history" as any).delete().eq("id", id);
+            // Se for usuario comum, faz soft delete
+            if (!isAdmin || !globalAdminView) {
+                await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
+            } else {
+                // Admin na visão global pode deletar fisicamente se quiser, 
+                // mas vamos manter o padrão de soft delete para segurança
+                await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
+            }
         } catch (e) { }
     };
 
     const clearHistory = async () => {
-        if (confirm("Apagar TODO o histórico? Esta ação é irreversível.")) {
+        const confirmMsg = "Limpar sua base de contatos? (Os dados permanecerão salvos para auditoria da gestão)";
+        if (confirm(confirmMsg)) {
             setData([]);
             try {
                 const { data: sessionData } = await supabase.auth.getSession();
                 if (sessionData.session?.user.id) {
-                    await supabase.from("reagenda_history" as any).delete().eq("user_id", sessionData.session.user.id);
+                    await supabase.from("reagenda_history" as any)
+                        .update({ deleted_by_user: true })
+                        .eq("user_id", sessionData.session.user.id);
                 }
+                toast({ title: "Histórico limpo", description: "Sua base pessoal foi ocultada." });
             } catch (e) { }
+        }
+    };
+
+    const clearGlobalHistory = async () => {
+        if (!isAdmin) return;
+        
+        const confirmMsg = "ATENÇÃO: Você está prestes a apagar PERMANENTEMENTE todos os registros de TODOS os usuários. Esta ação é irreversível e afetará métricas e dashboards. Deseja prosseguir?";
+        if (confirm(confirmMsg)) {
+            setLoading(true);
+            try {
+                // Força delete físico para limpeza administrativa real
+                const { error } = await supabase.from("reagenda_history" as any).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                if (error) throw error;
+                
+                setData([]);
+                setAdminMetrics({ total: 0, contatado: 0, aguardando: 0, semContato: 0, confirmada: 0, usuariosAtivos: 0 });
+                toast({ title: "Limpeza Global Concluída", description: "Todos os registros foram removidos do sistema." });
+            } catch (e) {
+                console.error(e);
+                toast({ title: "Erro ao limpar", variant: "destructive" });
+            } finally {
+                setLoading(false);
+            }
         }
     };
 
@@ -599,6 +681,14 @@ Fico no aguardo!`;
                         </CardHeader>
                         <CardContent className="p-4 space-y-3 text-xs leading-relaxed max-h-[70vh] overflow-y-auto">
                             <div className="space-y-2">
+                                <p className="font-semibold text-primary">👥 Bases Individuais:</p>
+                                <p>Cada usuário agora possui sua própria base. Os registros que você carrega são visíveis apenas para você e para os Administradores.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">🔒 Soft Delete (Lixeira):</p>
+                                <p>Quando você exclui um registro ou limpa sua base, os dados são apenas ocultados do seu painel, mas permanecem seguros no banco de dados para fins de métricas e auditoria da gestão.</p>
+                            </div>
+                            <div className="space-y-2">
                                 <p className="font-semibold text-primary">📝 Upload Drag & Drop:</p>
                                 <p>Arraste arquivos <code>.xlsx</code> ou <code>.csv</code> diretamente no painel pontilhado para iniciar o processamento. Você também pode clicar nele para abrir as pastas do sistema.</p>
                             </div>
@@ -642,16 +732,31 @@ Fico no aguardo!`;
                         </h1>
                     </div>
                     <div className="flex gap-2">
+                        {isAdmin && (
+                            <Button 
+                                variant={globalAdminView ? "default" : "outline"} 
+                                size="sm" 
+                                onClick={() => setGlobalAdminView(!globalAdminView)}
+                                className="flex items-center gap-2 border-primary"
+                            >
+                                <Users className="w-4 h-4" /> {globalAdminView ? "Sair da Visão Global" : "Visão Global Admin"}
+                            </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={downloadSample} className="flex items-center gap-2">
                             <Download className="w-4 h-4" /> Baixar Modelo
                         </Button>
+                        {isAdmin && globalAdminView && (
+                            <Button variant="destructive" size="sm" onClick={clearGlobalHistory} className="bg-red-600 hover:bg-red-700">
+                                <Trash2 className="w-4 h-4 mr-1" /> Limpar Base Global
+                            </Button>
+                        )}
                         {data.length > 0 && (
                             <>
                                 <Button variant="outline" size="sm" onClick={() => setShowInfo(!showInfo)} className="flex items-center gap-2">
                                     <Info className="w-4 h-4" /> Guia
                                 </Button>
-                                <Button variant="default" size="sm" onClick={exportResults} className="bg-primary hover:bg-primary/90">
-                                    <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados (Dinamicas)
+                                <Button variant="default" size="sm" onClick={() => setExportDialogOpen(true)} className="bg-primary hover:bg-primary/90">
+                                    <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados
                                 </Button>
                                 <Button variant="destructive" size="sm" onClick={clearHistory}>
                                     <Trash2 className="w-4 h-4" />
@@ -662,6 +767,34 @@ Fico no aguardo!`;
                 </header>
 
                 <main className="flex-1 w-full max-w-[1600px] mx-auto overflow-y-auto space-y-4 sm:space-y-6 px-1">
+                    {isAdmin && globalAdminView && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <Card className="bg-primary/5 border-primary/20">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-muted-foreground flex items-center gap-1.5"><FileSpreadsheet className="w-3 h-3" /> Total Global</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold">{adminMetrics.total}</p></CardContent>
+                            </Card>
+                            <Card className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-emerald-600 flex items-center gap-1.5"><CheckSquare className="w-3 h-3" /> Contatados</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold text-emerald-600">{adminMetrics.contatado}</p></CardContent>
+                            </Card>
+                            <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-amber-600 flex items-center gap-1.5"><Info className="w-3 h-3" /> Aguardando</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold text-amber-600">{adminMetrics.aguardando}</p></CardContent>
+                            </Card>
+                            <Card className="bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-red-600 flex items-center gap-1.5"><X className="w-3 h-3" /> Sem Contato</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold text-red-600">{adminMetrics.semContato}</p></CardContent>
+                            </Card>
+                            <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-blue-600 flex items-center gap-1.5"><BarChart3 className="w-3 h-3" /> Antecipações</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold text-blue-600">{adminMetrics.confirmada}</p></CardContent>
+                            </Card>
+                            <Card className="bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800">
+                                <CardHeader className="p-3 pb-0"><CardTitle className="text-[10px] uppercase text-purple-600 flex items-center gap-1.5"><Users className="w-3 h-3" /> Usuários Ativ.</CardTitle></CardHeader>
+                                <CardContent className="p-3 pt-1"><p className="text-xl font-bold text-purple-600">{adminMetrics.usuariosAtivos}</p></CardContent>
+                            </Card>
+                        </div>
+                    )}
                     <Card className="glass-card">
                         <CardHeader>
                             <CardTitle className="text-lg">Painel de Importação</CardTitle>
@@ -702,6 +835,7 @@ Fico no aguardo!`;
                                                 <TableHead className="w-[140px]">Status</TableHead>
                                                 <TableHead>SA / Setor</TableHead>
                                                 <TableHead>Nome / Contato</TableHead>
+                                                {isAdmin && globalAdminView && <TableHead>Carregado por</TableHead>}
                                                 <TableHead>Data Orig.</TableHead>
                                                 <TableHead className="w-[180px]">Decisão</TableHead>
                                                 <TableHead className="w-[120px]">Data Nova</TableHead>
@@ -757,6 +891,13 @@ Fico no aguardo!`;
                                                                 <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
                                                             </div>
                                                         </TableCell>
+                                                        {isAdmin && globalAdminView && (
+                                                            <TableCell>
+                                                                <span className="text-[10px] px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                                                                    {item.user_nome}
+                                                                </span>
+                                                            </TableCell>
+                                                        )}
                                                         <TableCell>
                                                             <span className="text-xs font-mono">{formatDate(item.dataAgendamento)}</span>
                                                         </TableCell>
@@ -835,6 +976,45 @@ Fico no aguardo!`;
                         </Card>
                     )}
                 </main>
+
+                <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Exportar Resultados</DialogTitle>
+                            <DialogDescription>
+                                Você deseja exportar os registros selecionados. Após exportar, gostaria de limpar estes itens do seu histórico atual ou mantê-los para visualização?
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter className="flex flex-col sm:flex-row gap-2">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => {
+                                    exportResults();
+                                    setExportDialogOpen(false);
+                                }}
+                            >
+                                Exportar e manter histórico
+                            </Button>
+                            <Button 
+                                variant="default"
+                                onClick={async () => {
+                                    const selectedItems = data.filter(i => i.selecionado);
+                                    exportResults();
+                                    // Soft delete selected items
+                                    try {
+                                        await supabase.from("reagenda_history" as any)
+                                            .update({ deleted_by_user: true })
+                                            .in("id", selectedItems.map(i => i.id));
+                                        setData(prev => prev.filter(i => !i.selecionado));
+                                    } catch (e) {}
+                                    setExportDialogOpen(false);
+                                }}
+                            >
+                                Exportar e limpar do painel
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </TooltipProvider>
     );
