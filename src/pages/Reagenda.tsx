@@ -228,8 +228,9 @@ const Reagenda = () => {
                 .select("sa, contato")
                 .eq("user_id", uid);
 
-            const existingSAs = new Set(existingRecords?.map(r => r.sa) || []);
-            const existingContacts = new Set(existingRecords?.map(r => r.contato) || []);
+            const existingRows = (existingRecords ?? []) as Array<{ sa?: string | null; contato?: string | null }>;
+            const existingSAs = new Set(existingRows.map((r) => r.sa).filter((v): v is string => Boolean(v)));
+            const existingContacts = new Set(existingRows.map((r) => r.contato).filter((v): v is string => Boolean(v)));
 
             const newEntries: ReagendaData[] = jsonData.map((row) => {
                 const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";

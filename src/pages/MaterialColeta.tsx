@@ -2012,18 +2012,18 @@ const MaterialColeta = () => {
                             </TableCell>
                             <TableCell className="text-center">
                               {c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA" ? (
-                                <Truck className="w-5 h-5 text-primary mx-auto" title="Logística Reversa" />
+                                <Truck className="w-5 h-5 text-primary mx-auto" />
                               ) : c.last_exported_at ? (
-                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" title="Exportado" />
+                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                               ) : (
                                 (() => {
                                   const sevenDaysAgo = new Date();
                                   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                                   const createdAt = new Date(c.created_at);
                                   if (createdAt < sevenDaysAgo) {
-                                    return <AlertCircle className="w-5 h-5 text-destructive mx-auto" title="Fora do prazo" />;
+                                    return <AlertCircle className="w-5 h-5 text-destructive mx-auto" />;
                                   }
-                                  return <AlertTriangle className="w-5 h-5 text-warning mx-auto" title="Novo" />;
+                                  return <AlertTriangle className="w-5 h-5 text-warning mx-auto" />;
                                 })()
                               )}
                             </TableCell>
