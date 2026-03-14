@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle, Truck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -1108,11 +1108,20 @@ const MaterialColeta = () => {
     }
   };
 
-  // Export Excel
+   // Export Excel
   const handleExport = (format: "xlsx" | "csv") => {
     // Gestech Sync Trigger: 2026-03-11 17:25
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
-    const rows = coletas.flatMap((c) =>
+    
+    // Filtrar para excluir Logística Reversa das exportações
+    const coletasToExport = coletas.filter(c => !(c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA"));
+    
+    if (coletasToExport.length === 0) {
+      toast.warning("Os registros selecionados são de Logística Reversa e não serão incluídos no relatório.");
+      return;
+    }
+
+    const rows = coletasToExport.flatMap((c) =>
       c.material_coleta_items.map((item) => ({
         "MATRÍCULA (TT)": c.matricula_tt || "",
         BA: c.ba || "",
@@ -1156,6 +1165,11 @@ const MaterialColeta = () => {
     // Filtrar pela faixa de data de execução, atividades permitidas e não exportados
     const filteredColetas = allColetas.filter(c => {
       if (!c.data_execucao) return false;
+
+      // Excluir explicitamente Logística Reversa
+      const isLogReversa = c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA";
+      if (isLogReversa) return false;
+
       const dataExec = c.data_execucao;
       return (
         dataExec >= gestechStartDate &&
@@ -1949,7 +1963,9 @@ const MaterialColeta = () => {
                               ))}
                             </TableCell>
                             <TableCell className="text-center">
-                              {c.last_exported_at ? (
+                              {c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA" ? (
+                                <Truck className="w-5 h-5 text-primary mx-auto" title="Logística Reversa" />
+                              ) : c.last_exported_at ? (
                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" title="Exportado" />
                               ) : (
                                 (() => {
