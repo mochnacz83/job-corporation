@@ -301,6 +301,78 @@ export type Database = {
         }
         Relationships: []
       }
+      reagenda_history: {
+        Row: {
+          contato: string
+          created_at: string
+          data_agendamento: string | null
+          data_nova: string | null
+          data_original_formatada: string | null
+          decisao: string
+          deleted_by_user: boolean
+          horario: string
+          id: string
+          is_manual_status: boolean
+          last_contacted_at: string | null
+          nome: string
+          operadora: string | null
+          periodo: string
+          sa: string | null
+          selecionado: boolean
+          setor: string | null
+          status: string
+          tipo_atividade: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          contato: string
+          created_at?: string
+          data_agendamento?: string | null
+          data_nova?: string | null
+          data_original_formatada?: string | null
+          decisao?: string
+          deleted_by_user?: boolean
+          horario?: string
+          id?: string
+          is_manual_status?: boolean
+          last_contacted_at?: string | null
+          nome: string
+          operadora?: string | null
+          periodo?: string
+          sa?: string | null
+          selecionado?: boolean
+          setor?: string | null
+          status?: string
+          tipo_atividade?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          contato?: string
+          created_at?: string
+          data_agendamento?: string | null
+          data_nova?: string | null
+          data_original_formatada?: string | null
+          decisao?: string
+          deleted_by_user?: boolean
+          horario?: string
+          id?: string
+          is_manual_status?: boolean
+          last_contacted_at?: string | null
+          nome?: string
+          operadora?: string | null
+          periodo?: string
+          sa?: string | null
+          selecionado?: boolean
+          setor?: string | null
+          status?: string
+          tipo_atividade?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tecnicos_cadastro: {
         Row: {
           cidade_residencia: string | null
