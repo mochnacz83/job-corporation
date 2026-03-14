@@ -532,7 +532,8 @@ const MaterialColeta = () => {
       prev.map((m) => {
         if (m.id !== id) return m;
         if (yes) {
-          return { ...m, askSeriais: false, seriais: Array(m.quantidade).fill("") };
+          const qty = typeof m.quantidade === "number" ? m.quantidade : Number(m.quantidade) || 0;
+          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => "") };
         }
         return { ...m, askSeriais: false, seriais: [] };
       })
