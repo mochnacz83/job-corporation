@@ -1702,26 +1702,17 @@ const MaterialColeta = () => {
                     <div className="flex flex-col gap-3">
                       <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
                       <div className="flex flex-wrap gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button className="gap-2 shrink-0">
-                              <ImageIcon className="w-4 h-4 text-white" /> Coletar Foto
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-64">
-                            <DropdownMenuItem onClick={() => cameraInputRef.current?.click()}>
-                              <Camera className="w-4 h-4 mr-2" /> Usar Câmera (Direto)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              toast.warning("IMPORTANTE: Ao utilizar fotos da galeria, certifique-se de que a imagem esteja DATADA e de preferência com GEOLOCALIZAÇÃO.", {
-                                duration: 8000,
-                              });
-                              galleryInputRef.current?.click();
-                            }}>
-                              <ImageIcon className="w-4 h-4 mr-2" /> Escolher da Galeria
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button className="gap-2 shrink-0" onClick={() => cameraInputRef.current?.click()}>
+                          <Camera className="w-4 h-4" /> Tirar Foto
+                        </Button>
+                        <Button variant="outline" className="gap-2 shrink-0" onClick={() => {
+                          toast.warning("IMPORTANTE: Ao utilizar fotos da galeria, certifique-se de que a imagem esteja DATADA e de preferência com GEOLOCALIZAÇÃO.", {
+                            duration: 8000,
+                          });
+                          galleryInputRef.current?.click();
+                        }}>
+                          <ImageIcon className="w-4 h-4" /> Galeria
+                        </Button>
                       </div>
 
                       <input 
