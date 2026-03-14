@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
@@ -144,6 +145,7 @@ const MaterialColeta = () => {
   const [gestechExportOpen, setGestechExportOpen] = useState(false);
   const [gestechStartDate, setGestechStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [gestechEndDate, setGestechEndDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedColetaIds, setSelectedColetaIds] = useState<Set<string>>(new Set());
 
   // Edit states
   const [editingTecnico, setEditingTecnico] = useState<Tecnico | null>(null);
@@ -970,7 +972,7 @@ const MaterialColeta = () => {
     try {
       const { data, error } = await (supabase
         .from("material_coletas")
-        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
         .order("created_at", { ascending: false })
         .limit(500) as any);
       if (error) throw error;
@@ -1014,6 +1016,25 @@ const MaterialColeta = () => {
     setSearchCircuito("");
     setSearchTecnico("");
     setColetas(allColetas);
+    setSelectedColetaIds(new Set());
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedColetaIds.size === coletas.length && coletas.length > 0) {
+      setSelectedColetaIds(new Set());
+    } else {
+      setSelectedColetaIds(new Set(coletas.map(c => c.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    const newSelected = new Set(selectedColetaIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedColetaIds(newSelected);
   };
 
   // Cadastro Management Functions
@@ -1154,16 +1175,30 @@ const MaterialColeta = () => {
     }
 
     // Filtrar pela faixa de data de execução, atividades permitidas e não exportados
-    const filteredColetas = allColetas.filter(c => {
-      if (!c.data_execucao) return false;
-      const dataExec = c.data_execucao;
-      return (
-        dataExec >= gestechStartDate &&
-        dataExec <= gestechEndDate &&
-        ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase()) &&
-        !c.last_exported_at // Somente os não exportados
-      );
-    });
+    // Se houver itens selecionados, prioriza eles
+    let filteredColetas = [];
+    
+    if (selectedColetaIds.size > 0) {
+      filteredColetas = allColetas.filter(c => selectedColetaIds.has(c.id));
+      
+      // Validar se os selecionados atendem aos critérios básicos do Gestech
+      const invalidItems = filteredColetas.filter(c => !["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase()));
+      if (invalidItems.length > 0) {
+        toast.warning(`${invalidItems.length} item(s) selecionado(s) não possuem atividade compatível com Gestech e serão ignorados.`);
+        filteredColetas = filteredColetas.filter(c => ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase()));
+      }
+    } else {
+      filteredColetas = allColetas.filter(c => {
+        if (!c.data_execucao) return false;
+        const dataExec = c.data_execucao;
+        return (
+          dataExec >= gestechStartDate &&
+          dataExec <= gestechEndDate &&
+          ["ATIVAÇÃO", "REPARO", "PREVENTIVA"].includes(c.atividade?.toUpperCase()) &&
+          !c.last_exported_at // Somente os não exportados
+        );
+      });
+    }
 
     // Deduplica por BA — mantém apenas o primeiro registro de cada BA
     const seenBAs = new Set<string>();
@@ -1250,6 +1285,7 @@ const MaterialColeta = () => {
 
       toast.success(`${uniqueColetas.length} registros exportados e marcados no sistema.`);
       setGestechExportOpen(false);
+      setSelectedColetaIds(new Set());
       
       // Refresh local coletas state
       setAllColetas(prev => prev.map(c => 
@@ -1921,6 +1957,12 @@ const MaterialColeta = () => {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-[40px]">
+                            <Checkbox 
+                              checked={selectedColetaIds.size === coletas.length && coletas.length > 0} 
+                              onCheckedChange={toggleSelectAll}
+                            />
+                          </TableHead>
                           <TableHead className="text-xs">Data Execução</TableHead>
                           <TableHead className="text-xs">BA</TableHead>
                           <TableHead className="text-xs">Circuito</TableHead>
@@ -1935,6 +1977,12 @@ const MaterialColeta = () => {
                       <TableBody>
                         {coletas.map((c) => (
                           <TableRow key={c.id}>
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedColetaIds.has(c.id)} 
+                                onCheckedChange={() => toggleSelectOne(c.id)}
+                              />
+                            </TableCell>
                             <TableCell className="text-xs">
                               {c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : new Date(c.created_at).toLocaleDateString("pt-BR")}
                             </TableCell>
