@@ -160,6 +160,12 @@ const MaterialColeta = () => {
   const [deleteTecnico, setDeleteTecnico] = useState<Tecnico | null>(null);
   const [deleteMaterial, setDeleteMaterial] = useState<MaterialCadastro | null>(null);
 
+  // Individual registration form states
+  const emptyTecnicoForm: Tecnico = { tr: "", tt: "", nome_empresa: "", nome_tecnico: "", supervisor: "", coordenador: "", telefone: "", cidade_residencia: "" };
+  const emptyMaterialForm: MaterialCadastro = { codigo: "", nome_material: "" };
+  const [newTecnicoForm, setNewTecnicoForm] = useState<Tecnico>(emptyTecnicoForm);
+  const [newMaterialForm, setNewMaterialForm] = useState<MaterialCadastro>(emptyMaterialForm);
+
   // Scanner state
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerCallback, setScannerCallback] = useState<((code: string) => void) | null>(null);
