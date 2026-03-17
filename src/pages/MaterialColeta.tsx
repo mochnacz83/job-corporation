@@ -1879,22 +1879,69 @@ const MaterialColeta = () => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5" /> Planilha de Técnicos
+                  <FileSpreadsheet className="w-5 h-5" /> Cadastro Técnicos
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador, Telefone, Cidade</strong>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                    <Upload className="w-4 h-4" /> Importar Planilha
-                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleTecnicoUpload} />
-                  </label>
-                  <Button variant="outline" size="sm" onClick={downloadTemplateTecnicos}>
-                    <Download className="w-4 h-4 mr-1" /> Baixar Modelo
-                  </Button>
-                </div>
+              <CardContent className="space-y-4">
+                <Tabs defaultValue="individual" className="w-full">
+                  <TabsList className="mb-3">
+                    <TabsTrigger value="individual">Cadastro Individual</TabsTrigger>
+                    <TabsTrigger value="massivo">Importação em Massa</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="individual" className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">TR</Label>
+                        <Input placeholder="TR" value={newTecnicoForm.tr} onChange={(e) => setNewTecnicoForm(f => ({ ...f, tr: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">TT *</Label>
+                        <Input placeholder="TT" value={newTecnicoForm.tt} onChange={(e) => setNewTecnicoForm(f => ({ ...f, tt: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nome Empresa</Label>
+                        <Input placeholder="Empresa" value={newTecnicoForm.nome_empresa} onChange={(e) => setNewTecnicoForm(f => ({ ...f, nome_empresa: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nome Técnico *</Label>
+                        <Input placeholder="Nome" value={newTecnicoForm.nome_tecnico} onChange={(e) => setNewTecnicoForm(f => ({ ...f, nome_tecnico: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Supervisor</Label>
+                        <Input placeholder="Supervisor" value={newTecnicoForm.supervisor} onChange={(e) => setNewTecnicoForm(f => ({ ...f, supervisor: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Coordenador</Label>
+                        <Input placeholder="Coordenador" value={newTecnicoForm.coordenador} onChange={(e) => setNewTecnicoForm(f => ({ ...f, coordenador: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Telefone</Label>
+                        <Input placeholder="Telefone" value={newTecnicoForm.telefone} onChange={(e) => setNewTecnicoForm(f => ({ ...f, telefone: e.target.value }))} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Cidade</Label>
+                        <Input placeholder="Cidade" value={newTecnicoForm.cidade_residencia} onChange={(e) => setNewTecnicoForm(f => ({ ...f, cidade_residencia: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={handleSaveNewTecnico} className="gap-1">
+                      <Plus className="w-4 h-4" /> Cadastrar Técnico
+                    </Button>
+                  </TabsContent>
+                  <TabsContent value="massivo" className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Colunas esperadas: <strong>TR, TT, Nome Empresa, Nome Técnico, Supervisor, Coordenador, Telefone, Cidade</strong>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                        <Upload className="w-4 h-4" /> Importar Planilha
+                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleTecnicoUpload} />
+                      </label>
+                      <Button variant="outline" size="sm" onClick={downloadTemplateTecnicos}>
+                        <Download className="w-4 h-4 mr-1" /> Baixar Modelo
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
                 <div className="max-h-48 overflow-auto border rounded">
                   {tecnicos.length > 0 ? (
                     <Table>
@@ -1937,7 +1984,7 @@ const MaterialColeta = () => {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado. Importe uma planilha para começar.</p>
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum técnico cadastrado.</p>
                   )}
                 </div>
               </CardContent>
@@ -1946,22 +1993,45 @@ const MaterialColeta = () => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <FileSpreadsheet className="w-5 h-5" /> Planilha de Materiais
+                  <FileSpreadsheet className="w-5 h-5" /> Cadastro Materiais
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Colunas esperadas: <strong>Codigo, Nome Material</strong>
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
-                    <Upload className="w-4 h-4" /> Importar Planilha
-                    <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleMaterialUpload} />
-                  </label>
-                  <Button variant="outline" size="sm" onClick={downloadTemplateMateriais}>
-                    <Download className="w-4 h-4 mr-1" /> Baixar Modelo
-                  </Button>
-                </div>
+              <CardContent className="space-y-4">
+                <Tabs defaultValue="individual" className="w-full">
+                  <TabsList className="mb-3">
+                    <TabsTrigger value="individual">Cadastro Individual</TabsTrigger>
+                    <TabsTrigger value="massivo">Importação em Massa</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="individual" className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Código *</Label>
+                        <Input placeholder="Código do material" value={newMaterialForm.codigo} onChange={(e) => setNewMaterialForm(f => ({ ...f, codigo: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nome Material *</Label>
+                        <Input placeholder="Nome do material" value={newMaterialForm.nome_material} onChange={(e) => setNewMaterialForm(f => ({ ...f, nome_material: toUpper(e.target.value) }))} className="uppercase" />
+                      </div>
+                    </div>
+                    <Button size="sm" onClick={handleSaveNewMaterial} className="gap-1">
+                      <Plus className="w-4 h-4" /> Cadastrar Material
+                    </Button>
+                  </TabsContent>
+                  <TabsContent value="massivo" className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Colunas esperadas: <strong>Codigo, Nome Material</strong>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-2 cursor-pointer px-4 py-2 border rounded-md text-sm hover:bg-accent transition-colors">
+                        <Upload className="w-4 h-4" /> Importar Planilha
+                        <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleMaterialUpload} />
+                      </label>
+                      <Button variant="outline" size="sm" onClick={downloadTemplateMateriais}>
+                        <Download className="w-4 h-4 mr-1" /> Baixar Modelo
+                      </Button>
+                    </div>
+                  </TabsContent>
+                </Tabs>
                 <div className="max-h-48 overflow-auto border rounded">
                   {materiaisCadastro.length > 0 ? (
                     <Table>
@@ -1992,7 +2062,7 @@ const MaterialColeta = () => {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado. Importe uma planilha para começar.</p>
+                    <p className="text-sm text-muted-foreground italic py-4 text-center">Nenhum material cadastrado.</p>
                   )}
                 </div>
               </CardContent>
