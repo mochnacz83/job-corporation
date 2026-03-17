@@ -1695,35 +1695,23 @@ const MaterialColeta = () => {
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                       <Camera className="w-5 h-5 text-primary" /> Registro Fotográfico dos Materiais *
+                       <ImageIcon className="w-5 h-5 text-primary" /> Registro Fotográfico dos Materiais *
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex flex-col gap-3">
-                      <p className="text-sm text-muted-foreground">Tire uma foto contendo todos os materiais visíveis para conferência.</p>
+                      <p className="text-sm text-muted-foreground">Selecione uma foto contendo todos os materiais visíveis para conferência.</p>
                       <div className="flex flex-wrap gap-2">
-                        <Button className="gap-2 shrink-0" onClick={() => cameraInputRef.current?.click()}>
-                          <Camera className="w-4 h-4" /> Tirar Foto
-                        </Button>
-                        <Button variant="outline" className="gap-2 shrink-0" onClick={() => {
-                          toast.warning("IMPORTANTE: Ao utilizar fotos da galeria, certifique-se de que a imagem esteja DATADA e de preferência com GEOLOCALIZAÇÃO.", {
+                        <Button className="gap-2 shrink-0" onClick={() => {
+                          toast.warning("IMPORTANTE: Certifique-se de que a imagem esteja DATADA e de preferência com GEOLOCALIZAÇÃO.", {
                             duration: 8000,
                           });
                           galleryInputRef.current?.click();
                         }}>
-                          <ImageIcon className="w-4 h-4" /> Galeria
+                          <ImageIcon className="w-4 h-4" /> Carregar Foto
                         </Button>
                       </div>
 
-                      <input 
-                        id="camera-capture-input"
-                        ref={cameraInputRef}
-                        type="file" 
-                        accept="image/*" 
-                        capture="environment" 
-                        className="hidden" 
-                        onChange={handleFotoChange} 
-                      />
                       <input 
                         id="gallery-select-input"
                         ref={galleryInputRef}
