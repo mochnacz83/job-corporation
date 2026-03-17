@@ -17,7 +17,7 @@ type UploadState = {
   repetida: File | null;
 };
 
-const CHUNK_SIZE = 1000; // Define insert chunk size
+const CHUNK_SIZE = 500; // Safer chunk size for large payloads
 
 export default function UploadBasesBI() {
   const navigate = useNavigate();
@@ -45,6 +45,20 @@ export default function UploadBasesBI() {
     }
   };
 
+  const sanitizeRow = (row: any) => {
+    const clean: any = {};
+    for (const key in row) {
+      if (Object.prototype.hasOwnProperty.call(row, key)) {
+        // Only keep properties that are not objects/functions to avoid deep enumeration issues
+        const val = row[key];
+        if (typeof val !== 'object' && typeof val !== 'function') {
+          clean[key] = val;
+        }
+      }
+    }
+    return clean;
+  };
+
   const parseExcelAndInsert = async (file: File, tableName: string, mapper: (row: any) => any) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
@@ -52,19 +66,26 @@ export default function UploadBasesBI() {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const json: any[] = XLSX.utils.sheet_to_json(firstSheet);
+          const firstSheetName = workbook.SheetNames[0];
+          const firstSheet = workbook.Sheets[firstSheetName];
           
-          if (json.length === 0) {
-            reject(new Error(`O arquivo ${file.name} está vazio.`));
+          // Optimization: Get JSON but sanitize keys immediately
+          const rawJson: any[] = XLSX.utils.sheet_to_json(firstSheet, { defval: null });
+          
+          if (rawJson.length === 0) {
+            reject(new Error(`O arquivo ${file.name} está vazio ou não possui cabeçalhos reconhecíveis.`));
             return;
           }
 
-          const mappedData = json.map(mapper);
+          // Map data and ensure we only have flat properties
+          const mappedData = rawJson.map(row => {
+            const sanitized = sanitizeRow(row);
+            return mapper(sanitized);
+          });
           
           setProgress(`Limpando base antiga: ${tableName}...`);
-          // Note: using truncate function instead as normal delete might be slow
-          await (supabase as any).from(tableName).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+          const { error: delError } = await (supabase as any).from(tableName).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+          if (delError) throw delError;
 
           setProgress(`Inserindo ${mappedData.length} registros em ${tableName}...`);
           let processed = 0;
@@ -86,15 +107,22 @@ export default function UploadBasesBI() {
     });
   };
 
-  const parseDateStr = (dateStr: string | number) => {
-    if (!dateStr) return null;
+  const parseDateStr = (dateStr: any) => {
+    if (dateStr === null || dateStr === undefined || dateStr === "") return null;
+    
+    // Handle Excel serial date (number)
     if (typeof dateStr === "number") {
-      // Excel numerical date format offset conversion
       const epoch = new Date(1899, 11, 30);
       return new Date(epoch.getTime() + dateStr * 86400000).toISOString();
     }
-    // Very simple fallback parser
-    return new Date(dateStr).toISOString();
+    
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString();
+    } catch {
+      return null;
+    }
   };
 
   const handleUploadAll = async () => {
@@ -105,37 +133,39 @@ export default function UploadBasesBI() {
 
     setLoading(true);
     try {
+      // Clear all first or per-file? The parseExcelAndInsert clears its own table.
+      
       // 1: Upload B2B
-      toast.info("Processando base B2B...");
+      setProgress("Iniciando B2B...");
       await parseExcelAndInsert(files.b2b, "raw_b2b", (row) => ({
         designacao: row["DESIGNACAO"] || row["Designação"] || row["designacao"],
         protocolo: row["PROTOCOLO"] || row["Protocolo"] || row["protocolo"],
         cliente: row["CLIENTE"] || row["Cliente"] || row["cliente"],
         produto: row["PRODUTO"] || row["Produto"] || row["produto"],
-        data_abertura: parseDateStr(row["ABERTURA"] || row["Abertura"] || row["abertura"]),
-        data_fechamento: parseDateStr(row["FECHAMENTO"] || row["Fechamento"] || row["fechamento"]),
+        data_abertura: parseDateStr(row["ABERTURA"] || row["Abertura"] || row["abertura"] || row["DATA_ABERTURA"] || row["Data Abertura"]),
+        data_fechamento: parseDateStr(row["FECHAMENTO"] || row["Fechamento"] || row["fechamento"] || row["DATA_FECHAMENTO"] || row["Data Fechamento"]),
         uf: row["UF"] || row["uf"],
         municipio: row["MUNICIPIO"] || row["Municipio"] || row["municipio"],
         tecnologia_acesso: row["TECNOLOGIA_ACESSO"] || row["Tecnologia Acesso"] || row["tecnologia"],
         posto_encerramento: row["POSTO_ENCERRAMENTO"] || row["Posto Encerramento"] || row["posto_encerramento"],
         posto_anterior: row["POSTO_ANTERIOR"] || row["Posto Anterior"] || row["posto_anterior"],
-        cldv: parseFloat(row["CLDV"] || "0") || null,
+        cldv: parseFloat(row["CLDV"]) || null,
         causa_ofensora_n1: row["CAUSA_OFENSORA_N1"] || row["Causa Ofensora N1"],
         causa_ofensora_n2: row["CAUSA_OFENSORA_N2"] || row["Causa Ofensora N2"],
         causa_ofensora_n3: row["CAUSA_OFENSORA_N3"] || row["Causa Ofensora N3"],
       }));
 
       // 2: Upload TMR
-      toast.info("Processando base VIP TMR...");
+      setProgress("Iniciando VIP TMR...");
       await parseExcelAndInsert(files.tmr, "raw_vip_tmr", (row) => ({
         circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
-        tmr: parseFloat(row["TMR"] || "0"),
-        tmr_pend_vtal: parseFloat(row["TMR_PEND_VTAL"] || "0"),
-        tmr_pend_oi: parseFloat(row["TMR_PEND_OI"] || "0"),
+        tmr: parseFloat(row["TMR"]) || 0,
+        tmr_pend_vtal: parseFloat(row["TMR_PEND_VTAL"]) || 0,
+        tmr_pend_oi: parseFloat(row["TMR_PEND_OI"]) || 0,
       }));
 
       // 3: Upload Prazo
-      toast.info("Processando base VIP Prazo...");
+      setProgress("Iniciando VIP Prazo...");
       await parseExcelAndInsert(files.prazo, "raw_vip_prazo", (row) => ({
         circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
         reparo_prazo: row["REPARO_PRAZO"] || row["Reparo Prazo"] || row["reparo_prazo"],
@@ -143,12 +173,12 @@ export default function UploadBasesBI() {
       }));
 
       // 4: Upload Repetida
-      toast.info("Processando base VIP Repetida...");
+      setProgress("Iniciando VIP Repetida...");
       await parseExcelAndInsert(files.repetida, "raw_vip_repetida", (row) => ({
         circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
         rep: row["REP"] || row["Rep"] || row["rep"],
         retido: row["RETIDO"] || row["Retido"] || row["retido"],
-        tempo_repetida: parseFloat(row["TEMPO_REPETIDA"] || "0"),
+        tempo_repetida: parseFloat(row["TEMPO_REPETIDA"]) || 0,
         faixa_repetida: row["FAIXA_REPETIDA"] || row["Faixa Repetida"] || row["faixa_repetida"],
       }));
 
