@@ -56,6 +56,8 @@ const persistentPages = [
   { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
   { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
+  { path: "/upload-bi", element: <ProtectedRoute><UploadBasesBI /></ProtectedRoute> },
+  { path: "/relatorio-gerencial", element: <ProtectedRoute><RelatorioGerencial /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
