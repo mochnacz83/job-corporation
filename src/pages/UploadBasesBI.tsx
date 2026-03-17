@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ArrowLeft, Upload, CheckCircle2, Play, Trash2, Database } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -17,7 +16,7 @@ type UploadState = {
   repetida: File | null;
 };
 
-const CHUNK_SIZE = 500; // Safer chunk size for large payloads
+const CHUNK_SIZE = 500;
 
 export default function UploadBasesBI() {
   const navigate = useNavigate();
@@ -33,7 +32,7 @@ export default function UploadBasesBI() {
 
   if (!isAdmin) {
     return (
-      <div className="p-8 text-center">
+      <div className="p-8 text-center text-muted-foreground">
         Você não tem permissão para acessar esta página.
       </div>
     );
@@ -45,56 +44,76 @@ export default function UploadBasesBI() {
     }
   };
 
-  const sanitizeRow = (row: any) => {
-    const clean: any = {};
-    for (const key in row) {
-      if (Object.prototype.hasOwnProperty.call(row, key)) {
-        // Only keep properties that are not objects/functions to avoid deep enumeration issues
-        const val = row[key];
-        if (typeof val !== 'object' && typeof val !== 'function') {
-          clean[key] = val;
-        }
-      }
+  const parseDate = (val: any) => {
+    if (val === null || val === undefined || val === "") return null;
+    if (typeof val === "number") {
+      const epoch = new Date(1899, 11, 30);
+      return new Date(epoch.getTime() + val * 86400000).toISOString();
     }
-    return clean;
+    try {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    } catch {
+      return null;
+    }
   };
 
-  const parseExcelAndInsert = async (file: File, tableName: string, mapper: (row: any) => any) => {
+  const parseExcelAndInsert = async (file: File, tableName: string, mapping: Record<string, string[]>) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
-          const firstSheetName = workbook.SheetNames[0];
-          const firstSheet = workbook.Sheets[firstSheetName];
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
           
-          // Optimization: Get JSON but sanitize keys immediately
-          const rawJson: any[] = XLSX.utils.sheet_to_json(firstSheet, { defval: null });
-          
-          if (rawJson.length === 0) {
-            reject(new Error(`O arquivo ${file.name} está vazio ou não possui cabeçalhos reconhecíveis.`));
+          // Use header: 1 to get array of arrays (more memory efficient)
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
+          if (rows.length < 2) {
+            reject(new Error(`O arquivo ${file.name} não possui dados ou cabeçalhos.`));
             return;
           }
 
-          // Map data and ensure we only have flat properties
-          const mappedData = rawJson.map(row => {
-            const sanitized = sanitizeRow(row);
-            return mapper(sanitized);
+          const fileHeaders = (rows[0] || []).map(h => h?.toString().toUpperCase().trim());
+          const dataRows = rows.slice(1);
+
+          // Build index map
+          const idxMap: Record<string, number> = {};
+          for (const [targetKey, aliases] of Object.entries(mapping)) {
+            for (const alias of aliases) {
+              const idx = fileHeaders.indexOf(alias.toUpperCase().trim());
+              if (idx !== -1) {
+                idxMap[targetKey] = idx;
+                break;
+              }
+            }
+          }
+
+          const mappedData = dataRows.map(row => {
+            const obj: any = {};
+            for (const [key, idx] of Object.entries(idxMap)) {
+              let val = row[idx];
+              if (key === 'data_abertura' || key === 'data_fechamento') {
+                obj[key] = parseDate(val);
+              } else if (key === 'tmr' || key === 'tmr_pend_vtal' || key === 'tmr_pend_oi' || key === 'cldv' || key === 'tempo_repetida') {
+                obj[key] = parseFloat(val) || 0;
+              } else {
+                obj[key] = val?.toString() || null;
+              }
+            }
+            return obj;
           });
-          
+
           setProgress(`Limpando base antiga: ${tableName}...`);
           const { error: delError } = await (supabase as any).from(tableName).delete().neq("id", "00000000-0000-0000-0000-000000000000");
           if (delError) throw delError;
 
           setProgress(`Inserindo ${mappedData.length} registros em ${tableName}...`);
-          let processed = 0;
           for (let i = 0; i < mappedData.length; i += CHUNK_SIZE) {
             const chunk = mappedData.slice(i, i + CHUNK_SIZE);
             const { error } = await (supabase as any).from(tableName).insert(chunk);
             if (error) throw error;
-            processed += chunk.length;
-            setProgress(`${processed} / ${mappedData.length} registros inseridos em ${tableName}...`);
+            setProgress(`${Math.min(i + CHUNK_SIZE, mappedData.length)} / ${mappedData.length} em ${tableName}...`);
           }
 
           resolve();
@@ -107,86 +126,61 @@ export default function UploadBasesBI() {
     });
   };
 
-  const parseDateStr = (dateStr: any) => {
-    if (dateStr === null || dateStr === undefined || dateStr === "") return null;
-    
-    // Handle Excel serial date (number)
-    if (typeof dateStr === "number") {
-      const epoch = new Date(1899, 11, 30);
-      return new Date(epoch.getTime() + dateStr * 86400000).toISOString();
-    }
-    
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return null;
-      return d.toISOString();
-    } catch {
-      return null;
-    }
-  };
-
   const handleUploadAll = async () => {
     if (!files.b2b || !files.tmr || !files.prazo || !files.repetida) {
-      toast.error("Por favor, selecione as quatro (4) bases antes de prosseguir.");
+      toast.error("Selecione as quatro (4) bases antes de prosseguir.");
       return;
     }
 
     setLoading(true);
     try {
-      // Clear all first or per-file? The parseExcelAndInsert clears its own table.
-      
-      // 1: Upload B2B
       setProgress("Iniciando B2B...");
-      await parseExcelAndInsert(files.b2b, "raw_b2b", (row) => ({
-        designacao: row["DESIGNACAO"] || row["Designação"] || row["designacao"],
-        protocolo: row["PROTOCOLO"] || row["Protocolo"] || row["protocolo"],
-        cliente: row["CLIENTE"] || row["Cliente"] || row["cliente"],
-        produto: row["PRODUTO"] || row["Produto"] || row["produto"],
-        data_abertura: parseDateStr(row["ABERTURA"] || row["Abertura"] || row["abertura"] || row["DATA_ABERTURA"] || row["Data Abertura"]),
-        data_fechamento: parseDateStr(row["FECHAMENTO"] || row["Fechamento"] || row["fechamento"] || row["DATA_FECHAMENTO"] || row["Data Fechamento"]),
-        uf: row["UF"] || row["uf"],
-        municipio: row["MUNICIPIO"] || row["Municipio"] || row["municipio"],
-        tecnologia_acesso: row["TECNOLOGIA_ACESSO"] || row["Tecnologia Acesso"] || row["tecnologia"],
-        posto_encerramento: row["POSTO_ENCERRAMENTO"] || row["Posto Encerramento"] || row["posto_encerramento"],
-        posto_anterior: row["POSTO_ANTERIOR"] || row["Posto Anterior"] || row["posto_anterior"],
-        cldv: parseFloat(row["CLDV"]) || null,
-        causa_ofensora_n1: row["CAUSA_OFENSORA_N1"] || row["Causa Ofensora N1"],
-        causa_ofensora_n2: row["CAUSA_OFENSORA_N2"] || row["Causa Ofensora N2"],
-        causa_ofensora_n3: row["CAUSA_OFENSORA_N3"] || row["Causa Ofensora N3"],
-      }));
+      await parseExcelAndInsert(files.b2b, "raw_b2b", {
+        designacao: ["DESIGNACAO", "Designação", "Circuito"],
+        protocolo: ["PROTOCOLO", "Protocolo"],
+        cliente: ["CLIENTE", "Cliente"],
+        produto: ["PRODUTO", "Produto"],
+        data_abertura: ["ABERTURA", "Abertura", "DATA_ABERTURA", "Data Abertura"],
+        data_fechamento: ["FECHAMENTO", "Fechamento", "DATA_FECHAMENTO", "Data Fechamento"],
+        uf: ["UF"],
+        municipio: ["MUNICIPIO", "Municipio"],
+        tecnologia_acesso: ["TECNOLOGIA_ACESSO", "Tecnologia Acesso"],
+        posto_encerramento: ["POSTO_ENCERRAMENTO", "Posto Encerramento"],
+        posto_anterior: ["POSTO_ANTERIOR", "Posto Anterior"],
+        cldv: ["CLDV"],
+        causa_ofensora_n1: ["CAUSA_OFENSORA_N1", "Causa N1"],
+        causa_ofensora_n2: ["CAUSA_OFENSORA_N2", "Causa N2"],
+        causa_ofensora_n3: ["CAUSA_OFENSORA_N3", "Causa N3"],
+      });
 
-      // 2: Upload TMR
       setProgress("Iniciando VIP TMR...");
-      await parseExcelAndInsert(files.tmr, "raw_vip_tmr", (row) => ({
-        circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
-        tmr: parseFloat(row["TMR"]) || 0,
-        tmr_pend_vtal: parseFloat(row["TMR_PEND_VTAL"]) || 0,
-        tmr_pend_oi: parseFloat(row["TMR_PEND_OI"]) || 0,
-      }));
+      await parseExcelAndInsert(files.tmr, "raw_vip_tmr", {
+        circuito: ["CIRCUITO", "Circuito", "Designação"],
+        tmr: ["TMR"],
+        tmr_pend_vtal: ["TMR_PEND_VTAL", "Pendência Vtal"],
+        tmr_pend_oi: ["TMR_PEND_OI", "Pendência Oi"],
+      });
 
-      // 3: Upload Prazo
       setProgress("Iniciando VIP Prazo...");
-      await parseExcelAndInsert(files.prazo, "raw_vip_prazo", (row) => ({
-        circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
-        reparo_prazo: row["REPARO_PRAZO"] || row["Reparo Prazo"] || row["reparo_prazo"],
-        posto_prazo: row["POSTO_PRAZO"] || row["Posto Prazo"] || row["posto_prazo"],
-      }));
+      await parseExcelAndInsert(files.prazo, "raw_vip_prazo", {
+        circuito: ["CIRCUITO", "Circuito", "Designação"],
+        reparo_prazo: ["REPARO_PRAZO", "Reparo Prazo", "SLA"],
+        posto_prazo: ["POSTO_PRAZO", "Posto Prazo", "Posto Ofensor"],
+      });
 
-      // 4: Upload Repetida
       setProgress("Iniciando VIP Repetida...");
-      await parseExcelAndInsert(files.repetida, "raw_vip_repetida", (row) => ({
-        circuito: row["CIRCUITO"] || row["Circuito"] || row["circuito"],
-        rep: row["REP"] || row["Rep"] || row["rep"],
-        retido: row["RETIDO"] || row["Retido"] || row["retido"],
-        tempo_repetida: parseFloat(row["TEMPO_REPETIDA"]) || 0,
-        faixa_repetida: row["FAIXA_REPETIDA"] || row["Faixa Repetida"] || row["faixa_repetida"],
-      }));
+      await parseExcelAndInsert(files.repetida, "raw_vip_repetida", {
+        circuito: ["CIRCUITO", "Circuito", "Designação"],
+        rep: ["REP"],
+        retido: ["RETIDO"],
+        tempo_repetida: ["TEMPO_REPETIDA", "Tempo Rep"],
+        faixa_repetida: ["FAIXA_REPETIDA", "Faixa"],
+      });
 
-      setProgress("Bases carregadas com sucesso! Executando ETL...");
-      toast.success("Bases carregadas!");
+      toast.success("Todas as bases foram carregadas na área temporária!");
     } catch (error: any) {
       console.error(error);
-      toast.error("Erro ao carregar bases: " + error.message);
+      toast.error(`Erro: ${error.message || "Falha desconhecida"}`);
     } finally {
       setLoading(false);
       setProgress("");
@@ -195,14 +189,14 @@ export default function UploadBasesBI() {
 
   const handleProcessETL = async () => {
     setLoading(true);
-    setProgress("Cruzando dados (B2B + VIPs) e atualizando Fato Reparos...");
+    setProgress("Cruzando dados e gerando Fato...");
     try {
       const { error } = await (supabase as any).rpc("process_bi_etl");
       if (error) throw error;
-      toast.success("ETL Processado com sucesso! Os dashboards já podem ser utilizados.");
+      toast.success("BI atualizado com sucesso!");
     } catch (error: any) {
-      console.error("Erro no ETL:", error);
-      toast.error("Erro ao processar dados Fato: " + error.message);
+      console.error(error);
+      toast.error("Erro no processamento: " + error.message);
     } finally {
       setLoading(false);
       setProgress("");
@@ -210,14 +204,13 @@ export default function UploadBasesBI() {
   };
 
   const handleClearRaw = async () => {
-    if (!window.confirm("Deseja realmente limpar as bases temporárias? Isso não limpa a Fato Resumo.")) return;
+    if (!window.confirm("Limpar bases brutas?")) return;
     setLoading(true);
     try {
       await (supabase as any).rpc("clear_raw_tables");
-      toast.success("Bases temporárias limpas com sucesso.");
+      toast.success("Limpo.");
     } catch (error: any) {
-      console.error(error);
-      toast.error("Erro: " + error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -232,108 +225,53 @@ export default function UploadBasesBI() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Carga de Bases para BI</h1>
-            <p className="text-muted-foreground">O módulo ETL nativo cruzará as informações preenchendo o Data Warehouse.</p>
+            <p className="text-muted-foreground text-sm">Integração nativa entre bases B2B e relatórios VIP.</p>
           </div>
         </div>
 
         {progress && (
-          <div className="p-4 bg-primary/10 text-primary font-medium rounded-md text-sm">
+          <div className="p-3 bg-primary/10 text-primary font-medium rounded-md text-sm animate-pulse">
             {progress}
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Base Principal (B2B)</CardTitle>
-              <CardDescription>Arquivo contendo todos os reparos e designações.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange("b2b")} disabled={loading} />
-                {files.b2b && <CheckCircle2 className="text-green-500 h-5 w-5" />}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">VIP - TMR</CardTitle>
-              <CardDescription>Arquivo com dados de tempo médio (Circuito, TMR).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange("tmr")} disabled={loading} />
-                {files.tmr && <CheckCircle2 className="text-green-500 h-5 w-5" />}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">VIP - Prazo (ICD03)</CardTitle>
-              <CardDescription>Arquivo contendo Posto ofensor de prazo.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange("prazo")} disabled={loading} />
-                {files.prazo && <CheckCircle2 className="text-green-500 h-5 w-5" />}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">VIP - Repetida (ICD02)</CardTitle>
-              <CardDescription>Arquivo contendo reincidência de falha.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange("repetida")} disabled={loading} />
-                {files.repetida && <CheckCircle2 className="text-green-500 h-5 w-5" />}
-              </div>
-            </CardContent>
-          </Card>
+          {[
+            { id: "b2b", name: "Principal (B2B)", file: files.b2b },
+            { id: "tmr", name: "VIP - TMR", file: files.tmr },
+            { id: "prazo", name: "VIP - Prazo", file: files.prazo },
+            { id: "repetida", name: "VIP - Repetida", file: files.repetida },
+          ].map((item) => (
+            <Card key={item.id}>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base flex items-center justify-between">
+                  {item.name}
+                  {item.file && <CheckCircle2 className="text-green-500 h-4 w-4" />}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange(item.id as any)} disabled={loading} className="text-xs" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 mt-6">
-          <Button 
-            className="flex-1" 
-            size="lg" 
-            onClick={handleUploadAll}
-            disabled={loading || !files.b2b || !files.tmr || !files.prazo || !files.repetida}
-          >
-            <Upload className="mr-2 h-5 w-5" />
-            1. Enviar Excel ao Supabase
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Button className="flex-1" onClick={handleUploadAll} disabled={loading}>
+            <Upload className="mr-2 h-4 w-4" /> 1. Carregar Planilhas
           </Button>
-          <Button 
-            className="flex-1" 
-            variant="default"
-            size="lg" 
-            onClick={handleProcessETL}
-            disabled={loading}
-          >
-            <Play className="mr-2 h-5 w-5" />
-            2. Processar Dados (Atualizar Fato)
+          <Button className="flex-1" onClick={handleProcessETL} disabled={loading}>
+            <Play className="mr-2 h-4 w-4" /> 2. Consolidar BI
           </Button>
-          <Button 
-            variant="destructive"
-            size="lg" 
-            onClick={handleClearRaw}
-            disabled={loading}
-          >
-            <Trash2 className="mr-2 h-5 w-5" />
-            Limpar Bruto
+          <Button variant="outline" onClick={handleClearRaw} disabled={loading}>
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
         
-        <div className="p-6 bg-muted/50 rounded-lg mt-8">
-          <div className="flex items-center gap-2 mb-2 text-muted-foreground">
-            <Database className="h-5 w-5" />
-            <h3 className="font-semibold">Como funciona o Relatório Nativo?</h3>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            As quatro planilhas são enviadas diretamente para o banco de dados temporário. Após o envio, clique em "Processar Dados" para que o sistema relacione todas as tabelas através do campo <strong>Designação/Circuito</strong> e empacote as informações em uma única base unificada para renderização instantânea do Dashboard pelo seu computador, sem depender de PowerBI externo.
+        <div className="p-4 bg-muted/30 rounded-lg text-xs text-muted-foreground flex items-center gap-3">
+          <Database className="h-4 w-4 shrink-0" />
+          <p>
+            O sistema utiliza o campo <strong>Designação/Circuito</strong> para cruzar as planilhas VIP com a B2B oficial, ignorando registros duplicados através de uma chave composta (Protocolo + Data).
           </p>
         </div>
       </div>
