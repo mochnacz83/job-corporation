@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, CheckCircle2, Play, Trash2, Database, AlertCircle, Loader2, Info, Search, FileCode } from "lucide-react";
+import { ArrowLeft, Upload, CheckCircle2, Play, Trash2, Database, AlertCircle, Loader2, Info, Search, FileCode, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -32,6 +32,7 @@ export default function UploadBasesBI() {
   const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState<Record<string, boolean>>({});
+  const [fnStatus, setFnStatus] = useState<Record<string, boolean>>({});
   const [checkingDb, setCheckingDb] = useState(false);
   const [files, setFiles] = useState<UploadState>({
     b2b: { file: null, info: { status: "idle", progress: 0, message: "" } },
@@ -47,14 +48,36 @@ export default function UploadBasesBI() {
   const checkDatabase = async () => {
     setCheckingDb(true);
     const tables = ["raw_b2b", "raw_vip_tmr", "raw_vip_prazo", "raw_vip_repetida", "fato_reparos"];
-    const status: Record<string, boolean> = {};
+    const functions = ["process_bi_etl", "clear_raw_tables"];
+    
+    const tStatus: Record<string, boolean> = {};
+    const fStatus: Record<string, boolean> = {};
+
+    // Check Tables
     for (const table of tables) {
       try {
         const { error } = await (supabase as any).from(table).select("id", { count: "exact", head: true }).limit(1);
-        status[table] = !error;
-      } catch { status[table] = false; }
+        tStatus[table] = !error;
+      } catch { tStatus[table] = false; }
     }
-    setDbStatus(status);
+
+    // Check Functions (via RPC call attempt to non-existent param if needed, or simple call)
+    for (const fn of functions) {
+      try {
+        // We try calling with a dummy select to see if it exists in the schema cache
+        const { error } = await (supabase as any).rpc(fn);
+        // If error is "Could not find the function", then false. 
+        // Note: process_bi_etl might take time, so we just check if it's "not found"
+        if (error && error.message?.includes("Could not find the function")) {
+          fStatus[fn] = false;
+        } else {
+          fStatus[fn] = true;
+        }
+      } catch { fStatus[fn] = false; }
+    }
+
+    setDbStatus(tStatus);
+    setFnStatus(fStatus);
     setCheckingDb(false);
   };
 
@@ -83,7 +106,6 @@ export default function UploadBasesBI() {
     return isNaN(d.getTime()) ? null : d.toISOString();
   };
 
-  // ULTRA-SAFE CSV PARSER (Manual String Stream)
   const uploadCsvSafe = async (key: keyof UploadState, tableName: string, mapping: Record<string, string[]>, file: File) => {
     updateFileInfo(key, { status: "reading", progress: 5, message: "Lendo CSV..." });
     const text = await file.text();
@@ -125,7 +147,6 @@ export default function UploadBasesBI() {
     }
   };
 
-  // ULTRA-SAFE EXCEL ITERATOR (No Property Enumeration)
   const uploadExcelSafe = async (key: keyof UploadState, tableName: string, mapping: Record<string, string[]>, file: File) => {
     updateFileInfo(key, { status: "reading", progress: 5, message: "Lendo Excel (Seguro)..." });
     const buffer = await file.arrayBuffer();
@@ -153,7 +174,6 @@ export default function UploadBasesBI() {
     for (let R = range.s.r + 1; R <= range.e.r; R += CHUNK_SIZE) {
       const batch: any[] = [];
       const endR = Math.min(R + CHUNK_SIZE - 1, range.e.r);
-      
       for (let iR = R; iR <= endR; iR++) {
         const obj: any = {};
         let empty = true;
@@ -169,7 +189,6 @@ export default function UploadBasesBI() {
         }
         if (!empty) batch.push(obj);
       }
-
       if (batch.length > 0) {
         const { error } = await (supabase as any).from(tableName).insert(batch);
         if (error) throw error;
@@ -191,9 +210,8 @@ export default function UploadBasesBI() {
       toast.success(`${tableName} carregada.`);
       checkDatabase();
     } catch (e: any) {
-      console.error(e);
       updateFileInfo(key, { status: "error", message: `Falha: ${e.message}` });
-      toast.error(`Erro ao carregar: ${e.message}`);
+      toast.error(`Erro: ${e.message}`);
     }
   };
 
@@ -202,9 +220,14 @@ export default function UploadBasesBI() {
     try {
       const { error } = await (supabase as any).rpc("process_bi_etl");
       if (error) throw error;
-      toast.success("BI Consolidado!");
-    } catch (e: any) { toast.error("Erro: " + e.message); }
-    finally { setLoading(false); }
+      toast.success("Dashboard consolidado!");
+      checkDatabase();
+    } catch (e: any) {
+      toast.error("Processamento falhou: " + e.message);
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -217,37 +240,55 @@ export default function UploadBasesBI() {
               <ArrowLeft className="h-6 w-6" />
             </Button>
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-white">Central de Dados BI</h1>
-              <p className="text-zinc-500 text-sm">Atualize as bases e consolide o dashboard gerencial.</p>
+              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Central de Dados BI</h1>
+              <p className="text-slate-500 text-sm">Gerencie o fluxo de dados do BI Nativo.</p>
             </div>
           </div>
           <div className="flex gap-3">
              <Button variant="outline" size="sm" onClick={checkDatabase} disabled={checkingDb}>
                 <Search className={`h-4 w-4 mr-2 ${checkingDb ? "animate-spin" : ""}`} /> Diagnóstico
              </Button>
-             <Button size="sm" className="bg-zinc-900 text-white font-bold" onClick={handleProcessBI} disabled={loading}>
+             <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg" onClick={handleProcessBI} disabled={loading}>
                 <Play className="h-4 w-4 mr-2" /> Consolidar Dashboard
              </Button>
           </div>
         </div>
 
-        <Card className="bg-zinc-900 border-none text-white overflow-hidden">
-          <CardContent className="p-4 flex flex-wrap gap-4 items-center justify-center sm:justify-between text-[10px] font-mono">
-            <div className="flex items-center gap-2">
-               <Database className="h-3 w-3 text-indigo-400" />
-               <span className="text-zinc-400 uppercase">STATUS TABELAS:</span>
-            </div>
-            <div className="flex flex-wrap gap-4">
-               {Object.entries(dbStatus).map(([name, exists]) => (
-                 <div key={name} className="flex items-center gap-1.5">
-                    <div className={`h-1.5 w-1.5 rounded-full ${exists ? "bg-green-500" : "bg-red-500 animate-pulse"}`} />
-                    <span className={exists ? "text-zinc-300" : "text-red-400 font-bold"}>{name}</span>
-                 </div>
-               ))}
+        {/* Diagnostic Bar */}
+        <Card className="bg-zinc-900 border-none text-white overflow-hidden shadow-2xl">
+          <CardContent className="p-4 flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[10px] font-mono">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-zinc-400 mb-2">
+                  <Database className="h-3 w-3" /> ESTRUTURA DE TABELAS
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {Object.entries(dbStatus).map(([name, exists]) => (
+                    <div key={name} className="flex items-center gap-1.5 bg-zinc-800 px-2 py-1 rounded">
+                      <div className={`h-1.5 w-1.5 rounded-full ${exists ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500 animate-pulse"}`} />
+                      <span className={exists ? "text-zinc-300" : "text-red-400"}>{name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-zinc-400 mb-2">
+                  <Wrench className="h-3 w-3" /> FUNÇÕES DE PROCESSAMENTO
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {Object.entries(fnStatus).map(([name, exists]) => (
+                    <div key={name} className="flex items-center gap-1.5 bg-zinc-800 px-2 py-1 rounded">
+                      <div className={`h-1.5 w-1.5 rounded-full ${exists ? "bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" : "bg-red-500 animate-pulse"}`} />
+                      <span className={exists ? "text-zinc-300" : "text-red-400"}>{name}()</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Upload Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { id: "b2b", name: "FCT Oficial (B2B)", table: "raw_b2b", map: {
@@ -266,24 +307,25 @@ export default function UploadBasesBI() {
             const isError = item.info.status === "error";
             const isSuccess = item.info.status === "success";
             return (
-              <Card key={cfg.id} className={`${isSuccess ? "border-green-500/50" : isError ? "border-red-500/50" : ""}`}>
-                <CardHeader className="p-5 pb-3">
-                  <CardTitle className="text-xs font-bold flex items-center justify-between uppercase">
+              <Card key={cfg.id} className={`${isSuccess ? "border-green-500 shadow-sm" : isError ? "border-red-500 bg-red-50/10" : "hover:border-indigo-300"}`}>
+                <CardHeader className="p-5 pb-2">
+                  <CardTitle className="text-xs font-bold flex items-center justify-between uppercase tracking-tighter">
                     {cfg.name}
                     {isSuccess && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                    {isError && <AlertCircle className="h-4 w-4 text-red-500" />}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-5 pt-0 space-y-4">
-                  <Input type="file" accept=".xlsx,.csv" onChange={handleFileChange(cfg.id as keyof UploadState)} disabled={isWorking || loading} className="text-[10px]" />
+                  <Input type="file" onChange={handleFileChange(cfg.id as keyof UploadState)} disabled={isWorking || loading} className="text-[10px] h-9" />
                   {(isWorking || isSuccess || isError) && (
                     <div className="space-y-1">
-                       <Progress value={item.info.progress} className={`h-1.5 ${isError ? "bg-red-200" : ""}`} />
-                       <p className={`text-[9px] font-bold truncate ${isError ? "text-red-600" : "text-zinc-500"}`}>{item.info.message}</p>
+                       <Progress value={item.info.progress} className={`h-1 ${isError ? "bg-red-200" : isSuccess ? "bg-green-100" : ""}`} />
+                       <p className={`text-[9px] font-bold truncate ${isError ? "text-red-600" : "text-slate-500"}`}>{item.info.message}</p>
                     </div>
                   )}
-                  <Button className="w-full text-xs font-bold" variant={isSuccess ? "secondary" : isError ? "destructive" : "default"} onClick={() => uploadBase(cfg.id as keyof UploadState, cfg.table, cfg.map)} disabled={!item.file || isWorking || loading}>
-                    {isWorking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                    {isSuccess ? "Reenviar" : "Carregar AGORA"}
+                  <Button className="w-full text-[10px] font-black uppercase h-10" variant={isSuccess ? "secondary" : isError ? "destructive" : "default"} onClick={() => uploadBase(cfg.id as keyof UploadState, cfg.table, cfg.map)} disabled={!item.file || isWorking || loading}>
+                    {isWorking ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Upload className="mr-2 h-3 w-3" />}
+                    {isSuccess ? "Reenviar" : "Carregar"}
                   </Button>
                 </CardContent>
               </Card>
@@ -291,15 +333,21 @@ export default function UploadBasesBI() {
           })}
         </div>
 
-        <div className="p-6 bg-amber-50 border border-amber-200 rounded-2xl flex gap-5">
-           <AlertCircle className="h-6 w-6 text-amber-600 shrink-0" />
-           <div className="space-y-1">
-             <h4 className="text-sm font-bold text-amber-900">PROBLEMAS COM B2B?</h4>
-             <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
-                Se o carregamento do B2B (FCT Oficial) continuar falhando, **SALVE O ARQUIVO COMO CSV (UTF-8)** no Excel antes de subir.
-                O formato CSV é processado linha a linha de forma ultra-leve e evita todos os erros de memória do navegador.
-             </p>
+        {/* Instructions */}
+        <div className="p-6 bg-white border border-slate-200 rounded-2xl flex flex-col gap-4 shadow-sm">
+           <div className="flex gap-4 items-start">
+             <AlertCircle className="h-6 w-6 text-red-600 shrink-0 mt-1" />
+             <div className="space-y-1">
+               <h4 className="text-sm font-bold text-slate-900 uppercase">Atenção ao Status de Consolidação</h4>
+               <p className="text-xs text-slate-500 leading-relaxed">
+                  Se o diagnóstico mostrar as funções em **VERMELHO**, o botão "Consolidar Dashboard" não irá funcionar. 
+                  Isso acontece quando o script de lógica (ETL) não foi executado no Supabase. Copie o SQL abaixo para resolver.
+               </p>
+             </div>
            </div>
+           <Button variant="outline" size="sm" className="w-fit text-[10px] h-8" onClick={() => navigate("/dashboard")}>
+              <FileCode className="h-3 w-3 mr-2" /> Instruções SQL no Chat
+           </Button>
         </div>
 
       </div>
