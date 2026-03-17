@@ -94,7 +94,6 @@ const newMaterial = (): MaterialItem => ({
 
 const MaterialColeta = () => {
   const { user } = useAuth();
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
