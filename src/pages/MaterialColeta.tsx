@@ -1131,7 +1131,57 @@ const MaterialColeta = () => {
     setDeleteMaterial(null);
   };
 
-  // Delete
+  // Individual registration handlers
+  const handleSaveNewTecnico = async () => {
+    if (!newTecnicoForm.tt || !newTecnicoForm.nome_tecnico) {
+      toast.error("TT e Nome Técnico são obrigatórios");
+      return;
+    }
+    if (!user) return;
+    const exists = tecnicos.some(t => t.tt === newTecnicoForm.tt);
+    if (exists) {
+      toast.error("Técnico com esta TT já está cadastrado");
+      return;
+    }
+    const { error } = await supabase.from("tecnicos_cadastro").insert({
+      tr: newTecnicoForm.tr || null,
+      tt: newTecnicoForm.tt,
+      nome_empresa: newTecnicoForm.nome_empresa || null,
+      nome_tecnico: newTecnicoForm.nome_tecnico,
+      supervisor: newTecnicoForm.supervisor || null,
+      coordenador: newTecnicoForm.coordenador || null,
+      telefone: newTecnicoForm.telefone || null,
+      cidade_residencia: newTecnicoForm.cidade_residencia || null,
+      uploaded_by: user.id,
+    });
+    if (error) { toast.error("Erro ao cadastrar técnico"); return; }
+    toast.success("Técnico cadastrado com sucesso");
+    setTecnicos(prev => [...prev, { ...newTecnicoForm }]);
+    setNewTecnicoForm({ tr: "", tt: "", nome_empresa: "", nome_tecnico: "", supervisor: "", coordenador: "", telefone: "", cidade_residencia: "" });
+  };
+
+  const handleSaveNewMaterial = async () => {
+    if (!newMaterialForm.codigo || !newMaterialForm.nome_material) {
+      toast.error("Código e Nome Material são obrigatórios");
+      return;
+    }
+    if (!user) return;
+    const exists = materiaisCadastro.some(m => m.codigo === newMaterialForm.codigo);
+    if (exists) {
+      toast.error("Material com este código já está cadastrado");
+      return;
+    }
+    const { error } = await supabase.from("materiais_cadastro").insert({
+      codigo: newMaterialForm.codigo,
+      nome_material: newMaterialForm.nome_material,
+      uploaded_by: user.id,
+    });
+    if (error) { toast.error("Erro ao cadastrar material"); return; }
+    toast.success("Material cadastrado com sucesso");
+    setMateriaisCadastro(prev => [...prev, { ...newMaterialForm }]);
+    setNewMaterialForm({ codigo: "", nome_material: "" });
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
