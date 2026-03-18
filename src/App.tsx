@@ -15,8 +15,6 @@ import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import MaterialColeta from "./pages/MaterialColeta";
 import NotFound from "./pages/NotFound";
-import UploadBasesBI from "./pages/UploadBasesBI";
-import RelatorioGerencial from "./pages/RelatorioGerencial";
 import { useEffect, useState, ReactNode } from "react";
 
 const queryClient = new QueryClient({
@@ -56,8 +54,6 @@ const persistentPages = [
   { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
   { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
-  { path: "/upload-bi", element: <ProtectedRoute><UploadBasesBI /></ProtectedRoute> },
-  { path: "/relatorio-gerencial", element: <ProtectedRoute><RelatorioGerencial /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
@@ -78,8 +74,6 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/upload-bi" element={<ProtectedRoute><UploadBasesBI /></ProtectedRoute>} />
-          <Route path="/relatorio-gerencial" element={<ProtectedRoute><RelatorioGerencial /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       )}
