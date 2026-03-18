@@ -43,9 +43,6 @@ const PowerBI = () => {
 
         if (error) throw error;
         const dbLinks = (data || []) as PowerBILink[];
-        if (!dbLinks.some((link) => link.titulo === "BI Gerencial Nativo (Reparos)")) {
-           dbLinks.push({ id: "bi-nativo", titulo: "BI Gerencial Nativo (Reparos)", url: "/relatorio-gerencial", descricao: "Dashboard gerado nativamente pelo portal" });
-        }
         if (!dbLinks.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
            dbLinks.push({ 
              id: "bi-servicos", 
@@ -68,7 +65,7 @@ const PowerBI = () => {
 
   // Filter links based on permissions (runs reactively but doesn't trigger loading)
   const filteredLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
-    ? links.filter(link => link.id === "bi-nativo" || link.id === "bi-servicos" || areaPermissions.powerbi_report_ids?.includes(link.id))
+    ? links.filter(link => link.id === "bi-servicos" || areaPermissions.powerbi_report_ids?.includes(link.id))
     : links;
 
   const selectLink = (link: PowerBILink) => {

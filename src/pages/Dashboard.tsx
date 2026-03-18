@@ -35,19 +35,10 @@ const Dashboard = () => {
 
   useEffect(() => {
     supabase.from("powerbi_links").select("*").order("ordem").then(({ data }) => {
-      const dbLinks = (data || []).map((link: any) => {
-        const legacyTitles = ["Relatório Power BI", "Dashboard de Vendas", "Dash Operacional Home Connect"];
-        if (legacyTitles.includes(link.titulo)) {
-          return { ...link, titulo: "Dashboard Operacional Home Connect" };
-        }
-        return link;
-      }) as PowerBILink[];
+      const dbLinks = (data || []) as PowerBILink[];
 
       setLinks(() => {
         const combined = [...dbLinks];
-        if (!combined.some((link) => link.titulo === "BI Gerencial Nativo (Reparos)")) {
-           combined.push({ id: "bi-nativo", titulo: "BI Gerencial Nativo (Reparos)", url: "/relatorio-gerencial", descricao: "Dashboard gerado nativamente pelo portal", icone: "" });
-        }
         if (!combined.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
            combined.push({ 
              id: "bi-servicos", 
