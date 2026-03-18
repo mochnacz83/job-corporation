@@ -45,8 +45,17 @@ const Dashboard = () => {
 
       setLinks(() => {
         const combined = [...dbLinks];
-        if (!combined.some((link) => link.titulo === "Dashboard Operacional de Comunicação de Dados")) {
-          combined.push({ id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" });
+        if (!combined.some((link) => link.titulo === "BI Gerencial Nativo (Reparos)")) {
+           combined.push({ id: "bi-nativo", titulo: "BI Gerencial Nativo (Reparos)", url: "/relatorio-gerencial", descricao: "Dashboard gerado nativamente pelo portal", icone: "" });
+        }
+        if (!combined.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
+           combined.push({ 
+             id: "bi-servicos", 
+             titulo: "Filas de Serviços - Instalação, Reparo e Mudança", 
+             url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9", 
+             descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança",
+             icone: ""
+           });
         }
         return combined;
       });

@@ -42,7 +42,19 @@ const PowerBI = () => {
           .order("ordem");
 
         if (error) throw error;
-        setLinks((data || []) as PowerBILink[]);
+        const dbLinks = (data || []) as PowerBILink[];
+        if (!dbLinks.some((link) => link.titulo === "BI Gerencial Nativo (Reparos)")) {
+           dbLinks.push({ id: "bi-nativo", titulo: "BI Gerencial Nativo (Reparos)", url: "/relatorio-gerencial", descricao: "Dashboard gerado nativamente pelo portal" });
+        }
+        if (!dbLinks.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
+           dbLinks.push({ 
+             id: "bi-servicos", 
+             titulo: "Filas de Serviços - Instalação, Reparo e Mudança", 
+             url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9", 
+             descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança" 
+           });
+        }
+        setLinks(dbLinks);
         hasFetched.current = true;
       } catch (err) {
         console.error("Erro ao carregar relatórios Power BI:", err);
@@ -56,7 +68,7 @@ const PowerBI = () => {
 
   // Filter links based on permissions (runs reactively but doesn't trigger loading)
   const filteredLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
-    ? links.filter(link => areaPermissions.powerbi_report_ids?.includes(link.id))
+    ? links.filter(link => link.id === "bi-nativo" || link.id === "bi-servicos" || areaPermissions.powerbi_report_ids?.includes(link.id))
     : links;
 
   const selectLink = (link: PowerBILink) => {
