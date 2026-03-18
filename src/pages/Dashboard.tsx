@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
-import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays, ClipboardList, Database } from "lucide-react";
+import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays, ClipboardList } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -47,9 +47,6 @@ const Dashboard = () => {
         const combined = [...dbLinks];
         if (!combined.some((link) => link.titulo === "Dashboard Operacional de Comunicação de Dados")) {
           combined.push({ id: "2", titulo: "Dashboard Operacional de Comunicação de Dados", url: "", descricao: "", icone: "" });
-        }
-        if (!combined.some((link) => link.titulo === "BI Gerencial Nativo (Reparos)")) {
-           combined.push({ id: "bi-nativo", titulo: "BI Gerencial Nativo (Reparos)", url: "/relatorio-gerencial", descricao: "Dashboard gerado nativamente pelo portal", icone: "" });
         }
         return combined;
       });
@@ -187,19 +184,6 @@ return (
               <CardContent>
                 <p className="text-muted-foreground text-sm">
                   Veja quem acessou, quem está online e gráficos de uso.
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer border-primary/20" onClick={() => navigate("/upload-bi")}>
-              <CardHeader className="pb-3">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
-                  <Database className="w-6 h-6 text-primary" />
-                </div>
-                <CardTitle className="text-lg">Carga de Bases (BI)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm">
-                  Envie as planilhas B2B e VIP para atualizar o BI nativo.
                 </p>
               </CardContent>
             </Card>

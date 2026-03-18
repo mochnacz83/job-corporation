@@ -15,8 +15,6 @@ import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import MaterialColeta from "./pages/MaterialColeta";
 import NotFound from "./pages/NotFound";
-import UploadBasesBI from "./pages/UploadBasesBI";
-import RelatorioGerencial from "./pages/RelatorioGerencial";
 import { useEffect, useState, ReactNode } from "react";
 
 const queryClient = new QueryClient({
@@ -76,7 +74,6 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/upload-bi" element={<ProtectedRoute><UploadBasesBI /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       )}
