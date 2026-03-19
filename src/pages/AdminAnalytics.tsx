@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Activity, Users, Circle } from "lucide-react";
+import { ArrowLeft, Activity, Users, Circle, Calendar, ChevronDown, ChevronUp, Trash2, Search, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface AccessLog {
   id: string;
@@ -30,6 +34,15 @@ interface ProfileMap {
   [userId: string]: { nome: string; matricula: string; area: string | null };
 }
 
+interface GroupedLog {
+  date: string;
+  user_id: string;
+  userName: string;
+  matricula: string;
+  area: string;
+  actions: AccessLog[];
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
 const AdminAnalytics = () => {
@@ -37,11 +50,19 @@ const AdminAnalytics = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<AccessLog[]>([]);
+  const [groupedLogs, setGroupedLogs] = useState<GroupedLog[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [onlineUsers, setOnlineUsers] = useState<Presence[]>([]);
   const [profileMap, setProfileMap] = useState<ProfileMap>({});
   const [chartData, setChartData] = useState<{ date: string; acessos: number }[]>([]);
   const [areaDistData, setAreaDistData] = useState<{ name: string; value: number }[]>([]);
   const [areaAccessData, setAreaAccessData] = useState<{ name: string; acessos: number }[]>([]);
+  
+  // Cleanup state
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [cleanupStart, setCleanupStart] = useState("");
+  const [cleanupEnd, setCleanupEnd] = useState("");
+  const [cleaning, setCleaning] = useState(false);
 
   useAccessTracking("/admin/analytics");
 
@@ -94,6 +115,32 @@ const AdminAnalytics = () => {
 
     setLogs(logsData);
 
+    // Group logs by Date and User
+    const groups: { [key: string]: GroupedLog } = {};
+    logsData.forEach((log) => {
+      const dateKey = new Date(log.created_at).toLocaleDateString("pt-BR");
+      const groupKey = `${dateKey}_${log.user_id}`;
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
+          date: dateKey,
+          user_id: log.user_id,
+          userName: pMap[log.user_id]?.nome || "Desconhecido",
+          matricula: pMap[log.user_id]?.matricula || "—",
+          area: pMap[log.user_id]?.area || "Sem Área",
+          actions: []
+        };
+      }
+      groups[groupKey].actions.push(log);
+    });
+    setGroupedLogs(Object.values(groups).sort((a, b) => {
+        // Sort by date descending
+        const dateA = a.date.split("/").reverse().join("-");
+        const dateB = b.date.split("/").reverse().join("-");
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+        return a.userName.localeCompare(b.userName);
+    }));
+
     // Area Access Data
     const areaAccessCounts: { [key: string]: number } = {};
     logsData.forEach((log: any) => {
@@ -121,6 +168,41 @@ const AdminAnalytics = () => {
     setChartData(Object.entries(dayMap).map(([date, acessos]) => ({ date, acessos })));
 
     setLoading(false);
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  };
+
+  const handleCleanup = async () => {
+    if (!cleanupStart || !cleanupEnd) {
+        toast.error("Selecione as datas de início e fim.");
+        return;
+    }
+
+    setCleaning(true);
+    try {
+        const { error } = await supabase
+            .from("access_logs")
+            .delete()
+            .gte("created_at", `${cleanupStart}T00:00:00Z`)
+            .lte("created_at", `${cleanupEnd}T23:59:59Z`);
+
+        if (error) throw error;
+        
+        toast.success("Histórico limpo com sucesso!");
+        setCleanupDialogOpen(false);
+        loadData();
+    } catch (err: any) {
+        toast.error("Erro ao limpar histórico: " + err.message);
+    } finally {
+        setCleaning(false);
+    }
   };
 
   if (loading) {
@@ -256,7 +338,41 @@ const AdminAnalytics = () => {
                 <Users className="w-5 h-5 text-primary" />
                 <CardTitle className="text-base font-bold">Histórico de Acessos Recentes</CardTitle>
               </div>
-              <Badge variant="outline" className="font-normal text-[10px]">Exibindo últimos 200 registros</Badge>
+              <div className="flex items-center gap-2">
+                <Dialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10">
+                            <Trash2 className="w-4 h-4 mr-1" /> Limpar Histórico
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Limpar Histórico de Acessos</DialogTitle>
+                            <DialogDescription>
+                                Selecione o intervalo de datas para excluir permanentemente os logs de acesso.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="start" className="text-right">Início</Label>
+                                <Input id="start" type="date" className="col-span-3" value={cleanupStart} onChange={e => setCleanupStart(e.target.value)} />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="end" className="text-right">Fim</Label>
+                                <Input id="end" type="date" className="col-span-3" value={cleanupEnd} onChange={e => setCleanupEnd(e.target.value)} />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setCleanupDialogOpen(false)}>Cancelar</Button>
+                            <Button variant="destructive" onClick={handleCleanup} disabled={cleaning}>
+                                {cleaning ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                                Confirmar Exclusão
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+                <Badge variant="outline" className="font-normal text-[10px]">Exibindo últimos 200 registros</Badge>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -271,28 +387,63 @@ const AdminAnalytics = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {logs.map((log) => (
-                      <TableRow key={log.id} className="hover:bg-muted/20">
-                        <TableCell className="font-medium">{profileMap[log.user_id]?.nome || "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{profileMap[log.user_id]?.matricula || "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[10px] font-normal">
-                            {profileMap[log.user_id]?.area || "Sem Área"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium">
-                              {log.action?.startsWith("Acessou ") ? log.action : (log.action || log.page || "Vizualização")}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {new Date(log.created_at).toLocaleString("pt-BR")}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {logs.length === 0 && (
+                    {groupedLogs.map((group) => {
+                      const groupKey = `${group.date}_${group.user_id}`;
+                      const isExpanded = expandedGroups.has(groupKey);
+                      
+                      return (
+                        <React.Fragment key={groupKey}>
+                          <TableRow 
+                            className="hover:bg-muted/20 cursor-pointer transition-colors"
+                            onClick={() => toggleGroup(groupKey)}
+                          >
+                            <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                    {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                                    {group.userName}
+                                </div>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{group.matricula}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px] font-normal">
+                                {group.area}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] font-bold">
+                                    {group.actions.length} ações
+                                </Badge>
+                                <span className="text-[10px] text-muted-foreground italic">
+                                    Clique para ver detalhes
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs font-semibold">
+                              {group.date}
+                            </TableCell>
+                          </TableRow>
+                          
+                          {isExpanded && group.actions.map((log) => (
+                            <TableRow key={log.id} className="bg-muted/5 border-l-2 border-primary/20">
+                                <TableCell colSpan={3}></TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2 pl-4">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0" />
+                                        <span className="text-xs font-medium">
+                                            {log.action?.startsWith("Acessou ") ? log.action : (log.action || log.page || "Visualização")}
+                                        </span>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-[10px] text-muted-foreground italic">
+                                    {new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                                </TableCell>
+                            </TableRow>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
+                    {groupedLogs.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center text-muted-foreground py-10 italic">
                           Nenhum acesso registrado no histórico.
