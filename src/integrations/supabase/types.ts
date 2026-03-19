@@ -68,6 +68,96 @@ export type Database = {
         }
         Relationships: []
       }
+      fato_reparos: {
+        Row: {
+          causa_ofensora_n1: string | null
+          causa_ofensora_n2: string | null
+          causa_ofensora_n3: string | null
+          chave_reparo: string | null
+          cldv: number | null
+          cliente: string | null
+          created_at: string | null
+          data_abertura: string | null
+          data_fechamento: string | null
+          designacao: string | null
+          faixa_repetida: string | null
+          id: string
+          municipio: string | null
+          posto_anterior: string | null
+          posto_encerramento: string | null
+          posto_prazo: string | null
+          produto: string | null
+          protocolo: string | null
+          rep: string | null
+          reparo_prazo: string | null
+          retido: string | null
+          tecnologia_acesso: string | null
+          tempo_repetida: number | null
+          tmr: number | null
+          tmr_real: number | null
+          uf: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          causa_ofensora_n1?: string | null
+          causa_ofensora_n2?: string | null
+          causa_ofensora_n3?: string | null
+          chave_reparo?: string | null
+          cldv?: number | null
+          cliente?: string | null
+          created_at?: string | null
+          data_abertura?: string | null
+          data_fechamento?: string | null
+          designacao?: string | null
+          faixa_repetida?: string | null
+          id?: string
+          municipio?: string | null
+          posto_anterior?: string | null
+          posto_encerramento?: string | null
+          posto_prazo?: string | null
+          produto?: string | null
+          protocolo?: string | null
+          rep?: string | null
+          reparo_prazo?: string | null
+          retido?: string | null
+          tecnologia_acesso?: string | null
+          tempo_repetida?: number | null
+          tmr?: number | null
+          tmr_real?: number | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          causa_ofensora_n1?: string | null
+          causa_ofensora_n2?: string | null
+          causa_ofensora_n3?: string | null
+          chave_reparo?: string | null
+          cldv?: number | null
+          cliente?: string | null
+          created_at?: string | null
+          data_abertura?: string | null
+          data_fechamento?: string | null
+          designacao?: string | null
+          faixa_repetida?: string | null
+          id?: string
+          municipio?: string | null
+          posto_anterior?: string | null
+          posto_encerramento?: string | null
+          posto_prazo?: string | null
+          produto?: string | null
+          protocolo?: string | null
+          rep?: string | null
+          reparo_prazo?: string | null
+          retido?: string | null
+          tecnologia_acesso?: string | null
+          tempo_repetida?: number | null
+          tmr?: number | null
+          tmr_real?: number | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       materiais_cadastro: {
         Row: {
           codigo: string
@@ -301,6 +391,147 @@ export type Database = {
         }
         Relationships: []
       }
+      raw_b2b: {
+        Row: {
+          causa_ofensora_n1: string | null
+          causa_ofensora_n2: string | null
+          causa_ofensora_n3: string | null
+          cldv: number | null
+          cliente: string | null
+          created_at: string | null
+          data_abertura: string | null
+          data_fechamento: string | null
+          designacao: string | null
+          id: string
+          municipio: string | null
+          posto_anterior: string | null
+          posto_encerramento: string | null
+          produto: string | null
+          protocolo: string | null
+          tecnologia_acesso: string | null
+          uf: string | null
+        }
+        Insert: {
+          causa_ofensora_n1?: string | null
+          causa_ofensora_n2?: string | null
+          causa_ofensora_n3?: string | null
+          cldv?: number | null
+          cliente?: string | null
+          created_at?: string | null
+          data_abertura?: string | null
+          data_fechamento?: string | null
+          designacao?: string | null
+          id?: string
+          municipio?: string | null
+          posto_anterior?: string | null
+          posto_encerramento?: string | null
+          produto?: string | null
+          protocolo?: string | null
+          tecnologia_acesso?: string | null
+          uf?: string | null
+        }
+        Update: {
+          causa_ofensora_n1?: string | null
+          causa_ofensora_n2?: string | null
+          causa_ofensora_n3?: string | null
+          cldv?: number | null
+          cliente?: string | null
+          created_at?: string | null
+          data_abertura?: string | null
+          data_fechamento?: string | null
+          designacao?: string | null
+          id?: string
+          municipio?: string | null
+          posto_anterior?: string | null
+          posto_encerramento?: string | null
+          produto?: string | null
+          protocolo?: string | null
+          tecnologia_acesso?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
+      raw_vip_prazo: {
+        Row: {
+          circuito: string | null
+          created_at: string | null
+          id: string
+          posto_prazo: string | null
+          reparo_prazo: string | null
+        }
+        Insert: {
+          circuito?: string | null
+          created_at?: string | null
+          id?: string
+          posto_prazo?: string | null
+          reparo_prazo?: string | null
+        }
+        Update: {
+          circuito?: string | null
+          created_at?: string | null
+          id?: string
+          posto_prazo?: string | null
+          reparo_prazo?: string | null
+        }
+        Relationships: []
+      }
+      raw_vip_repetida: {
+        Row: {
+          circuito: string | null
+          created_at: string | null
+          faixa_repetida: string | null
+          id: string
+          rep: string | null
+          retido: string | null
+          tempo_repetida: number | null
+        }
+        Insert: {
+          circuito?: string | null
+          created_at?: string | null
+          faixa_repetida?: string | null
+          id?: string
+          rep?: string | null
+          retido?: string | null
+          tempo_repetida?: number | null
+        }
+        Update: {
+          circuito?: string | null
+          created_at?: string | null
+          faixa_repetida?: string | null
+          id?: string
+          rep?: string | null
+          retido?: string | null
+          tempo_repetida?: number | null
+        }
+        Relationships: []
+      }
+      raw_vip_tmr: {
+        Row: {
+          circuito: string | null
+          created_at: string | null
+          id: string
+          tmr: number | null
+          tmr_pend_oi: number | null
+          tmr_pend_vtal: number | null
+        }
+        Insert: {
+          circuito?: string | null
+          created_at?: string | null
+          id?: string
+          tmr?: number | null
+          tmr_pend_oi?: number | null
+          tmr_pend_vtal?: number | null
+        }
+        Update: {
+          circuito?: string | null
+          created_at?: string | null
+          id?: string
+          tmr?: number | null
+          tmr_pend_oi?: number | null
+          tmr_pend_vtal?: number | null
+        }
+        Relationships: []
+      }
       reagenda_history: {
         Row: {
           contato: string
@@ -487,32 +718,12 @@ export type Database = {
         }
         Relationships: []
       }
-      user_preferences: {
-        Row: {
-          created_at: string
-          powerbi_report_order: string[] | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          powerbi_report_order?: string[] | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          powerbi_report_order?: string[] | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      clear_raw_tables: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -520,6 +731,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      process_bi_etl: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
