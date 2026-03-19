@@ -253,7 +253,22 @@ const Login = () => {
       setCargo(""); setArea(""); setMatricula("");
     } catch (err: any) {
       console.error("[Signup] Erro final:", err);
-      toast({ title: "Ops! Algo deu errado", description: err.message || "Não foi possível completar seu cadastro. Tente novamente em instantes.", variant: "destructive", duration: 8000 });
+      
+      let errorMessage = err.message || "Não foi possível completar seu cadastro. Tente novamente em instantes.";
+      let errorTitle = "Ops! Algo deu errado";
+
+      // Detect "Failed to fetch" (usually network error or CORS issue)
+      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
+        errorMessage = "Falha de conexão com o servidor. Se você já tentou se cadastrar antes, sua matrícula pode estar em processamento. Tente fazer login ou use a recuperação de senha.";
+        errorTitle = "Erro de Conexão";
+      }
+
+      toast({ 
+        title: errorTitle, 
+        description: errorMessage, 
+        variant: "destructive", 
+        duration: 10000 
+      });
     } finally {
       setLoading(false);
     }
