@@ -98,12 +98,17 @@ serve(async (req) => {
     console.log(`[AUTH] Action: ${action} | Caller: ${caller.id} | Target: ${userId} | isAdmin: ${isAdmin}`);
 
     // Verify admin role ONLY for privileged actions
-    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status'];
+    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts'];
+    const publicActions = ['get-user-status', 'reset-my-ghost'];
 
     // Authorization logic
     let authorized = false;
 
-    if (action === 'complete-signup') {
+    if (publicActions.includes(action)) {
+      // These actions are safe to be called without a strictly valid 'caller'
+      // but we still want to log who is calling if possible
+      authorized = true;
+    } else if (action === 'complete-signup') {
       // Allow user to complete their own signup
       authorized = caller.id === userId;
     } else if (action === 'update-profile') {
@@ -386,6 +391,105 @@ serve(async (req) => {
         .eq('user_id', userId);
 
       if (updateError) throw new Error(`Failed to update profile: ${updateError.message}`);
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'cleanup-ghosts') {
+      console.log(`[CLEANUP] Starting global ghost cleanup initiated by ${caller.id}`);
+      
+      // 1. Get all users from auth.users
+      const { data: { users }, error: listError } = await serviceClient.auth.admin.listUsers();
+      if (listError) throw listError;
+
+      // 2. Get all user_ids from public.profiles
+      const { data: profiles, error: profilesError } = await serviceClient
+        .from('profiles')
+        .select('user_id');
+      if (profilesError) throw profilesError;
+
+      const profileIds = new Set(profiles.map(p => p.user_id));
+      const ghosts = users.filter(u => !profileIds.has(u.id));
+
+      console.log(`[CLEANUP] Found ${ghosts.length} ghost users out of ${users.length} total users.`);
+
+      let deletedCount = 0;
+      for (const ghost of ghosts) {
+        const { error: delError } = await serviceClient.auth.admin.deleteUser(ghost.id);
+        if (!delError) deletedCount++;
+        else console.error(`[CLEANUP] Failed to delete ghost ${ghost.id}:`, delError.message);
+      }
+
+      return new Response(JSON.stringify({ success: true, deletedCount, totalFound: ghosts.length }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'get-user-status') {
+      const { email } = await req.json();
+      if (!email) throw new Error('Email is required');
+
+      // Check auth metadata first
+      const { data: { users }, error: findError } = await serviceClient.auth.admin.listUsers();
+      if (findError) throw findError;
+
+      const user = users.find(u => u.email === email);
+      if (!user) {
+        return new Response(JSON.stringify({ exists: false }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check if profile exists
+      const { data: profile } = await serviceClient
+        .from('profiles')
+        .select('id, status, matricula')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      return new Response(JSON.stringify({
+        exists: true,
+        hasProfile: !!profile,
+        status: profile?.status || null,
+        matricula: profile?.matricula || null,
+        userId: user.id
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'reset-my-ghost') {
+      const { email } = await req.json();
+      if (!email) throw new Error('Email is required');
+
+      const { data: { users } } = await serviceClient.auth.admin.listUsers();
+      const user = users.find(u => u.email === email);
+
+      if (!user) {
+        return new Response(JSON.stringify({ success: true, message: 'User not found, nothing to reset.' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // CRITICAL: Only delete if NO profile exists
+      const { data: profile } = await serviceClient
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        return new Response(JSON.stringify({ error: 'Cannot reset active account. Use password recovery instead.' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error: delError } = await serviceClient.auth.admin.deleteUser(user.id);
+      if (delError) throw delError;
+
+      console.log(`[RESET] Ghost user ${user.id} (${email}) deleted successfully.`);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

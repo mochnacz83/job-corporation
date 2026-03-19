@@ -25,7 +25,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail, UserMinus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -81,6 +81,7 @@ const AdminUsers = () => {
   const [editUser, setEditUser] = useState<UserProfile | null>(null);
   const [editForm, setEditForm] = useState({ nome: "", cargo: "", area: "", email: "", empresa: "", telefone: "" });
   const [saving, setSaving] = useState(false);
+  const [cleaningGhosts, setCleaningGhosts] = useState(false);
 
   useEffect(() => {
     checkAdminAndLoad();
@@ -309,6 +310,29 @@ const AdminUsers = () => {
     }
   };
 
+  const handleCleanupGhosts = async () => {
+    if (!confirm("Isso removerá permanentemente todos os usuários que não possuem perfil completo. Deseja prosseguir?")) return;
+
+    setCleaningGhosts(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "cleanup-ghosts" },
+      });
+
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+
+      toast({
+        title: "Limpeza concluída",
+        description: `${data.deletedCount} usuários fantasmas foram removidos.`,
+      });
+      await loadUsers();
+    } catch (err: any) {
+      toast({ title: "Erro na limpeza", description: err.message, variant: "destructive" });
+    } finally {
+      setCleaningGhosts(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo":
@@ -376,9 +400,15 @@ const AdminUsers = () => {
                 <Users className="w-5 h-5 text-primary" />
                 <CardTitle>Usuários Cadastrados</CardTitle>
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigate("/admin/perfis")}>
-                <Shield className="w-4 h-4 mr-2" /> Gerenciar Perfis
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleCleanupGhosts} disabled={cleaningGhosts} className="text-orange-600 border-orange-200 hover:bg-orange-50">
+                  {cleaningGhosts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserMinus className="w-4 h-4 mr-2" />}
+                  Limpar Fantasmas
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate("/admin/perfis")}>
+                  <Shield className="w-4 h-4 mr-2" /> Gerenciar Perfis
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

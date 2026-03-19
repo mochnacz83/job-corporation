@@ -16,6 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const MATRICULA_REGEX = /^TT\d{6}$/;
 const PHONE_REGEX = /^\d{11}$/;
@@ -51,6 +59,11 @@ const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Ghost reset state
+  const [ghostDialogOpen, setGhostDialogOpen] = useState(false);
+  const [ghostEmail, setGhostEmail] = useState("");
+  const [resettingGhost, setResettingGhost] = useState(false);
 
   const handleMatriculaChange = (value: string) => {
     // Always start with TT, only allow digits after
@@ -164,8 +177,25 @@ const Login = () => {
         return;
       }
 
-      const authEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
-      console.log("[Signup] Iniciando cadastro para:", authEmail);
+      // Check if user already exists in Auth but not in Profiles (Ghost User)
+      const signupEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
+      try {
+        const { data: statusData } = await supabase.functions.invoke("admin-actions", {
+            body: { action: "get-user-status", email: signupEmail }
+        });
+
+        if (statusData?.exists && !statusData?.hasProfile) {
+            console.log("[Signup] Ghost user detected:", signupEmail);
+            setGhostEmail(signupEmail);
+            setGhostDialogOpen(true);
+            setLoading(false);
+            return;
+        }
+      } catch (err) {
+        console.warn("[Signup] Ghost check failed (non-blocking):", err);
+      }
+
+      console.log("[Signup] Iniciando cadastro para:", signupEmail);
 
       const signupMetadata = {
         matricula: matricula.trim(),
@@ -187,7 +217,7 @@ const Login = () => {
       console.log("=========================================");
 
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: authEmail,
+        email: signupEmail,
         password: signupPassword,
         options: {
           data: signupMetadata,
@@ -254,18 +284,37 @@ const Login = () => {
     } catch (err: any) {
       console.error("[Signup] Erro final:", err);
       
-      let errorMessage = err.message || "Não foi possível completar seu cadastro. Tente novamente em instantes.";
+      const caughtMsg = err.message || "";
+      
+      // Specifically catch "already registered" and check for ghost status
+      if (caughtMsg.toLowerCase().includes("already registered") || caughtMsg.toLowerCase().includes("already exists")) {
+        const errorAuthEmail = `${matricula.trim().toLowerCase()}@corporativo.local`;
+        try {
+            const { data: statusData } = await supabase.functions.invoke("admin-actions", {
+                body: { action: "get-user-status", email: errorAuthEmail }
+            });
+
+            if (statusData?.exists && !statusData?.hasProfile) {
+                setGhostEmail(errorAuthEmail);
+                setGhostDialogOpen(true);
+                setLoading(false);
+                return;
+            }
+        } catch (e) { }
+      }
+      
+      let finalErrorMessage = caughtMsg || "Não foi possível completar seu cadastro. Tente novamente em instantes.";
       let errorTitle = "Ops! Algo deu errado";
 
       // Detect "Failed to fetch" (usually network error or CORS issue)
-      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
-        errorMessage = "Falha de conexão com o servidor. Se você já tentou se cadastrar antes, sua matrícula pode estar em processamento. Tente fazer login ou use a recuperação de senha.";
+      if (finalErrorMessage.includes("Failed to fetch") || finalErrorMessage.includes("NetworkError")) {
+        finalErrorMessage = "Falha de conexão com o servidor. Se você já tentou se cadastrar antes, sua matrícula pode estar em processamento. Tente fazer login ou use a recuperação de senha.";
         errorTitle = "Erro de Conexão";
       }
 
       toast({ 
         title: errorTitle, 
-        description: errorMessage, 
+        description: finalErrorMessage, 
         variant: "destructive", 
         duration: 10000 
       });
@@ -527,6 +576,48 @@ const Login = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={ghostDialogOpen} onOpenChange={setGhostDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+                <Info className="w-5 h-5 text-blue-600" /> Cadastro Incompleto Detectado
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-foreground">
+              Identificamos que sua matrícula <strong>{matricula}</strong> possui um cadastro antigo que não foi concluído.
+              <br/><br/>
+              Para garantir que seus dados atuais sejam salvos corretamente, precisamos <strong>reiniciar seu processo de cadastro</strong>. Isso não afetará seus acessos futuros.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:gap-0 mt-4">
+            <Button variant="outline" onClick={() => setGhostDialogOpen(false)} disabled={resettingGhost}>
+              Cancelar
+            </Button>
+            <Button 
+                onClick={async () => {
+                    setResettingGhost(true);
+                    try {
+                        const { data, error } = await supabase.functions.invoke("admin-actions", {
+                            body: { action: "reset-my-ghost", email: ghostEmail }
+                        });
+                        if (error || data?.error) throw new Error(data?.error || error?.message);
+                        
+                        toast({ title: "Pronto!", description: "Histórico antigo removido. Você já pode clicar em 'Cadastrar' novamente." });
+                        setGhostDialogOpen(false);
+                    } catch (err: any) {
+                        toast({ title: "Erro ao reiniciar", description: err.message, variant: "destructive" });
+                    } finally {
+                        setResettingGhost(false);
+                    }
+                }}
+                disabled={resettingGhost}
+            >
+              {resettingGhost ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Reiniciar cadastro agora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
