@@ -135,17 +135,15 @@ const PowerBI = () => {
         }
         setLinks(dbLinks);
 
-        // Fetch user preferences
-        const { data: prefData } = await supabase
-          .from("user_preferences")
-          .select("powerbi_report_order")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (prefData?.powerbi_report_order) {
-          setOrderedIds(prefData.powerbi_report_order);
+        // Load user preferences from localStorage
+        const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
+        if (savedOrder) {
+          try {
+            setOrderedIds(JSON.parse(savedOrder));
+          } catch {
+            setOrderedIds(dbLinks.map(l => l.id));
+          }
         } else {
-          // Default order based on database 'ordem'
           setOrderedIds(dbLinks.map(l => l.id));
         }
 
@@ -196,14 +194,9 @@ const PowerBI = () => {
       const newOrderIds = arrayMove(orderedIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
 
-      // Persist to database
+      // Persist to localStorage
       if (user) {
-        await supabase
-          .from("user_preferences")
-          .upsert({ 
-            user_id: user.id, 
-            powerbi_report_order: newOrderIds 
-          }, { onConflict: "user_id" });
+        localStorage.setItem(`powerbi_order_${user.id}`, JSON.stringify(newOrderIds));
       }
     }
   };
