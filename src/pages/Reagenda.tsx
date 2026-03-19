@@ -312,6 +312,7 @@ const Reagenda = () => {
                     toast({ title: "Erro ao salvar", description: `Detalhe: ${error.message || "Falha desconhecida no banco de dados."}`, variant: "destructive" });
                 } else {
                     setData(prev => [...prev, ...uniqueNewEntries]);
+                    trackAction(`Carregou planilha com ${uniqueNewEntries.length} registros`);
                     toast({
                         title: "Planilha carregada",
                         description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados ignorados.` : ""}`,
@@ -452,6 +453,7 @@ Fico no aguardo!`;
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || item.contato})`);
         startContactTimer(item.id, "Contatado");
     };
 
@@ -459,12 +461,14 @@ Fico no aguardo!`;
         const message = getMessageTemplate(item);
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://t.me/share/url?url=&text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou mensagem via Telegram para ${item.nome} (${item.sa || item.contato})`);
         startContactTimer(item.id, "Contatado");
     };
 
     const copyToClipboard = (item: ReagendaData) => {
         navigator.clipboard.writeText(getMessageTemplate(item)).then(() => {
             toast({ title: "Copiado!" });
+            trackAction(`Copiou mensagem de reagendamento para ${item.nome}`);
             startContactTimer(item.id, "Contatado");
         });
     };
@@ -742,7 +746,7 @@ Fico no aguardo!`;
                         </Button>
                         <h1 className="text-base sm:text-xl md:text-2xl font-bold flex items-center gap-2 truncate">
                             <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
-                            <span className="truncate">Reagendamento</span>
+                            <span className="truncate">Reserva / Antecipação</span>
                         </h1>
                     </div>
                     <div className="flex gap-2">

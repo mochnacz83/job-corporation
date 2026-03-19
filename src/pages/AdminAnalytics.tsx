@@ -282,7 +282,9 @@ const AdminAnalytics = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs truncate max-w-[150px]">{log.page || log.action}</span>
+                            <span className="text-xs font-medium">
+                              {log.action?.startsWith("Acessou ") ? log.action : (log.action || log.page || "Vizualização")}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">

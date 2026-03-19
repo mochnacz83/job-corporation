@@ -95,7 +95,7 @@ const PowerBI = () => {
 
   const hasFetched = useRef(false);
 
-  useAccessTracking("/powerbi");
+  const { trackAction } = useAccessTracking("/powerbi");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -210,6 +210,7 @@ const PowerBI = () => {
 
   const selectLink = (link: PowerBILink) => {
     setSelectedLinkId(link.id);
+    trackAction(`Acessou o BI: ${link.titulo}`);
     // Mount iframe if not yet mounted
     setMountedIframes(prev => {
       const next = new Set(prev);

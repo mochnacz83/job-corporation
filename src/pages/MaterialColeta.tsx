@@ -958,6 +958,7 @@ const MaterialColeta = () => {
       }
 
       toast.success("Salvo com sucesso!");
+      trackAction(isReversa ? `Cadastrou material de reversa (BA: ${ba})` : `Cadastrou material de aplicação (BA: ${ba})`);
 
       if (isReversa) {
         generatePDF({
