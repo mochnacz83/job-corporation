@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3, Loader2, GripVertical } from "lucide-react";
+import { ArrowLeft, BarChart3, Loader2, GripVertical, RotateCcw } from "lucide-react";
 import { 
   DndContext, 
   closestCenter,
@@ -144,16 +144,26 @@ const PowerBI = () => {
         }
         setLinks(dbLinks);
 
-        // Load user preferences from localStorage
-        const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
-        if (savedOrder) {
-          try {
-            setOrderedIds(JSON.parse(savedOrder));
-          } catch {
+        // Load user preferences (DB first, then localStorage)
+        const { data: prefData } = await supabase
+          .from("user_preferences")
+          .select("powerbi_report_order")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (prefData?.powerbi_report_order && prefData.powerbi_report_order.length > 0) {
+          setOrderedIds(prefData.powerbi_report_order);
+        } else {
+          const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
+          if (savedOrder) {
+            try {
+              setOrderedIds(JSON.parse(savedOrder));
+            } catch {
+              setOrderedIds(dbLinks.map(l => l.id));
+            }
+          } else {
             setOrderedIds(dbLinks.map(l => l.id));
           }
-        } else {
-          setOrderedIds(dbLinks.map(l => l.id));
         }
 
         hasFetched.current = true;
@@ -203,11 +213,77 @@ const PowerBI = () => {
       const newOrderIds = arrayMove(orderedIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
 
-      // Persist to localStorage
+      // Persist to DB and localStorage
       if (user) {
         localStorage.setItem(`powerbi_order_${user.id}`, JSON.stringify(newOrderIds));
+        
+        await supabase
+          .from("user_preferences")
+          .upsert({ 
+            user_id: user.id, 
+            powerbi_report_order: newOrderIds 
+          });
       }
     }
+  };
+
+  const handleRefresh = () => {
+    hasFetched.current = false;
+    setMountedIframes(new Set());
+    // Trigger the effect again by toggling a local state or just calling fetchLinks
+    // Since fetchLinks is inside useEffect, we can just call it if it's exposed or use a trigger state
+    // For simplicity, let's just reload the data manually here
+    const fetchLinks = async () => {
+      setLoading(true);
+      try {
+        const { data: reportData, error: reportError } = await supabase
+          .from("powerbi_links")
+          .select("*")
+          .eq("ativo", true)
+          .order("ordem");
+
+        if (reportError) throw reportError;
+        
+        const dbLinks = (reportData || []) as PowerBILink[];
+        
+        if (!dbLinks.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
+           dbLinks.push({ 
+             id: "bi-servicos", 
+             titulo: "Filas de Serviços - Instalação, Reparo e Mudança", 
+             url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9", 
+             descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança" 
+           });
+        }
+
+        if (!dbLinks.some((link) => link.titulo === "DashBoard SEF São Jose")) {
+           dbLinks.push({ 
+             id: "bi-sef-sj", 
+             titulo: "DashBoard SEF São Jose", 
+             url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969", 
+             descricao: "Monitoramento de indicadores SEF São Jose" 
+           });
+        }
+        setLinks(dbLinks);
+
+        const { data: prefData } = await supabase
+          .from("user_preferences")
+          .select("powerbi_report_order")
+          .eq("user_id", user?.id)
+          .maybeSingle();
+
+        if (prefData?.powerbi_report_order && prefData.powerbi_report_order.length > 0) {
+          setOrderedIds(prefData.powerbi_report_order);
+        }
+        
+        hasFetched.current = true;
+      } catch (err) {
+        console.error("Erro ao recarregar relatórios:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (user) fetchLinks();
+    trackAction("Acionou o botão de refresh no Power BI");
   };
 
   const selectLink = (link: PowerBILink) => {
@@ -247,6 +323,18 @@ const PowerBI = () => {
             <h1 className="text-lg font-bold text-foreground">
               {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
             </h1>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="gap-2"
+              disabled={loading}
+            >
+              <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Atualizar</span>
+            </Button>
           </div>
         </div>
       </header>
