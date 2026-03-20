@@ -97,19 +97,34 @@ const AdminPermissions = () => {
                 // Table exists but is empty — seed with defaults
                 setPermissions(DEFAULT_AREAS);
             } else {
-                // Merge DB data with defaults to ensure all 4 areas exist
+                // Use all areas from DB, and ensure DEFAULT_AREAS are also there
                 const dbAreas = permData as unknown as AreaPermission[];
-                const merged = DEFAULT_AREAS.map(def => {
-                    const found = dbAreas.find(a => a.area === def.area);
-                    return found ? {
-                        ...def,
-                        ...found,
-                        modules: found.modules || [],
-                        powerbi_report_ids: found.powerbi_report_ids || [],
-                    } : def;
-                });
-                setPermissions(merged);
+                const dbAreaNames = new Set(dbAreas.map(a => a.area));
+                
+                const missingDefaults = DEFAULT_AREAS.filter(def => !dbAreaNames.has(def.area));
+                const allMappedAreas = [...dbAreas, ...missingDefaults].map(a => ({
+                    ...a,
+                    modules: a.modules || [],
+                    powerbi_report_ids: a.powerbi_report_ids || [],
+                    all_access: a.all_access || false
+                }));
+                
+                setPermissions(allMappedAreas.sort((a, b) => a.area.localeCompare(b.area)));
             }
+
+            // Ensure hardcoded fallbacks are in reports list if not in DB
+            setReports(prev => {
+                const current = [...prev];
+                const titles = new Set(current.map(r => r.titulo));
+                
+                if (!titles.has("Filas de Serviços - Instalação, Reparo e Mudança")) {
+                    current.push({ id: "bi-servicos", titulo: "Filas de Serviços - Instalação, Reparo e Mudança" });
+                }
+                if (!titles.has("DashBoard SEF São Jose")) {
+                    current.push({ id: "bi-sef-sj", titulo: "DashBoard SEF São Jose" });
+                }
+                return current;
+            });
         } catch (err: any) {
             console.error("Unexpected error:", err);
             setPermissions(DEFAULT_AREAS);

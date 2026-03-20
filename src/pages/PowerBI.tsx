@@ -180,7 +180,7 @@ const PowerBI = () => {
   // Filter and Sort links
   const sortedLinks = useMemo(() => {
     const baseLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
-      ? links.filter(link => link.id === "bi-servicos" || areaPermissions.powerbi_report_ids?.includes(link.id))
+      ? links.filter(link => areaPermissions.powerbi_report_ids?.includes(link.id))
       : links;
 
     if (orderedIds.length === 0) return baseLinks;

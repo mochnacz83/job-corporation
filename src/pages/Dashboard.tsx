@@ -39,6 +39,7 @@ const Dashboard = () => {
 
       setLinks(() => {
         const combined = [...dbLinks];
+        // Ensure "Filas de Serviços" fallback
         if (!combined.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
            combined.push({ 
              id: "bi-servicos", 
@@ -47,6 +48,16 @@ const Dashboard = () => {
              descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança",
              icone: ""
            });
+        }
+        // Ensure "SEF São Jose" fallback
+        if (!combined.some((link) => link.titulo === "DashBoard SEF São Jose")) {
+          combined.push({ 
+            id: "bi-sef-sj", 
+            titulo: "DashBoard SEF São Jose", 
+            url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969", 
+            descricao: "Monitoramento de indicadores SEF São Jose",
+            icone: ""
+          });
         }
         return combined;
       });
