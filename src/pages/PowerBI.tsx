@@ -133,6 +133,15 @@ const PowerBI = () => {
              descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança" 
            });
         }
+
+        if (!dbLinks.some((link) => link.titulo === "DashBoard SEF São Jose")) {
+           dbLinks.push({ 
+             id: "bi-sef-sj", 
+             titulo: "DashBoard SEF São Jose", 
+             url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969", 
+             descricao: "Monitoramento de indicadores SEF São Jose" 
+           });
+        }
         setLinks(dbLinks);
 
         // Load user preferences from localStorage
