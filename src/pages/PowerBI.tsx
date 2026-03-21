@@ -207,10 +207,11 @@ const PowerBI = () => {
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
-      const oldIndex = orderedIds.indexOf(active.id as string);
-      const newIndex = orderedIds.indexOf(over.id as string);
+      const currentIds = sortedLinks.map(l => l.id);
+      const oldIndex = currentIds.indexOf(active.id as string);
+      const newIndex = currentIds.indexOf(over.id as string);
       
-      const newOrderIds = arrayMove(orderedIds, oldIndex, newIndex);
+      const newOrderIds = arrayMove(currentIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
 
       // Persist to DB and localStorage
@@ -365,7 +366,7 @@ const PowerBI = () => {
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext 
-                  items={orderedIds}
+                  items={sortedLinks.map(l => l.id)}
                   strategy={rectSortingStrategy}
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
