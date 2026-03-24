@@ -154,7 +154,6 @@ const PowerBI = () => {
           }
         } else {
           setOrderedIds(dbLinks.map(l => l.id));
-          }
         }
 
         hasFetched.current = true;
