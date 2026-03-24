@@ -172,6 +172,7 @@ const MaterialColeta = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const sigDialogAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingDialogAlmox, setIsDrawingDialogAlmox] = useState(false);
+  const [confirmAlmoxSignId, setConfirmAlmoxSignId] = useState<string | null>(null);
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
