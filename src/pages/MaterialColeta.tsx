@@ -93,7 +93,7 @@ const newMaterial = (): MaterialItem => ({
 });
 
 const MaterialColeta = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
