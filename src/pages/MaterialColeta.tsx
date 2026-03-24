@@ -2215,9 +2215,15 @@ const MaterialColeta = () => {
                                     <FileText className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                {!(c.assinatura_colaborador && c.assinatura_almoxarifado) && !c.almox_edit_done ? (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                ) : (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground cursor-not-allowed" disabled title="Documento travado (assinado)">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
