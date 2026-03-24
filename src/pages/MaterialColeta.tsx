@@ -329,6 +329,17 @@ const MaterialColeta = () => {
     return canvas.toDataURL("image/png");
   };
 
+  const isCanvasEmpty = (canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return true;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return true;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 0; i < imageData.length; i += 4) {
+      if (imageData[i + 3] !== 0) return false;
+    }
+    return true;
+  };
+
   const handleCidadeChange = (value: string) => {
     const upper = value.toUpperCase();
     setCidade(upper);
@@ -901,8 +912,8 @@ const MaterialColeta = () => {
         fotoUrl = urlData.publicUrl;
       }
 
-      const colabSig = isReversa ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
-      const almoxSig = isReversa ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
+      const colabSig = isReversa && !isCanvasEmpty(sigColabCanvasRef.current) ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
+      const almoxSig = isReversa && !isCanvasEmpty(sigAlmoxCanvasRef.current) ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
 
       const { data: coleta, error: coletaError } = await supabase
         .from("material_coletas")
@@ -1206,8 +1217,7 @@ const MaterialColeta = () => {
   };
 
   const handleRequestAlmoxSignature = (coletaId: string) => {
-    const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
-    if (!signature || signature === "data:,") {
+    if (isCanvasEmpty(sigDialogAlmoxCanvasRef.current)) {
       toast.error("Assinatura obrigatória");
       return;
     }
