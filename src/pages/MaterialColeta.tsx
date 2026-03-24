@@ -2526,7 +2526,54 @@ const MaterialColeta = () => {
         </DialogContent>
       </Dialog >
 
-      {/* Confirmation dialog for almox signature */}
+      {/* Edit Coleta Dialog */}
+      <Dialog open={!!editingColeta} onOpenChange={() => setEditingColeta(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Informações Complementares</DialogTitle>
+            <DialogDescription>Edite apenas as informações complementares do registro. Assinaturas não podem ser alteradas.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">BA</Label>
+                <Input value={editColetaForm.ba} onChange={e => setEditColetaForm(prev => ({ ...prev, ba: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Circuito</Label>
+                <Input value={editColetaForm.circuito} onChange={e => setEditColetaForm(prev => ({ ...prev, circuito: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cidade</Label>
+                <Input value={editColetaForm.cidade} onChange={e => setEditColetaForm(prev => ({ ...prev, cidade: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Sigla</Label>
+                <Input value={editColetaForm.sigla_cidade} maxLength={4} onChange={e => setEditColetaForm(prev => ({ ...prev, sigla_cidade: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">UF</Label>
+                <Select value={editColetaForm.uf} onValueChange={v => setEditColetaForm(prev => ({ ...prev, uf: v }))}>
+                  <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                  <SelectContent>
+                    {UF_LIST.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data Execução</Label>
+                <Input type="date" value={editColetaForm.data_execucao} onChange={e => setEditColetaForm(prev => ({ ...prev, data_execucao: e.target.value }))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingColeta(null)}>Cancelar</Button>
+              <Button onClick={handleSaveEditColeta}>Salvar Alterações</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       <AlertDialog open={!!confirmAlmoxSignId} onOpenChange={() => setConfirmAlmoxSignId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
