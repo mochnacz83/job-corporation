@@ -93,7 +93,7 @@ const newMaterial = (): MaterialItem => ({
 });
 
 const MaterialColeta = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -173,6 +173,8 @@ const MaterialColeta = () => {
   const sigDialogAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingDialogAlmox, setIsDrawingDialogAlmox] = useState(false);
   const [confirmAlmoxSignId, setConfirmAlmoxSignId] = useState<string | null>(null);
+  const [editingColeta, setEditingColeta] = useState<ColetaRecord | null>(null);
+  const [editColetaForm, setEditColetaForm] = useState<{ ba: string; circuito: string; cidade: string; sigla_cidade: string; uf: string; data_execucao: string }>({ ba: "", circuito: "", cidade: "", sigla_cidade: "", uf: "", data_execucao: "" });
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
@@ -1243,6 +1245,53 @@ const MaterialColeta = () => {
     }
   };
 
+  const handleOpenEditColeta = (c: ColetaRecord) => {
+    setEditingColeta(c);
+    setEditColetaForm({
+      ba: c.ba || "",
+      circuito: c.circuito || "",
+      cidade: c.cidade || "",
+      sigla_cidade: c.sigla_cidade || "",
+      uf: c.uf || "",
+      data_execucao: c.data_execucao || "",
+    });
+  };
+
+  const handleSaveEditColeta = async () => {
+    if (!editingColeta) return;
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          ba: editColetaForm.ba.toUpperCase() || null,
+          circuito: editColetaForm.circuito.toUpperCase() || null,
+          cidade: editColetaForm.cidade.toUpperCase() || null,
+          sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
+          uf: editColetaForm.uf.toUpperCase() || null,
+          data_execucao: editColetaForm.data_execucao || null,
+        } as any)
+        .eq("id", editingColeta.id);
+
+      if (error) throw error;
+
+      const updated = {
+        ...editingColeta,
+        ba: editColetaForm.ba.toUpperCase() || null,
+        circuito: editColetaForm.circuito.toUpperCase() || null,
+        cidade: editColetaForm.cidade.toUpperCase() || null,
+        sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
+        uf: editColetaForm.uf.toUpperCase() || null,
+        data_execucao: editColetaForm.data_execucao || null,
+      };
+      setAllColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
+      setColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
+      toast.success("Registro atualizado com sucesso!");
+      setEditingColeta(null);
+    } catch (err: any) {
+      toast.error("Erro ao atualizar: " + err.message);
+    }
+  };
+
    // Export Excel
   const handleExport = (format: "xlsx" | "csv") => {
     // Gestech Sync Trigger: 2026-03-11 17:25
@@ -2210,17 +2259,16 @@ const MaterialColeta = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
                                   <Eye className="w-3.5 h-3.5" />
                                 </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleOpenEditColeta(c)} title="Editar informações complementares">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
                                 {c.pdf_url && (
                                   <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
                                     <FileText className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
-                                {!(c.assinatura_colaborador && c.assinatura_almoxarifado) && !c.almox_edit_done ? (
+                                {isAdmin && (
                                   <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                ) : (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground cursor-not-allowed" disabled title="Documento travado (assinado)">
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
@@ -2478,7 +2526,54 @@ const MaterialColeta = () => {
         </DialogContent>
       </Dialog >
 
-      {/* Confirmation dialog for almox signature */}
+      {/* Edit Coleta Dialog */}
+      <Dialog open={!!editingColeta} onOpenChange={() => setEditingColeta(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Informações Complementares</DialogTitle>
+            <DialogDescription>Edite apenas as informações complementares do registro. Assinaturas não podem ser alteradas.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">BA</Label>
+                <Input value={editColetaForm.ba} onChange={e => setEditColetaForm(prev => ({ ...prev, ba: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Circuito</Label>
+                <Input value={editColetaForm.circuito} onChange={e => setEditColetaForm(prev => ({ ...prev, circuito: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cidade</Label>
+                <Input value={editColetaForm.cidade} onChange={e => setEditColetaForm(prev => ({ ...prev, cidade: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Sigla</Label>
+                <Input value={editColetaForm.sigla_cidade} maxLength={4} onChange={e => setEditColetaForm(prev => ({ ...prev, sigla_cidade: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">UF</Label>
+                <Select value={editColetaForm.uf} onValueChange={v => setEditColetaForm(prev => ({ ...prev, uf: v }))}>
+                  <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
+                  <SelectContent>
+                    {UF_LIST.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data Execução</Label>
+                <Input type="date" value={editColetaForm.data_execucao} onChange={e => setEditColetaForm(prev => ({ ...prev, data_execucao: e.target.value }))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingColeta(null)}>Cancelar</Button>
+              <Button onClick={handleSaveEditColeta}>Salvar Alterações</Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
       <AlertDialog open={!!confirmAlmoxSignId} onOpenChange={() => setConfirmAlmoxSignId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
