@@ -66,6 +66,10 @@ interface ColetaRecord {
   assinatura_almoxarifado: string | null;
   almox_edit_done: boolean;
   user_id: string;
+  local_retirada: string | null;
+  classificacao_cenario: string | null;
+  circuito_compartilhado: string | null;
+  opcoes_adicionais: string | null;
   last_exported_at: string | null;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
@@ -784,16 +788,16 @@ const MaterialColeta = () => {
 
     // Almoxarifado (Right)
     const sigRightX = pageW - sigMargin - sigW;
+    doc.setFontSize(8);
+    doc.text("Assinatura Almoxarifado/Logística:", sigRightX, y);
     if (coletaData.assinaturaAlmoxarifado) {
-      doc.setFontSize(8);
-      doc.text("Assinatura Almoxarifado/Logística:", sigRightX, y);
       try {
         doc.addImage(coletaData.assinaturaAlmoxarifado, "PNG", sigRightX, y + 1, sigW, sigH);
       } catch { }
-      doc.line(sigRightX, y + sigH + 2, sigRightX + sigW, y + sigH + 2);
-      doc.setFontSize(7);
-      doc.text("Responsável Recebimento", sigRightX, y + sigH + 5);
     }
+    doc.line(sigRightX, y + sigH + 2, sigRightX + sigW, y + sigH + 2);
+    doc.setFontSize(7);
+    doc.text("Responsável Recebimento", sigRightX, y + sigH + 5);
 
     // Footer
     doc.setFontSize(6);
@@ -1040,7 +1044,7 @@ const MaterialColeta = () => {
     try {
       const { data, error } = await (supabase
         .from("material_coletas")
-        .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+        .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
         .order("created_at", { ascending: false })
         .limit(500) as any);
       if (error) throw error;
@@ -1680,6 +1684,7 @@ const MaterialColeta = () => {
                       <SelectContent>
                         <SelectItem value="ESTACAO E CLIENTE">ESTAÇÃO E CLIENTE</SelectItem>
                         <SelectItem value="SO CLIENTE">SÓ CLIENTE</SelectItem>
+                        <SelectItem value="SO ESTACAO">SÓ ESTAÇÃO</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
