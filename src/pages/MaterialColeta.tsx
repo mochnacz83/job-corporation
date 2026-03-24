@@ -2478,7 +2478,23 @@ const MaterialColeta = () => {
         </DialogContent>
       </Dialog >
 
-      {/* Scanner Dialog */}
+      {/* Confirmation dialog for almox signature */}
+      <AlertDialog open={!!confirmAlmoxSignId} onOpenChange={() => setConfirmAlmoxSignId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Assinatura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Após salvar a assinatura do Almoxarifado, o documento será <strong>travado permanentemente</strong> e não poderá mais ser editado ou excluído. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAlmoxSignature}>Confirmar e Travar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
