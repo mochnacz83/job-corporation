@@ -205,16 +205,9 @@ const PowerBI = () => {
       const newOrderIds = arrayMove(currentIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
 
-      // Persist to DB and localStorage
+      // Persist to localStorage
       if (user) {
         localStorage.setItem(`powerbi_order_${user.id}`, JSON.stringify(newOrderIds));
-        
-        await supabase
-          .from("user_preferences")
-          .upsert({ 
-            user_id: user.id, 
-            powerbi_report_order: newOrderIds 
-          });
       }
     }
   };
