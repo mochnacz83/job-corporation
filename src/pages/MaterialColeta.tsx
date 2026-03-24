@@ -93,7 +93,7 @@ const newMaterial = (): MaterialItem => ({
 });
 
 const MaterialColeta = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -2278,14 +2278,13 @@ const MaterialColeta = () => {
                                      <FileText className="w-3.5 h-3.5" />
                                    </Button>
                                  )}
-                                 {isAdmin && (
+                                 {(isAdmin || profile?.area === "Gerencia") && (
                                    <Button 
                                      size="icon" 
                                      variant="ghost" 
                                      className="h-7 w-7 text-destructive" 
                                      onClick={() => setDeleteId(c.id)} 
-                                     disabled={!!c.assinatura_colaborador && !!c.assinatura_almoxarifado}
-                                     title={!!c.assinatura_colaborador && !!c.assinatura_almoxarifado ? "Documento assinado não pode ser excluído" : "Excluir"}
+                                     title="Excluir"
                                    >
                                      <Trash2 className="w-3.5 h-3.5" />
                                    </Button>
