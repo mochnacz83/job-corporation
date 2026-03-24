@@ -2259,17 +2259,16 @@ const MaterialColeta = () => {
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setViewColeta(c)} title="Visualizar">
                                   <Eye className="w-3.5 h-3.5" />
                                 </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleOpenEditColeta(c)} title="Editar informações complementares">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
                                 {c.pdf_url && (
                                   <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
                                     <FileText className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
-                                {!(c.assinatura_colaborador && c.assinatura_almoxarifado) && !c.almox_edit_done ? (
+                                {isAdmin && (
                                   <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                ) : (
-                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground cursor-not-allowed" disabled title="Documento travado (assinado)">
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
