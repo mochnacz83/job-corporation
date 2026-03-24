@@ -65,6 +65,7 @@ interface ColetaRecord {
   assinatura_colaborador: string | null;
   assinatura_almoxarifado: string | null;
   almox_edit_done: boolean;
+  user_id: string;
   last_exported_at: string | null;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
@@ -175,6 +176,9 @@ const MaterialColeta = () => {
   const [confirmAlmoxSignId, setConfirmAlmoxSignId] = useState<string | null>(null);
   const [editingColeta, setEditingColeta] = useState<ColetaRecord | null>(null);
   const [editColetaForm, setEditColetaForm] = useState<{ ba: string; circuito: string; cidade: string; sigla_cidade: string; uf: string; data_execucao: string }>({ ba: "", circuito: "", cidade: "", sigla_cidade: "", uf: "", data_execucao: "" });
+  const [editFotoFile, setEditFotoFile] = useState<File | null>(null);
+  const [editFotoPreview, setEditFotoPreview] = useState<string | null>(null);
+  const editGalleryInputRef = useRef<HTMLInputElement>(null);
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
@@ -1025,7 +1029,7 @@ const MaterialColeta = () => {
     try {
       const { data, error } = await (supabase
         .from("material_coletas")
-        .select("id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+        .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
         .order("created_at", { ascending: false })
         .limit(500) as any);
       if (error) throw error;
@@ -1246,8 +1250,9 @@ const MaterialColeta = () => {
   };
 
   const handleOpenEditColeta = (c: ColetaRecord) => {
-    if (c.assinatura_colaborador && c.assinatura_almoxarifado) {
-      toast.error("Documento com ambas assinaturas está travado para edição.");
+    const canEdit = isAdmin || profile?.area === "Gerencia" || c.user_id === user?.id;
+    if (!canEdit) {
+      toast.error("Você não tem permissão para editar este registro.");
       return;
     }
     setEditingColeta(c);
@@ -1259,11 +1264,24 @@ const MaterialColeta = () => {
       uf: c.uf || "",
       data_execucao: c.data_execucao || "",
     });
+    setEditFotoPreview(c.foto_url);
+    setEditFotoFile(null);
   };
 
   const handleSaveEditColeta = async () => {
     if (!editingColeta) return;
     try {
+      let finalFotoUrl = editingColeta.foto_url;
+
+      if (editFotoFile) {
+        const ext = editFotoFile.name.split(".").pop();
+        const path = `${user?.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from("material-fotos").upload(path, editFotoFile);
+        if (uploadErr) throw uploadErr;
+        const { data: urlData } = supabase.storage.from("material-fotos").getPublicUrl(path);
+        finalFotoUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase
         .from("material_coletas")
         .update({
@@ -1273,6 +1291,7 @@ const MaterialColeta = () => {
           sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
           uf: editColetaForm.uf.toUpperCase() || null,
           data_execucao: editColetaForm.data_execucao || null,
+          foto_url: finalFotoUrl
         } as any)
         .eq("id", editingColeta.id);
 
@@ -1286,6 +1305,7 @@ const MaterialColeta = () => {
         sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
         uf: editColetaForm.uf.toUpperCase() || null,
         data_execucao: editColetaForm.data_execucao || null,
+        foto_url: finalFotoUrl
       };
       setAllColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
       setColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
@@ -2268,8 +2288,8 @@ const MaterialColeta = () => {
                                    variant="ghost" 
                                    className="h-7 w-7" 
                                    onClick={() => handleOpenEditColeta(c)} 
-                                   disabled={!!c.assinatura_colaborador && !!c.assinatura_almoxarifado}
-                                   title={!!c.assinatura_colaborador && !!c.assinatura_almoxarifado ? "Documento assinado não pode ser editado" : "Editar informações complementares"}
+                                   disabled={!(isAdmin || profile?.area === "Gerencia" || c.user_id === user?.id)}
+                                   title={!(isAdmin || profile?.area === "Gerencia" || c.user_id === user?.id) ? "Sem permissão para editar" : "Editar informações complementares"}
                                  >
                                    <Pencil className="w-3.5 h-3.5" />
                                  </Button>
@@ -2582,6 +2602,44 @@ const MaterialColeta = () => {
                 <Input type="date" value={editColetaForm.data_execucao} onChange={e => setEditColetaForm(prev => ({ ...prev, data_execucao: e.target.value }))} />
               </div>
             </div>
+            
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-xs font-semibold flex items-center gap-1">
+                <ImageIcon className="w-3.5 h-3.5" /> Alterar Foto do Material
+              </Label>
+              <div className="flex flex-col gap-2">
+                <Button size="sm" variant="outline" className="w-full" onClick={() => editGalleryInputRef.current?.click()}>
+                   Selecionar Nova Foto
+                </Button>
+                <input 
+                  ref={editGalleryInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setEditFotoFile(file);
+                      setEditFotoPreview(URL.createObjectURL(file));
+                    }
+                  }} 
+                />
+                {editFotoPreview && (
+                  <div className="relative mt-1 inline-block">
+                    <img src={editFotoPreview} alt="Preview" className="max-h-32 rounded border mx-auto" />
+                    <Button 
+                      variant="destructive" 
+                      size="icon" 
+                      className="absolute -top-2 -right-2 h-5 w-5 rounded-full"
+                      onClick={() => { setEditFotoPreview(null); setEditFotoFile(null); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingColeta(null)}>Cancelar</Button>
               <Button onClick={handleSaveEditColeta}>Salvar Alterações</Button>
