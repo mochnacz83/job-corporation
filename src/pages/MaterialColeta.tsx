@@ -1199,7 +1199,20 @@ const MaterialColeta = () => {
     }
   };
 
-  const handleSaveAlmoxSignature = async (coletaId: string) => {
+  const handleRequestAlmoxSignature = (coletaId: string) => {
+    const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
+    if (!signature || signature === "data:,") {
+      toast.error("Assinatura obrigatória");
+      return;
+    }
+    setConfirmAlmoxSignId(coletaId);
+  };
+
+  const handleConfirmAlmoxSignature = async () => {
+    if (!confirmAlmoxSignId) return;
+    const coletaId = confirmAlmoxSignId;
+    setConfirmAlmoxSignId(null);
+
     const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
     if (!signature || signature === "data:,") {
       toast.error("Assinatura obrigatória");
@@ -1217,7 +1230,7 @@ const MaterialColeta = () => {
 
       if (error) throw error;
 
-      toast.success("Assinatura salva com sucesso!");
+      toast.success("Assinatura salva com sucesso! Documento travado para edição.");
       
       // Update local state
       setAllColetas(prev => prev.map(c => c.id === coletaId ? { ...c, assinatura_almoxarifado: signature, almox_edit_done: true } : c));
