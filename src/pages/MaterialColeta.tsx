@@ -173,6 +173,8 @@ const MaterialColeta = () => {
   const sigDialogAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingDialogAlmox, setIsDrawingDialogAlmox] = useState(false);
   const [confirmAlmoxSignId, setConfirmAlmoxSignId] = useState<string | null>(null);
+  const [editingColeta, setEditingColeta] = useState<ColetaRecord | null>(null);
+  const [editColetaForm, setEditColetaForm] = useState<{ ba: string; circuito: string; cidade: string; sigla_cidade: string; uf: string; data_execucao: string }>({ ba: "", circuito: "", cidade: "", sigla_cidade: "", uf: "", data_execucao: "" });
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
