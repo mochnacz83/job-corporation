@@ -1245,6 +1245,53 @@ const MaterialColeta = () => {
     }
   };
 
+  const handleOpenEditColeta = (c: ColetaRecord) => {
+    setEditingColeta(c);
+    setEditColetaForm({
+      ba: c.ba || "",
+      circuito: c.circuito || "",
+      cidade: c.cidade || "",
+      sigla_cidade: c.sigla_cidade || "",
+      uf: c.uf || "",
+      data_execucao: c.data_execucao || "",
+    });
+  };
+
+  const handleSaveEditColeta = async () => {
+    if (!editingColeta) return;
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          ba: editColetaForm.ba.toUpperCase() || null,
+          circuito: editColetaForm.circuito.toUpperCase() || null,
+          cidade: editColetaForm.cidade.toUpperCase() || null,
+          sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
+          uf: editColetaForm.uf.toUpperCase() || null,
+          data_execucao: editColetaForm.data_execucao || null,
+        } as any)
+        .eq("id", editingColeta.id);
+
+      if (error) throw error;
+
+      const updated = {
+        ...editingColeta,
+        ba: editColetaForm.ba.toUpperCase() || null,
+        circuito: editColetaForm.circuito.toUpperCase() || null,
+        cidade: editColetaForm.cidade.toUpperCase() || null,
+        sigla_cidade: editColetaForm.sigla_cidade.toUpperCase() || null,
+        uf: editColetaForm.uf.toUpperCase() || null,
+        data_execucao: editColetaForm.data_execucao || null,
+      };
+      setAllColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
+      setColetas(prev => prev.map(c => c.id === editingColeta.id ? { ...c, ...updated } : c));
+      toast.success("Registro atualizado com sucesso!");
+      setEditingColeta(null);
+    } catch (err: any) {
+      toast.error("Erro ao atualizar: " + err.message);
+    }
+  };
+
    // Export Excel
   const handleExport = (format: "xlsx" | "csv") => {
     // Gestech Sync Trigger: 2026-03-11 17:25
