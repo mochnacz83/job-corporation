@@ -2262,7 +2262,7 @@ const MaterialColeta = () => {
                               ))}
                             </TableCell>
                             <TableCell className="text-center">
-                              {c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA" ? (
+                              {c.tipo_aplicacao === "REVERSA" ? (
                                 <Truck className="w-5 h-5 text-primary mx-auto" />
                               ) : c.last_exported_at ? (
                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
@@ -2488,7 +2488,7 @@ const MaterialColeta = () => {
               {((viewColeta.tipo_aplicacao === "REVERSA" || viewColeta.atividade === "RETIRADA") && !viewColeta.assinatura_almoxarifado) && (
                 <div className="space-y-2 border-t pt-3">
                   <Label className="text-sm font-semibold text-primary">Assinatura de Recebimento (Almoxarifado)</Label>
-                  <p className="text-xs text-muted-foreground">O Almoxarifado pode assinar o recebimento apenas uma vez.</p>
+                  <p className="text-xs text-muted-foreground">O Almoxarifado pode assinar o recebimento apenas uma vez. Após assinado e gravado, não será mais possível editar esta assinatura.</p>
                   <div className="border rounded-md bg-white" style={{ touchAction: "none" }}>
                     <canvas
                       ref={sigDialogAlmoxCanvasRef}
