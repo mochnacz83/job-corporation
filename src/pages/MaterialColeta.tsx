@@ -2414,7 +2414,7 @@ const MaterialColeta = () => {
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => clearCanvas(sigDialogAlmoxCanvasRef.current)}>Limpar</Button>
-                    <Button size="sm" onClick={() => handleSaveAlmoxSignature(viewColeta.id)}>Salvar Assinatura Recebimento</Button>
+                    <Button size="sm" onClick={() => handleRequestAlmoxSignature(viewColeta.id)}>Salvar Assinatura Recebimento</Button>
                   </div>
                 </div>
               )}
