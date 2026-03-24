@@ -250,14 +250,11 @@ const PowerBI = () => {
         }
         setLinks(dbLinks);
 
-        const { data: prefData } = await supabase
-          .from("user_preferences")
-          .select("powerbi_report_order")
-          .eq("user_id", user?.id)
-          .maybeSingle();
-
-        if (prefData?.powerbi_report_order && prefData.powerbi_report_order.length > 0) {
-          setOrderedIds(prefData.powerbi_report_order);
+        const savedOrder = localStorage.getItem(`powerbi_order_${user?.id}`);
+        if (savedOrder) {
+          try {
+            setOrderedIds(JSON.parse(savedOrder));
+          } catch { /* ignore */ }
         }
         
         hasFetched.current = true;
