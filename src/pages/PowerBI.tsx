@@ -144,26 +144,16 @@ const PowerBI = () => {
         }
         setLinks(dbLinks);
 
-        // Load user preferences (DB first, then localStorage)
-        const { data: prefData } = await supabase
-          .from("user_preferences")
-          .select("powerbi_report_order")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (prefData?.powerbi_report_order && prefData.powerbi_report_order.length > 0) {
-          setOrderedIds(prefData.powerbi_report_order);
-        } else {
-          const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
-          if (savedOrder) {
-            try {
-              setOrderedIds(JSON.parse(savedOrder));
-            } catch {
-              setOrderedIds(dbLinks.map(l => l.id));
-            }
-          } else {
+        // Load user preferences from localStorage
+        const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
+        if (savedOrder) {
+          try {
+            setOrderedIds(JSON.parse(savedOrder));
+          } catch {
             setOrderedIds(dbLinks.map(l => l.id));
           }
+        } else {
+          setOrderedIds(dbLinks.map(l => l.id));
         }
 
         hasFetched.current = true;
@@ -214,16 +204,9 @@ const PowerBI = () => {
       const newOrderIds = arrayMove(currentIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
 
-      // Persist to DB and localStorage
+      // Persist to localStorage
       if (user) {
         localStorage.setItem(`powerbi_order_${user.id}`, JSON.stringify(newOrderIds));
-        
-        await supabase
-          .from("user_preferences")
-          .upsert({ 
-            user_id: user.id, 
-            powerbi_report_order: newOrderIds 
-          });
       }
     }
   };
@@ -266,14 +249,11 @@ const PowerBI = () => {
         }
         setLinks(dbLinks);
 
-        const { data: prefData } = await supabase
-          .from("user_preferences")
-          .select("powerbi_report_order")
-          .eq("user_id", user?.id)
-          .maybeSingle();
-
-        if (prefData?.powerbi_report_order && prefData.powerbi_report_order.length > 0) {
-          setOrderedIds(prefData.powerbi_report_order);
+        const savedOrder = localStorage.getItem(`powerbi_order_${user?.id}`);
+        if (savedOrder) {
+          try {
+            setOrderedIds(JSON.parse(savedOrder));
+          } catch { /* ignore */ }
         }
         
         hasFetched.current = true;

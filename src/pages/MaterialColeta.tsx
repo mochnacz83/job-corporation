@@ -172,6 +172,7 @@ const MaterialColeta = () => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const sigDialogAlmoxCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingDialogAlmox, setIsDrawingDialogAlmox] = useState(false);
+  const [confirmAlmoxSignId, setConfirmAlmoxSignId] = useState<string | null>(null);
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
@@ -1198,7 +1199,20 @@ const MaterialColeta = () => {
     }
   };
 
-  const handleSaveAlmoxSignature = async (coletaId: string) => {
+  const handleRequestAlmoxSignature = (coletaId: string) => {
+    const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
+    if (!signature || signature === "data:,") {
+      toast.error("Assinatura obrigatória");
+      return;
+    }
+    setConfirmAlmoxSignId(coletaId);
+  };
+
+  const handleConfirmAlmoxSignature = async () => {
+    if (!confirmAlmoxSignId) return;
+    const coletaId = confirmAlmoxSignId;
+    setConfirmAlmoxSignId(null);
+
     const signature = getCanvasDataUrl(sigDialogAlmoxCanvasRef.current);
     if (!signature || signature === "data:,") {
       toast.error("Assinatura obrigatória");
@@ -1216,7 +1230,7 @@ const MaterialColeta = () => {
 
       if (error) throw error;
 
-      toast.success("Assinatura salva com sucesso!");
+      toast.success("Assinatura salva com sucesso! Documento travado para edição.");
       
       // Update local state
       setAllColetas(prev => prev.map(c => c.id === coletaId ? { ...c, assinatura_almoxarifado: signature, almox_edit_done: true } : c));
@@ -2201,9 +2215,15 @@ const MaterialColeta = () => {
                                     <FileText className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                {!(c.assinatura_colaborador && c.assinatura_almoxarifado) && !c.almox_edit_done ? (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setDeleteId(c.id)} title="Excluir">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                ) : (
+                                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground cursor-not-allowed" disabled title="Documento travado (assinado)">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2400,7 +2420,7 @@ const MaterialColeta = () => {
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => clearCanvas(sigDialogAlmoxCanvasRef.current)}>Limpar</Button>
-                    <Button size="sm" onClick={() => handleSaveAlmoxSignature(viewColeta.id)}>Salvar Assinatura Recebimento</Button>
+                    <Button size="sm" onClick={() => handleRequestAlmoxSignature(viewColeta.id)}>Salvar Assinatura Recebimento</Button>
                   </div>
                 </div>
               )}
@@ -2458,7 +2478,23 @@ const MaterialColeta = () => {
         </DialogContent>
       </Dialog >
 
-      {/* Scanner Dialog */}
+      {/* Confirmation dialog for almox signature */}
+      <AlertDialog open={!!confirmAlmoxSignId} onOpenChange={() => setConfirmAlmoxSignId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Assinatura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Após salvar a assinatura do Almoxarifado, o documento será <strong>travado permanentemente</strong> e não poderá mais ser editado ou excluído. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmAlmoxSignature}>Confirmar e Travar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <Dialog open={scannerOpen} onOpenChange={(open) => { if (!open) closeScanner(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
