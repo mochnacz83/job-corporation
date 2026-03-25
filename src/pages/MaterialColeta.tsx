@@ -835,7 +835,7 @@ const MaterialColeta = () => {
     const downloadUrl = URL.createObjectURL(pdfBlob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = `Material_${formData.nomeTecnico.replace(/\s+/g, "_")}_${formData.dataExecucao}.pdf`;
+    link.download = `Material_${coletaData.nomeTecnico.replace(/\s+/g, "_")}_${coletaData.dataExecucao}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
