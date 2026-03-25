@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
-import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays, ClipboardList } from "lucide-react";
+import { BarChart3, LogOut, User, Shield, Activity, KeyRound, CalendarDays, ClipboardList, ClipboardCheck } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -163,6 +163,23 @@ return (
             <CardContent>
               <p className="text-muted-foreground text-sm">
                 Registre materiais aplicados, consulte por BA/Circuito e exporte dados.
+              </p>
+            </CardContent>
+          </Card>
+        }
+
+        {/* Vistoria de Campo Section */}
+        {(isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("vistoria_campo")) &&
+          <Card className="glass-card hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => navigate("/vistoria-campo")}>
+            <CardHeader className="pb-3">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
+                <ClipboardCheck className="w-6 h-6 text-primary" />
+              </div>
+              <CardTitle className="text-lg">Vistoria de Campo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-sm">
+                Realize acompanhamentos técnicos, verifique indicadores e garanta a qualidade.
               </p>
             </CardContent>
           </Card>

@@ -14,6 +14,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import MaterialColeta from "./pages/MaterialColeta";
+import VistoriaCampo from "./pages/VistoriaCampo";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState, ReactNode } from "react";
 
@@ -54,6 +55,7 @@ const persistentPages = [
   { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
   { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
+  { path: "/vistoria-campo", element: <ProtectedRoute><VistoriaCampo /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
