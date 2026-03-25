@@ -516,7 +516,7 @@ const VistoriaCampo = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="re" className="font-semibold text-foreground">RE (Matrícula) *</Label>
                     <Input
@@ -527,23 +527,32 @@ const VistoriaCampo = () => {
                       className="bg-background border-primary/20 focus:border-primary uppercase h-10"
                     />
                   </div>
-                  <div className="md:col-span-3">
-                    {indicadores ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-primary/5 p-4 rounded-lg border border-primary/20 animate-in fade-in slide-in-from-top-2">
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Nome Técnico</p>
-                          <p className="text-sm font-semibold">{indicadores.nome}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Supervisor Atual</p>
-                          <p className="text-sm font-semibold">{indicadores.supervisor}</p>
-                        </div>
-                      </div>
-                    ) : re.length > 0 && (
-                      <div className="p-4 rounded-lg border border-dashed border-muted-foreground/30 flex items-center justify-center h-[58px]">
-                        <p className="text-sm text-muted-foreground italic">Buscando informações...</p>
-                      </div>
-                    )}
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-foreground">TT</Label>
+                    <Input
+                      value={indicadores?.tt || ""}
+                      readOnly
+                      placeholder="Preenchido pela RE"
+                      className="bg-muted/30 h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-foreground">Nome Técnico</Label>
+                    <Input
+                      value={indicadores?.nome || ""}
+                      readOnly
+                      placeholder="Preenchido pela RE"
+                      className="bg-muted/30 h-10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-semibold text-foreground">Supervisor</Label>
+                    <Input
+                      value={indicadores?.supervisor || ""}
+                      readOnly
+                      placeholder="Preenchido pela RE"
+                      className="bg-muted/30 h-10"
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -583,9 +592,9 @@ const VistoriaCampo = () => {
             )}
 
             {/* Section: Quality Phrase */}
-            <Card className="bg-primary/10 border-primary/20 border-l-4">
-              <CardContent className="py-4">
-                <p className="text-sm text-primary-foreground font-medium italic leading-relaxed text-center">
+            <Card className="bg-primary/10 border-primary/30 border-l-4 border-l-primary">
+              <CardContent className="py-5">
+                <p className="text-base text-foreground font-semibold italic leading-relaxed text-center">
                   "{FRASE_COMPROMISSO}"
                 </p>
               </CardContent>
