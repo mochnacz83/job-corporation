@@ -685,7 +685,7 @@ const MaterialColeta = () => {
       ["Circuito:", coletaData.circuito || "-"],
     ];
 
-    if (coletaData.atividade === "RETIRADA") {
+    if (coletaData.atividade === "RETIRADA" || coletaData.tipo_aplicacao === "REVERSA") {
       infoLeft.push(["Local Retirada:", coletaData.local_retirada || "-"]);
       infoRight.push(["Cenário:", coletaData.classificacao_cenario || "-"]);
       if (coletaData.circuito_compartilhado) {
@@ -2568,6 +2568,9 @@ const MaterialColeta = () => {
                 )}
                 <Button size="sm" variant="outline" onClick={() => {
                   // Regenerate PDF from coleta data
+                  const tecnicoData = tecnicos.find(t => t.tt === viewColeta.matricula_tt);
+                  const tel = tecnicoData?.telefone || "";
+
                   const items: MaterialItem[] = viewColeta.material_coleta_items.map((item, i) => ({
                     id: String(i),
                     codigo_material: item.codigo_material,
@@ -2578,10 +2581,11 @@ const MaterialColeta = () => {
                     seriais: [],
                     askSeriais: false,
                   }));
+
                   generatePDF({
                     matriculaTt: viewColeta.matricula_tt || "",
                     nomeTecnico: viewColeta.nome_tecnico,
-                    telefoneTecnico: "",
+                    telefoneTecnico: tel,
                     cidade: viewColeta.cidade || "",
                     siglaCidade: viewColeta.sigla_cidade || "",
                     uf: viewColeta.uf || "",
@@ -2594,6 +2598,10 @@ const MaterialColeta = () => {
                     assinaturaAlmoxarifado: viewColeta.assinatura_almoxarifado || "",
                     fotoDataUrl: viewColeta.foto_url || null,
                     tipo_aplicacao: viewColeta.tipo_aplicacao,
+                    local_retirada: viewColeta.local_retirada || "",
+                    classificacao_cenario: viewColeta.classificacao_cenario || "",
+                    circuito_compartilhado: viewColeta.circuito_compartilhado || "",
+                    opcoes_adicionais: viewColeta.opcoes_adicionais || "",
                   });
                 }}>
                   <Download className="w-4 h-4 mr-1" /> Gerar PDF
