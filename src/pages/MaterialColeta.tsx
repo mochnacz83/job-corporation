@@ -830,9 +830,16 @@ const MaterialColeta = () => {
     doc.setTextColor(150, 150, 150);
     doc.text("Ability Tecnologia — Documento gerado automaticamente", pageW / 2, 290, { align: "center" });
 
-    // Open PDF
-    const pdfOutput = doc.output("bloburl");
-    window.open(pdfOutput, "_blank");
+    // Download PDF instead of opening in new tab (avoids ad-blocker blocking)
+    const pdfBlob = doc.output("blob");
+    const downloadUrl = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `Material_${coletaData.nomeTecnico.replace(/\s+/g, "_")}_${coletaData.dataExecucao}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
 
     // Log PDF generation action
     trackAction("gerar_pdf");
