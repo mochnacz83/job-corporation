@@ -592,9 +592,9 @@ const VistoriaCampo = () => {
             )}
 
             {/* Section: Quality Phrase */}
-            <Card className="bg-primary/10 border-primary/20 border-l-4">
-              <CardContent className="py-4">
-                <p className="text-sm text-primary-foreground font-medium italic leading-relaxed text-center">
+            <Card className="bg-primary/10 border-primary/30 border-l-4 border-l-primary">
+              <CardContent className="py-5">
+                <p className="text-base text-foreground font-semibold italic leading-relaxed text-center">
                   "{FRASE_COMPROMISSO}"
                 </p>
               </CardContent>
