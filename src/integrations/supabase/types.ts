@@ -646,6 +646,57 @@ export type Database = {
         }
         Relationships: []
       }
+      tecnicos_indicadores: {
+        Row: {
+          created_at: string
+          dias_trabalhados: string | null
+          eficacia: string | null
+          id: string
+          infancia: string | null
+          lote_importacao: string | null
+          nome: string
+          produtividade: string | null
+          re: string
+          repetida: string | null
+          supervisor: string | null
+          tt: string | null
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          dias_trabalhados?: string | null
+          eficacia?: string | null
+          id?: string
+          infancia?: string | null
+          lote_importacao?: string | null
+          nome?: string
+          produtividade?: string | null
+          re: string
+          repetida?: string | null
+          supervisor?: string | null
+          tt?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          dias_trabalhados?: string | null
+          eficacia?: string | null
+          id?: string
+          infancia?: string | null
+          lote_importacao?: string | null
+          nome?: string
+          produtividade?: string | null
+          re?: string
+          repetida?: string | null
+          supervisor?: string | null
+          tt?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       user_presence: {
         Row: {
           current_page: string | null
@@ -715,6 +766,57 @@ export type Database = {
           status?: string
           supervisor_id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      vistoria_evolucao: {
+        Row: {
+          created_at: string
+          data_revisita: string
+          eficacia_anterior: string | null
+          eficacia_atual: string | null
+          id: string
+          infancia_anterior: string | null
+          infancia_atual: string | null
+          observacoes: string | null
+          produtividade_anterior: string | null
+          produtividade_atual: string | null
+          repetida_anterior: string | null
+          repetida_atual: string | null
+          tecnico_re: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_revisita?: string
+          eficacia_anterior?: string | null
+          eficacia_atual?: string | null
+          id?: string
+          infancia_anterior?: string | null
+          infancia_atual?: string | null
+          observacoes?: string | null
+          produtividade_anterior?: string | null
+          produtividade_atual?: string | null
+          repetida_anterior?: string | null
+          repetida_atual?: string | null
+          tecnico_re: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data_revisita?: string
+          eficacia_anterior?: string | null
+          eficacia_atual?: string | null
+          id?: string
+          infancia_anterior?: string | null
+          infancia_atual?: string | null
+          observacoes?: string | null
+          produtividade_anterior?: string | null
+          produtividade_atual?: string | null
+          repetida_anterior?: string | null
+          repetida_atual?: string | null
+          tecnico_re?: string
+          user_id?: string
         }
         Relationships: []
       }
