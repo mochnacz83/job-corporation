@@ -535,6 +535,8 @@ export type Database = {
       reagenda_history: {
         Row: {
           contato: string
+          contato2: string | null
+          contato3: string | null
           created_at: string
           data_agendamento: string | null
           data_nova: string | null
@@ -558,6 +560,8 @@ export type Database = {
         }
         Insert: {
           contato: string
+          contato2?: string | null
+          contato3?: string | null
           created_at?: string
           data_agendamento?: string | null
           data_nova?: string | null
@@ -581,6 +585,8 @@ export type Database = {
         }
         Update: {
           contato?: string
+          contato2?: string | null
+          contato3?: string | null
           created_at?: string
           data_agendamento?: string | null
           data_nova?: string | null
