@@ -291,7 +291,8 @@ const Reagenda = () => {
                 const { data: existingRecords } = await supabase
                     .from("reagenda_history" as any)
                     .select("sa, contato")
-                    .eq("user_id", targetUid);
+                    .eq("user_id", targetUid)
+                    .eq("deleted_by_user", false);
 
                 const existingRows = (existingRecords ?? []) as Array<{ sa?: string | null; contato?: string | null }>;
                 const existingSAs = new Set(existingRows.map((r) => r.sa).filter((v): v is string => Boolean(v)));
@@ -555,27 +556,29 @@ Fico no aguardo!`;
     const deleteEntry = async (id: string) => {
         setData(prev => prev.filter(item => item.id !== id));
         try {
-            if (!isAdmin || !globalAdminView) {
-                await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
-            } else {
-                await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
-            }
-        } catch (e) { }
+            await supabase.from("reagenda_history" as any).delete().eq("id", id);
+            toast({ title: "Registro excluído permanentemente" });
+        } catch (e) { 
+            console.error(e);
+            toast({ title: "Erro ao excluir", variant: "destructive" });
+        }
     };
 
     const clearHistory = async () => {
-        const confirmMsg = "Limpar sua base de contatos? (Os dados permanecerão salvos para auditoria da gestão)";
+        const confirmMsg = "Limpar sua base de contatos permanentemente? (Esta ação não pode ser desfeita e os dados serão excluídos definitivamente)";
         if (confirm(confirmMsg)) {
             setData([]);
             try {
                 const { data: sessionData } = await supabase.auth.getSession();
                 if (sessionData.session?.user.id) {
                     await supabase.from("reagenda_history" as any)
-                        .update({ deleted_by_user: true })
+                        .delete()
                         .eq("user_id", sessionData.session.user.id);
                 }
-                toast({ title: "Histórico limpo", description: "Sua base pessoal foi ocultada." });
-            } catch (e) { }
+                toast({ title: "Histórico excluído", description: "Sua base pessoal foi removida permanentemente." });
+            } catch (e) { 
+                toast({ title: "Erro ao limpar", variant: "destructive" });
+            }
         }
     };
 
@@ -1108,7 +1111,7 @@ Fico no aguardo!`;
                                     exportResults();
                                     try {
                                         await supabase.from("reagenda_history" as any)
-                                            .update({ deleted_by_user: true })
+                                            .delete()
                                             .in("id", selectedItems.map(i => i.id));
                                         setData(prev => prev.filter(i => !i.selecionado));
                                     } catch (e) {}
