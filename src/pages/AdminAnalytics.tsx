@@ -60,7 +60,7 @@ const AdminAnalytics = () => {
   
   const [filterStart, setFilterStart] = useState<string>(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(d.getDate() - 3);
     return d.toISOString().split("T")[0];
   });
   const [filterEnd, setFilterEnd] = useState<string>(() => {
@@ -87,6 +87,7 @@ const AdminAnalytics = () => {
 
 
   const loadData = async () => {
+    setLoading(true);
     // Check admin
     const { data: roleData } = await supabase
       .from("user_roles")
@@ -106,7 +107,8 @@ const AdminAnalytics = () => {
         .select("*")
         .gte("created_at", `${filterStart}T00:00:00Z`)
         .lte("created_at", `${filterEnd}T23:59:59Z`)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(1000),
       supabase.from("user_presence").select("*"),
       supabase.from("profiles").select("user_id, nome, matricula, area"),
     ]);
@@ -466,7 +468,7 @@ const AdminAnalytics = () => {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-                <Badge variant="outline" className="font-normal text-[10px]">Filtrado por data</Badge>
+                <Badge variant="outline" className="font-normal text-[10px]">Exibindo máx. de 1000 acessos</Badge>
               </div>
             </CardHeader>
             <CardContent>

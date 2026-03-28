@@ -48,13 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-      const p = profileData as Profile | null;
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("user_id", userId).single(),
+        supabase.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle()
+      ]);
+      
+      const p = profileRes.data as Profile | null;
       setProfile(p);
+      setIsAdmin(!!roleRes.data);
 
       if (p?.area) {
         const { data: permData } = await supabase
@@ -66,15 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setAreaPermissions(null);
       }
-
-      // Check admin role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .eq("role", "admin")
-        .maybeSingle();
-      setIsAdmin(!!roleData);
     } catch (err) {
       console.error("Error fetching profile:", err);
     }
