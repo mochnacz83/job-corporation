@@ -39,6 +39,9 @@ interface ReagendaData {
     setor: string;
     nome: string;
     contato: string;
+    contato2: string;
+    contato3: string;
+    contatoSelecionado?: string; // which contact is actively selected for messaging
     operadora: string;
     tipoAtividade: string;
     dataAgendamento: string;
@@ -53,7 +56,7 @@ interface ReagendaData {
     selecionado: boolean;
     user_id?: string;
     deleted_by_user?: boolean;
-    user_nome?: string; // Para visão admin
+    user_nome?: string;
 }
 
 const Reagenda = () => {
@@ -65,6 +68,9 @@ const Reagenda = () => {
     const [infoPosition, setInfoPosition] = useState({ x: 20, y: 80 });
     const [isDraggingInfo, setIsDraggingInfo] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    
+    // Filter state
+    const [filterSetor, setFilterSetor] = useState<string>("__all__");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
@@ -99,6 +105,7 @@ const Reagenda = () => {
             }
         }
     }, [isAdmin, areaPermissions, authLoading, navigate, toast]);
+
     const loadHistory = async () => {
         try {
             let query = supabase
@@ -107,7 +114,6 @@ const Reagenda = () => {
                 .order("created_at", { ascending: true });
 
             if (!isAdmin || !globalAdminView) {
-                // Usuário comum ou admin na visão pessoal: vê apenas seus próprios e não deletados
                 const { data: sessionData } = await supabase.auth.getSession();
                 if (sessionData.session?.user.id) {
                     query = query.eq("user_id", sessionData.session.user.id).eq("deleted_by_user", false);
@@ -128,6 +134,9 @@ const Reagenda = () => {
                     setor: row.setor,
                     nome: row.nome,
                     contato: row.contato,
+                    contato2: row.contato2 || "",
+                    contato3: row.contato3 || "",
+                    contatoSelecionado: row.contato, // default to first contact
                     operadora: row.operadora,
                     tipoAtividade: row.tipo_atividade,
                     dataAgendamento: row.data_agendamento,
@@ -147,7 +156,6 @@ const Reagenda = () => {
                 setData(mappedData);
                 
                 if (isAdmin) {
-                    // Update metrics
                     const metrics = {
                         total: mappedData.length,
                         contatado: mappedData.filter((i: any) => i.status === "Contatado").length,
@@ -174,16 +182,26 @@ const Reagenda = () => {
         loadHistory();
     }, [globalAdminView]);
 
+    // Compute unique setores for filter
+    const uniqueSetores = React.useMemo(() => {
+        const setores = new Set(data.map(d => d.setor).filter(Boolean));
+        return Array.from(setores).sort();
+    }, [data]);
+
+    // Filtered data
+    const filteredData = React.useMemo(() => {
+        if (filterSetor === "__all__") return data;
+        return data.filter(d => d.setor === filterSetor);
+    }, [data, filterSetor]);
+
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
 
         let val = dateValue;
-        // Check if string is a numeric excel serial
         if (typeof val === 'string' && /^\d{5}$/.test(val)) {
             val = Number(val);
         }
 
-        // Se já estiver no formato DD/MM/AAAA, retorna
         if (typeof val === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
             return val;
         }
@@ -191,7 +209,6 @@ const Reagenda = () => {
         try {
             let date: Date;
             if (typeof val === 'number') {
-                // Serial do Excel
                 date = new Date((val - 25569) * 86400 * 1000);
             } else {
                 date = new Date(val);
@@ -222,17 +239,23 @@ const Reagenda = () => {
                 return;
             }
 
-            // Fetch all existing SA/Contacts for this user to ensure NO DUPLICATES (even hidden ones)
-            const { data: existingRecords } = await supabase
-                .from("reagenda_history" as any)
-                .select("sa, contato")
-                .eq("user_id", uid);
+            // If admin, import for ALL active users; otherwise just for this user
+            let targetUserIds: string[] = [uid];
 
-            const existingRows = (existingRecords ?? []) as Array<{ sa?: string | null; contato?: string | null }>;
-            const existingSAs = new Set(existingRows.map((r) => r.sa).filter((v): v is string => Boolean(v)));
-            const existingContacts = new Set(existingRows.map((r) => r.contato).filter((v): v is string => Boolean(v)));
+            if (isAdmin) {
+                // Fetch all active user profiles
+                const { data: allProfiles } = await supabase
+                    .from("profiles")
+                    .select("user_id")
+                    .eq("status", "ativo");
+                
+                if (allProfiles && allProfiles.length > 0) {
+                    targetUserIds = allProfiles.map((p: any) => p.user_id);
+                }
+            }
 
-            const newEntries: ReagendaData[] = jsonData.map((row) => {
+            // Parse new entries from spreadsheet
+            const newEntries = jsonData.map((row) => {
                 const rawData = row["DATA DE AGENDAMENTO"] || row["Data de Agendamento"] || row["DATA"] || "";
                 const formattedDate = formatDate(rawData);
 
@@ -242,88 +265,98 @@ const Reagenda = () => {
                 }
 
                 const operadoraValue = String(row["OPERADORA"] || row["Operadora"] || "").trim().toUpperCase();
-                
-                // Safe UUID fallback for non-secure contexts
-                const generateSafeId = () => {
-                    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-                    return 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
-                };
+                const contato1 = String(row["CONTATO"] || row["Contato"] || row["CONTATO 1"] || row["Contato 1"] || "").replace(/\D/g, "");
+                const contato2 = String(row["CONTATO 2"] || row["Contato 2"] || "").replace(/\D/g, "");
+                const contato3 = String(row["CONTATO 3"] || row["Contato 3"] || "").replace(/\D/g, "");
 
                 return {
-                    id: generateSafeId(),
                     sa: saValue,
                     setor: String(row["SETOR"] || row["Setor"] || row["setor"] || "").trim(),
                     nome: row["NOME"] || row["Nome"] || "",
-                    contato: String(row["CONTATO"] || row["Contato"] || "").replace(/\D/g, ""),
+                    contato: contato1,
+                    contato2,
+                    contato3,
                     operadora: operadoraValue,
                     tipoAtividade: row["TIPO DE ATIVIDADE"] || row["Tipo de Atividade"] || row["ATIVIDADE"] || "",
                     dataAgendamento: formattedDate,
                     dataOriginalFormatada: formattedDate,
-                    dataNova: "",
-                    lastContactedAt: undefined,
-                    isManualStatus: false,
-                    status: "Pendente",
-                    decisao: "Pendente",
-                    periodo: "",
-                    horario: "",
-                    selecionado: false,
                 };
-            });
+            }).filter(item => item.nome && item.contato);
 
-            const validNewEntries = newEntries.filter(item => item.nome && item.contato);
-            const uniqueNewEntries: ReagendaData[] = [];
-            let duplicatesCount = 0;
+            let totalInserted = 0;
+            let totalDuplicates = 0;
 
-            for (const newItem of validNewEntries) {
-                const isDuplicateInDB = (newItem.sa && existingSAs.has(newItem.sa)) || existingContacts.has(newItem.contato);
-                const isDuplicateInBatch = uniqueNewEntries.some(addedItem => 
-                    (newItem.sa && addedItem.sa && newItem.sa === addedItem.sa) || 
-                    (newItem.contato === addedItem.contato)
-                );
+            for (const targetUid of targetUserIds) {
+                // Fetch existing SA/Contacts for THIS user
+                const { data: existingRecords } = await supabase
+                    .from("reagenda_history" as any)
+                    .select("sa, contato")
+                    .eq("user_id", targetUid);
 
-                if (isDuplicateInDB || isDuplicateInBatch) {
-                    duplicatesCount++;
-                } else {
-                    uniqueNewEntries.push(newItem);
+                const existingRows = (existingRecords ?? []) as Array<{ sa?: string | null; contato?: string | null }>;
+                const existingSAs = new Set(existingRows.map((r) => r.sa).filter((v): v is string => Boolean(v)));
+                const existingContacts = new Set(existingRows.map((r) => r.contato).filter((v): v is string => Boolean(v)));
+
+                const uniqueForUser: any[] = [];
+                const batchSAs = new Set<string>();
+                const batchContacts = new Set<string>();
+
+                for (const entry of newEntries) {
+                    const isDupDB = (entry.sa && existingSAs.has(entry.sa)) || existingContacts.has(entry.contato);
+                    const isDupBatch = (entry.sa && batchSAs.has(entry.sa)) || batchContacts.has(entry.contato);
+
+                    if (isDupDB || isDupBatch) {
+                        if (targetUid === uid) totalDuplicates++;
+                    } else {
+                        const generateSafeId = () => {
+                            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+                            return 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
+                        };
+
+                        uniqueForUser.push({
+                            id: generateSafeId(),
+                            user_id: targetUid,
+                            sa: entry.sa,
+                            setor: entry.setor,
+                            nome: entry.nome,
+                            contato: entry.contato,
+                            contato2: entry.contato2,
+                            contato3: entry.contato3,
+                            operadora: entry.operadora,
+                            tipo_atividade: entry.tipoAtividade,
+                            data_agendamento: entry.dataAgendamento,
+                            data_original_formatada: entry.dataOriginalFormatada,
+                            status: "Pendente",
+                            decisao: "Pendente",
+                            selecionado: false,
+                        });
+                        if (entry.sa) batchSAs.add(entry.sa);
+                        batchContacts.add(entry.contato);
+                    }
+                }
+
+                if (uniqueForUser.length > 0) {
+                    const { error } = await supabase.from("reagenda_history" as any).insert(uniqueForUser);
+                    if (error) {
+                        console.error("Insert error for user", targetUid, error);
+                    } else {
+                        if (targetUid === uid) totalInserted = uniqueForUser.length;
+                    }
                 }
             }
 
-            if (uniqueNewEntries.length > 0) {
-                const userHistoryPayload = uniqueNewEntries.map(entry => ({
-                    id: entry.id,
-                    user_id: uid,
-                    sa: entry.sa,
-                    setor: entry.setor,
-                    nome: entry.nome,
-                    contato: entry.contato,
-                    operadora: entry.operadora,
-                    tipo_atividade: entry.tipoAtividade,
-                    data_agendamento: entry.dataAgendamento,
-                    data_original_formatada: entry.dataOriginalFormatada,
-                    status: entry.status,
-                    decisao: entry.decisao,
-                    selecionado: entry.selecionado
-                }));
+            // Reload to show new data
+            await loadHistory();
 
-                const { error } = await supabase.from("reagenda_history" as any).insert(userHistoryPayload);
-                
-                if (error) {
-                    console.error("Supabase insert error:", error);
-                    toast({ title: "Erro ao salvar", description: `Detalhe: ${error.message || "Falha desconhecida no banco de dados."}`, variant: "destructive" });
-                } else {
-                    setData(prev => [...prev, ...uniqueNewEntries]);
-                    trackAction(`Carregou planilha com ${uniqueNewEntries.length} registros`);
-                    toast({
-                        title: "Planilha carregada",
-                        description: `${uniqueNewEntries.length} novos registros adicionados. ${duplicatesCount > 0 ? `${duplicatesCount} duplicados ignorados.` : ""}`,
-                    });
-                }
-            } else if (duplicatesCount > 0) {
-                toast({
-                    title: "Nenhum registro novo",
-                    description: `${duplicatesCount} registros duplicados foram ignorados.`,
-                    variant: "destructive"
-                });
+            if (totalInserted > 0 || (isAdmin && newEntries.length > 0)) {
+                const insertedMsg = isAdmin
+                    ? `Base carregada para ${targetUserIds.length} usuários com ${newEntries.length} registros cada.`
+                    : `${totalInserted} novos registros adicionados.`;
+                const dupMsg = totalDuplicates > 0 ? ` ${totalDuplicates} duplicados ignorados.` : "";
+                trackAction(`Carregou planilha com ${newEntries.length} registros${isAdmin ? ` para ${targetUserIds.length} usuários` : ""}`);
+                toast({ title: "Planilha carregada", description: insertedMsg + dupMsg });
+            } else if (totalDuplicates > 0) {
+                toast({ title: "Nenhum registro novo", description: `${totalDuplicates} registros duplicados foram ignorados.`, variant: "destructive" });
             }
         } catch (err) {
             console.error(err);
@@ -420,6 +453,10 @@ const Reagenda = () => {
         setIsDraggingInfo(false);
     };
 
+    const getActiveContact = (item: ReagendaData) => {
+        return item.contatoSelecionado || item.contato;
+    };
+
     const getMessageTemplate = (item: ReagendaData) => {
         const dataSafelyFormatted = formatDate(item.dataAgendamento);
         return `Olá, ${item.nome}! Tudo bem?
@@ -451,9 +488,10 @@ Fico no aguardo!`;
 
     const openWhatsApp = (item: ReagendaData) => {
         const message = getMessageTemplate(item);
+        const contact = getActiveContact(item);
         const encodedMessage = encodeURIComponent(message);
-        window.open(`https://api.whatsapp.com/send?phone=55${item.contato}&text=${encodedMessage}`, "_blank");
-        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || item.contato})`);
+        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || contact})`);
         startContactTimer(item.id, "Contatado");
     };
 
@@ -484,7 +522,6 @@ Fico no aguardo!`;
         setData(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
 
         try {
-            // Map frontend fields to database fields if needed
             const dbFieldMap: any = {
                 dataNova: "data_nova",
                 tipoAtividade: "tipo_atividade"
@@ -506,23 +543,21 @@ Fico no aguardo!`;
     };
 
     const toggleAll = () => {
-        const allSelected = data.every(item => item.selecionado);
-        setData(prev => prev.map(item => ({ ...item, selecionado: !allSelected })));
+        const allSelected = filteredData.every(item => item.selecionado);
+        const filteredIds = new Set(filteredData.map(d => d.id));
+        setData(prev => prev.map(item => filteredIds.has(item.id) ? { ...item, selecionado: !allSelected } : item));
 
         try {
-            supabase.from("reagenda_history" as any).update({ selecionado: !allSelected }).in("id", data.map(d => d.id)).then();
+            supabase.from("reagenda_history" as any).update({ selecionado: !allSelected }).in("id", Array.from(filteredIds)).then();
         } catch (e) { }
     };
 
     const deleteEntry = async (id: string) => {
         setData(prev => prev.filter(item => item.id !== id));
         try {
-            // Se for usuario comum, faz soft delete
             if (!isAdmin || !globalAdminView) {
                 await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
             } else {
-                // Admin na visão global pode deletar fisicamente se quiser, 
-                // mas vamos manter o padrão de soft delete para segurança
                 await supabase.from("reagenda_history" as any).update({ deleted_by_user: true }).eq("id", id);
             }
         } catch (e) { }
@@ -551,7 +586,6 @@ Fico no aguardo!`;
         if (confirm(confirmMsg)) {
             setLoading(true);
             try {
-                // Força delete físico para limpeza administrativa real
                 const { error } = await supabase.from("reagenda_history" as any).delete().not("id", "is", null);
                 if (error) throw error;
                 
@@ -576,7 +610,7 @@ Fico no aguardo!`;
 
             const updatedData = data.map(item => {
                 if (item.isManualStatus || !item.lastContactedAt || item.status === "Sem Contato" || item.status === "Pendente") {
-                    return item; // Do not touch manual overrides, finished, or virgin items
+                    return item;
                 }
 
                 const contactedTime = new Date(item.lastContactedAt).getTime();
@@ -592,7 +626,6 @@ Fico no aguardo!`;
                 }
 
                 if (newStatus !== item.status) {
-                    // Fire-and-forget DB update
                     supabase.from("reagenda_history" as any).update({ status: newStatus }).eq("id", item.id).then();
                     return { ...item, status: newStatus };
                 }
@@ -602,7 +635,7 @@ Fico no aguardo!`;
             if (hasChanges) {
                 setData(updatedData);
             }
-        }, 15000); // Check every 15 seconds
+        }, 15000);
 
         return () => clearInterval(interval);
     }, [data]);
@@ -614,6 +647,8 @@ Fico no aguardo!`;
                 "SETOR": "Setor A",
                 "NOME": "Nome do Cliente",
                 "CONTATO": "11999999999",
+                "CONTATO 2": "11988887777",
+                "CONTATO 3": "11977776666",
                 "OPERADORA": "Vivo",
                 "TIPO DE ATIVIDADE": "Instalação",
                 "DATA DE AGENDAMENTO": new Date(2026, 2, 10)
@@ -623,12 +658,13 @@ Fico no aguardo!`;
                 "SETOR": "Setor B",
                 "NOME": "Maria da Silva",
                 "CONTATO": "11988888888",
+                "CONTATO 2": "",
+                "CONTATO 3": "",
                 "OPERADORA": "Claro",
                 "TIPO DE ATIVIDADE": "Reparo",
                 "DATA DE AGENDAMENTO": new Date(2026, 2, 12)
             }
         ];
-        // Usar cellDates para formatar como data nativa no Excel e dateNF para definir o formato DD/MM/AAAA
         const ws = XLSX.utils.json_to_sheet(sampleData, { cellDates: true, dateNF: "dd/mm/yyyy" });
 
         ws['!cols'] = [
@@ -636,6 +672,8 @@ Fico no aguardo!`;
             { wch: 15 }, // Setor
             { wch: 30 }, // Nome
             { wch: 15 }, // Contato
+            { wch: 15 }, // Contato 2
+            { wch: 15 }, // Contato 3
             { wch: 15 }, // Operadora
             { wch: 20 }, // Atividade
             { wch: 20 }, // Data
@@ -647,11 +685,13 @@ Fico no aguardo!`;
     };
 
     const exportResults = () => {
-        const exportData = data.filter(item => item.selecionado).map(item => ({
+        const exportData = filteredData.filter(item => item.selecionado).map(item => ({
             "SA": item.sa,
             "Setor": item.setor,
             "Nome": item.nome,
             "Contato": item.contato,
+            "Contato 2": item.contato2,
+            "Contato 3": item.contato3,
             "Operadora": item.operadora,
             "Atividade": item.tipoAtividade,
             "Data Original": item.dataAgendamento,
@@ -669,13 +709,22 @@ Fico no aguardo!`;
 
         const ws = XLSX.utils.json_to_sheet(exportData);
         ws['!cols'] = [
-            { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
-            { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
+            { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+            { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
             { wch: 15 }, { wch: 15 }
         ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Resultados");
         XLSX.writeFile(wb, "resultados_reagendamento.xlsx");
+    };
+
+    // Build contact options for a given item
+    const getContactOptions = (item: ReagendaData) => {
+        const options: { value: string; label: string }[] = [];
+        if (item.contato) options.push({ value: item.contato, label: `1: ${item.contato}` });
+        if (item.contato2) options.push({ value: item.contato2, label: `2: ${item.contato2}` });
+        if (item.contato3) options.push({ value: item.contato3, label: `3: ${item.contato3}` });
+        return options;
     };
 
     return (
@@ -699,8 +748,16 @@ Fico no aguardo!`;
                         </CardHeader>
                         <CardContent className="p-4 space-y-3 text-xs leading-relaxed max-h-[70vh] overflow-y-auto">
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">👥 Bases Individuais:</p>
-                                <p>Cada usuário agora possui sua própria base. Os registros que você carrega são visíveis apenas para você e para os Administradores.</p>
+                                <p className="font-semibold text-primary">👥 Base Compartilhada (Admin):</p>
+                                <p>Quando o Administrador importa uma planilha, ela é distribuída automaticamente para todos os usuários ativos. Cada usuário trata os seus registros de forma independente.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">🔍 Filtro por Setor:</p>
+                                <p>Use o filtro de Setor acima da tabela para visualizar apenas os registros do setor desejado.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="font-semibold text-primary">📞 Múltiplos Contatos:</p>
+                                <p>Cada registro pode ter até 3 contatos. Use a lista suspensa na coluna "Contato" para selecionar qual número usar para enviar mensagem.</p>
                             </div>
                             <div className="space-y-2">
                                 <p className="font-semibold text-primary">🔒 Soft Delete (Lixeira):</p>
@@ -711,26 +768,16 @@ Fico no aguardo!`;
                                 <p>Arraste arquivos <code>.xlsx</code> ou <code>.csv</code> diretamente no painel pontilhado para iniciar o processamento. Você também pode clicar nele para abrir as pastas do sistema.</p>
                             </div>
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">🛡️ Deduplicação Flexível Inteligente:</p>
-                                <p>O sistema escaneia a sua planilha <strong>linha a linha</strong> para procurar duplicados de número de Contato ou número de SA. Ele também compara o que você está enviando agora com o que <strong>já existe cadastrado</strong>. Qualquer item repetido é sumariamente ignorado e mantemos apenas os indivíduos únicos.</p>
+                                <p className="font-semibold text-primary">🛡️ Deduplicação Inteligente:</p>
+                                <p>O sistema verifica duplicados por SA e Contato antes de inserir. Registros já existentes são ignorados.</p>
                             </div>
                             <div className="space-y-2">
-                                <p className="font-semibold text-primary">📅 Tabela e Formatação de Data:</p>
-                                <p>A coluna Data na tabela modelo baixada agora possui o formato nativo de data no sistema DD/MM/AAAA. Ao subir uma planilha nossa engine extrai essas datas do Excel com sucesso.</p>
+                                <p className="font-semibold text-primary">⏱️ Temporizador de Status:</p>
+                                <p>Ao clicar no <strong>WhatsApp</strong> ou <strong>Telegram</strong>, o sistema inicia automaticamente o cronômetro. Após 5 min → Aguardando retorno. Após 10 min → Sem Contato. Se você mudar o status manualmente, o temporizador para.</p>
                             </div>
                             <div className="space-y-2">
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">⏱️ Temporizador de Status:</p>
-                                    <p>Ao clicar no <strong>WhatsApp</strong> ou <strong>Telegram</strong>, o sistema inicia automaticamente o cronômetro. Após 5 min → Aguardando retorno. Após 10 min → Sem Contato. Se você mudar o status manualmente, o temporizador para.</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">🎨 Cores de Status:</p>
-                                    <p><span className="bg-blue-100 px-1 rounded">Contatado</span> = Azul &nbsp; <span className="bg-amber-100 px-1 rounded">Aguardando</span> = Laranja &nbsp; <span className="bg-red-100 px-1 rounded opacity-75">Sem Contato</span> = Vermelho</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="font-semibold text-primary">💬 Mensagem via Chat:</p>
-                                    <p>O ícone de enviar WhatsApp copia as informações do cliente baseadas na operadora e preenche o convite de reagendamento direto no WebApp.</p>
-                                </div>
+                                <p className="font-semibold text-primary">🎨 Cores de Status:</p>
+                                <p><span className="bg-blue-100 px-1 rounded">Contatado</span> = Azul &nbsp; <span className="bg-amber-100 px-1 rounded">Aguardando</span> = Laranja &nbsp; <span className="bg-red-100 px-1 rounded opacity-75">Sem Contato</span> = Vermelho</p>
                             </div>
                             <div className="pt-2 border-t text-[10px] text-muted-foreground italic text-center">
                                 Você pode arrastar este painel tranquilamente pelo cabeçalho cinza!
@@ -749,7 +796,7 @@ Fico no aguardo!`;
                             <span className="truncate">Reserva / Antecipação</span>
                         </h1>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                         {isAdmin && (
                             <Button 
                                 variant={globalAdminView ? "default" : "outline"} 
@@ -830,18 +877,37 @@ Fico no aguardo!`;
                                 <Button size="sm" onClick={() => document.getElementById("file-upload")?.click()} disabled={loading}>
                                     {loading ? "Processando..." : "Carregar Planilha"}
                                 </Button>
-                                <p className="text-[10px] text-muted-foreground mt-2">ou arraste o arquivo aqui</p>
+                                <p className="text-[10px] text-muted-foreground mt-2">
+                                    {isAdmin ? "A base será distribuída para todos os usuários ativos" : "ou arraste o arquivo aqui"}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
 
                     {data.length > 0 && (
                         <Card>
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-lg font-semibold">Base de Contatos ({data.length})</CardTitle>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Checkbox checked={data.every(i => i.selecionado)} onCheckedChange={toggleAll} />
-                                    <span>Selecionar p/ Painel</span>
+                            <CardHeader className="flex flex-row items-center justify-between pb-2 gap-4 flex-wrap">
+                                <CardTitle className="text-lg font-semibold">Base de Contatos ({filteredData.length})</CardTitle>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    {/* Setor Filter */}
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="w-4 h-4 text-muted-foreground" />
+                                        <Select value={filterSetor} onValueChange={setFilterSetor}>
+                                            <SelectTrigger className="h-8 w-[180px] text-xs">
+                                                <SelectValue placeholder="Filtrar por Setor" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__all__">Todos os Setores</SelectItem>
+                                                {uniqueSetores.map(setor => (
+                                                    <SelectItem key={setor} value={setor}>{setor}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Checkbox checked={filteredData.every(i => i.selecionado)} onCheckedChange={toggleAll} />
+                                        <span>Selecionar p/ Painel</span>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -852,7 +918,8 @@ Fico no aguardo!`;
                                                 <TableHead className="w-10"></TableHead>
                                                 <TableHead className="w-[140px]">Status</TableHead>
                                                 <TableHead>SA / Setor</TableHead>
-                                                <TableHead>Nome / Contato</TableHead>
+                                                <TableHead>Nome</TableHead>
+                                                <TableHead className="w-[160px]">Contato</TableHead>
                                                 {isAdmin && globalAdminView && <TableHead>Carregado por</TableHead>}
                                                 <TableHead>Data Orig.</TableHead>
                                                 <TableHead className="w-[180px]">Decisão</TableHead>
@@ -863,8 +930,7 @@ Fico no aguardo!`;
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {[...data].reverse().map((item) => {
-                                                // Determine row background color dynamically based on Status
+                                            {[...filteredData].reverse().map((item) => {
                                                 let rowColorClass = "";
                                                 if (item.status === "Pendente") rowColorClass = "bg-gray-50/40 dark:bg-gray-900/10";
                                                 else if (item.status === "Contatado") rowColorClass = "bg-emerald-50/60 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500";
@@ -874,6 +940,9 @@ Fico no aguardo!`;
                                                 if (item.selecionado) {
                                                     rowColorClass = "bg-primary/10 border-primary";
                                                 }
+
+                                                const contactOptions = getContactOptions(item);
+                                                const hasMultipleContacts = contactOptions.length > 1;
 
                                                 return (
                                                     <TableRow key={item.id} className={rowColorClass}>
@@ -904,10 +973,29 @@ Fico no aguardo!`;
                                                             </div>
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-sm font-medium">{item.nome}</span>
-                                                                <span className="text-[11px] text-muted-foreground">{item.contato} • {item.operadora}</span>
-                                                            </div>
+                                                            <span className="text-sm font-medium">{item.nome}</span>
+                                                            <span className="text-[11px] text-muted-foreground block">{item.operadora}</span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {hasMultipleContacts ? (
+                                                                <Select
+                                                                    value={item.contatoSelecionado || item.contato}
+                                                                    onValueChange={(v) => {
+                                                                        setData(prev => prev.map(d => d.id === item.id ? { ...d, contatoSelecionado: v } : d));
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger className="h-8 text-xs">
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {contactOptions.map(opt => (
+                                                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            ) : (
+                                                                <span className="text-xs">{item.contato}</span>
+                                                            )}
                                                         </TableCell>
                                                         {isAdmin && globalAdminView && (
                                                             <TableCell>
@@ -1016,9 +1104,8 @@ Fico no aguardo!`;
                             <Button 
                                 variant="default"
                                 onClick={async () => {
-                                    const selectedItems = data.filter(i => i.selecionado);
+                                    const selectedItems = filteredData.filter(i => i.selecionado);
                                     exportResults();
-                                    // Soft delete selected items
                                     try {
                                         await supabase.from("reagenda_history" as any)
                                             .update({ deleted_by_user: true })
