@@ -135,6 +135,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (user) {
+      try {
+        await supabase.from("user_presence").upsert({
+           user_id: user.id,
+           last_seen_at: new Date().toISOString(),
+           current_page: "Desconectado"
+        });
+      } catch (err) {
+        console.warn("Could not update presence on signout", err);
+      }
+    }
     await supabase.auth.signOut();
     setProfile(null);
   };

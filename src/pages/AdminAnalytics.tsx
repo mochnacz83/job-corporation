@@ -58,18 +58,33 @@ const AdminAnalytics = () => {
   const [areaDistData, setAreaDistData] = useState<{ name: string; value: number }[]>([]);
   const [areaAccessData, setAreaAccessData] = useState<{ name: string; acessos: number }[]>([]);
   
+  const [filterStart, setFilterStart] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split("T")[0];
+  });
+  const [filterEnd, setFilterEnd] = useState<string>(() => {
+    return new Date().toISOString().split("T")[0];
+  });
+  
   // Cleanup state
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
   const [cleanupStart, setCleanupStart] = useState("");
   const [cleanupEnd, setCleanupEnd] = useState("");
   const [cleaning, setCleaning] = useState(false);
 
+  // Kick user state
+  const [kickDialogOpen, setKickDialogOpen] = useState(false);
+  const [userToKick, setUserToKick] = useState<Presence | null>(null);
+  const [kicking, setKicking] = useState(false);
+
   useAccessTracking("/admin/analytics");
 
   useEffect(() => {
     if (!user) return;
     loadData();
-  }, [user]);
+  }, [user]); // Removed filter deps so it doesn't auto-fetch while typing, only on button click or load
+
 
   const loadData = async () => {
     // Check admin
@@ -87,7 +102,11 @@ const AdminAnalytics = () => {
 
     // Fetch all in parallel
     const [logsRes, presenceRes, profilesRes] = await Promise.all([
-      supabase.from("access_logs").select("*").order("created_at", { ascending: false }).limit(200),
+      supabase.from("access_logs")
+        .select("*")
+        .gte("created_at", `${filterStart}T00:00:00Z`)
+        .lte("created_at", `${filterEnd}T23:59:59Z`)
+        .order("created_at", { ascending: false }),
       supabase.from("user_presence").select("*"),
       supabase.from("profiles").select("user_id, nome, matricula, area"),
     ]);
@@ -149,23 +168,46 @@ const AdminAnalytics = () => {
     });
     setAreaAccessData(Object.entries(areaAccessCounts).map(([name, acessos]) => ({ name, acessos })));
 
-    // Online = last_seen within 2 minutes
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    setOnlineUsers(presenceData.filter((p: any) => p.last_seen_at > twoMinAgo));
+    // Online = actively not disconnected, within 24 hours
+    const now = new Date();
+    const loggedInThreshold = 24 * 60 * 60 * 1000;
+    
+    setOnlineUsers(presenceData.filter((p: any) => {
+      if (!p.current_page || p.current_page.startsWith("Desconectado")) return false;
+      const lastSeen = new Date(p.last_seen_at).getTime();
+      return (now.getTime() - lastSeen) < loggedInThreshold;
+    }));
 
-    // Chart: accesses per day (last 7 days)
+    // Chart: accesses per day
     const dayMap: { [key: string]: number } = {};
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-      dayMap[key] = 0;
+    const startD = new Date(`${filterStart}T00:00:00`);
+    const endD = new Date(`${filterEnd}T23:59:59`);
+    
+    // Safety check just in case range is massive we don't crash
+    const diffDays = Math.ceil((endD.getTime() - startD.getTime()) / (1000 * 3600 * 24));
+    if (diffDays <= 60) {
+      for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+        const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+        dayMap[key] = 0;
+      }
     }
+    
     logsData.forEach((log: any) => {
       const key = new Date(log.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
       if (dayMap[key] !== undefined) dayMap[key]++;
+      else if (diffDays > 60) {
+          // If range > 60 days, just add dynamically found dates
+          dayMap[key] = (dayMap[key] || 0) + 1;
+      }
     });
-    setChartData(Object.entries(dayMap).map(([date, acessos]) => ({ date, acessos })));
+    
+    // Sort keys if dynamic
+    const sortedChartData = Object.entries(dayMap)
+      .map(([date, acessos]) => ({ date, acessos, raw: date.split('/').reverse().join('') }))
+      .sort((a, b) => a.raw.localeCompare(b.raw))
+      .map(({ date, acessos }) => ({ date, acessos }));
+
+    setChartData(sortedChartData);
 
     setLoading(false);
   };
@@ -177,6 +219,26 @@ const AdminAnalytics = () => {
       else next.add(groupKey);
       return next;
     });
+  };
+
+  const handleKickUser = async () => {
+    if (!userToKick) return;
+    setKicking(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "kick-user", userId: userToKick.user_id },
+      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      
+      toast.success("Usuário desconectado do sistema!");
+      setKickDialogOpen(false);
+      setUserToKick(null);
+      loadData();
+    } catch (err: any) {
+      toast.error("Erro ao derrubar usuário: " + err.message);
+    } finally {
+      setKicking(false);
+    }
   };
 
   const handleCleanup = async () => {
@@ -230,6 +292,23 @@ const AdminAnalytics = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6 text-foreground">
+        
+        {/* Painel de Filtro */}
+        <div className="flex flex-col md:flex-row items-end gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
+          <div className="space-y-1 w-full md:max-w-xs">
+             <Label htmlFor="filter-start" className="text-xs font-semibold text-muted-foreground uppercase">Data Inicial</Label>
+             <Input id="filter-start" type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} />
+          </div>
+          <div className="space-y-1 w-full md:max-w-xs">
+             <Label htmlFor="filter-end" className="text-xs font-semibold text-muted-foreground uppercase">Data Final</Label>
+             <Input id="filter-end" type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} />
+          </div>
+          <Button onClick={() => loadData()} disabled={loading} className="w-full md:w-auto">
+             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+             Filtrar Histórico
+          </Button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Online Users */}
           <Card className="md:col-span-1">
@@ -241,18 +320,34 @@ const AdminAnalytics = () => {
             </CardHeader>
             <CardContent className="max-h-[300px] overflow-y-auto">
               {onlineUsers.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">Nenhum usuário online no momento.</p>
+                <p className="text-sm text-muted-foreground italic">Nenhum usuário logado no momento.</p>
               ) : (
-                <div className="space-y-3">
-                  {onlineUsers.map((p) => (
-                    <div key={p.user_id} className="flex flex-col border-b border-border pb-2 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">{profileMap[p.user_id]?.nome || "Desconhecido"}</span>
-                        <Badge variant="secondary" className="text-[10px] py-0">{profileMap[p.user_id]?.area || "Sem Área"}</Badge>
+                <div className="space-y-2">
+                  {onlineUsers.map((p) => {
+                    const isActive = (new Date().getTime() - new Date(p.last_seen_at).getTime()) < 5 * 60 * 1000;
+                    return (
+                      <div 
+                        key={p.user_id} 
+                        className="flex flex-col border-b border-border pb-2 last:border-0 hover:bg-muted/50 p-2 -mx-2 rounded cursor-pointer transition-colors"
+                        onClick={() => { setUserToKick(p); setKickDialogOpen(true); }}
+                        title="Clique para derrubar o usuário"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isActive ? (
+                            <Circle className="w-2.5 h-2.5 fill-green-500 text-green-500 animate-[pulse_2s_ease-in-out_infinite]" />
+                          ) : (
+                            <Circle className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                          )}
+                          <span className="text-sm font-semibold">{profileMap[p.user_id]?.nome || "Desconhecido"}</span>
+                          <Badge variant="secondary" className="text-[10px] py-0">{profileMap[p.user_id]?.area || "Sem Área"}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[11px] text-muted-foreground truncate max-w-[150px]">{p.current_page}</span>
+                          <span className="text-[10px] font-medium text-muted-foreground">{isActive ? "Online" : "Ausente"}</span>
+                        </div>
                       </div>
-                      <span className="text-[11px] text-muted-foreground truncate">{p.current_page}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -371,7 +466,7 @@ const AdminAnalytics = () => {
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-                <Badge variant="outline" className="font-normal text-[10px]">Exibindo últimos 200 registros</Badge>
+                <Badge variant="outline" className="font-normal text-[10px]">Filtrado por data</Badge>
               </div>
             </CardHeader>
             <CardContent>
@@ -456,6 +551,26 @@ const AdminAnalytics = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Kick Dialog */}
+        <Dialog open={kickDialogOpen} onOpenChange={setKickDialogOpen}>
+          <DialogContent>
+             <DialogHeader>
+                <DialogTitle>Derrubar Usuário</DialogTitle>
+                <DialogDescription>
+                   Tem certeza que deseja forçar a desconexão de <strong>{userToKick ? profileMap[userToKick.user_id]?.nome : ''}</strong>?
+                   Eles serão deslogados imediatamente de qualquer sessão ativa.
+                </DialogDescription>
+             </DialogHeader>
+             <DialogFooter className="mt-4">
+                <Button variant="outline" onClick={() => setKickDialogOpen(false)} disabled={kicking}>Cancelar</Button>
+                <Button variant="destructive" onClick={handleKickUser} disabled={kicking}>
+                   {kicking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                   Forçar Desconexão
+                </Button>
+             </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

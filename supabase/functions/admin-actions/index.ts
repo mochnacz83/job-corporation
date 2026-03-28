@@ -98,7 +98,7 @@ serve(async (req) => {
     console.log(`[AUTH] Action: ${action} | Caller: ${caller.id} | Target: ${userId} | isAdmin: ${isAdmin}`);
 
     // Verify admin role ONLY for privileged actions
-    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts'];
+    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user'];
     const publicActions = ['get-user-status', 'reset-my-ghost'];
 
     // Authorization logic
@@ -423,6 +423,26 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, deletedCount, totalFound: ghosts.length }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'kick-user') {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'userId required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { error: signOutError } = await serviceClient.auth.admin.signOut(userId, 'global');
+      if (signOutError) throw new Error(`Failed to kick user: ${signOutError.message}`);
+
+      await serviceClient
+        .from('user_presence')
+        .update({ current_page: 'Desconectado (Ação do Admin)' })
+        .eq('user_id', userId);
+
+      return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
