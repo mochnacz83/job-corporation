@@ -331,8 +331,15 @@ const AdminAnalytics = () => {
                       <div 
                         key={p.user_id} 
                         className="flex flex-col border-b border-border pb-2 last:border-0 hover:bg-muted/50 p-2 -mx-2 rounded cursor-pointer transition-colors"
-                        onClick={() => { setUserToKick(p); setKickDialogOpen(true); }}
-                        title="Clique para derrubar o usuário"
+                        onClick={() => { 
+                          if (profileMap[p.user_id]?.matricula === 'TT011249') {
+                             toast.error("Proteção de Sistema: Este administrador Mestre não pode ser desconectado.");
+                             return;
+                          }
+                          setUserToKick(p); 
+                          setKickDialogOpen(true); 
+                        }}
+                        title={profileMap[p.user_id]?.matricula === 'TT011249' ? "Administrador protegido" : "Clique para derrubar o usuário"}
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           {isActive ? (
