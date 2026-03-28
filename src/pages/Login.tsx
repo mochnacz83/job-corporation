@@ -94,7 +94,7 @@ const Login = () => {
         await supabase.auth.signOut();
         toast({
           title: "⏳ Aguardando validação do Administrador",
-          description: "Sua conta ainda não foi ativada. Entre em contato:\n📱 Juniomar Alex Mochnacz — (48) 99143-1983\n📧 juniomar.mochnacz@abilitytecnologia.com.br",
+          description: "Sua conta ainda não foi ativada ou a alteração de senha está pendente. Entre em contato:\n📱 Juniomar Alex Mochnacz — (48) 99146-1983\n📧 juniomar.mochnacz@abilitytecnologia.com.br",
           variant: "destructive",
           duration: 12000,
         });

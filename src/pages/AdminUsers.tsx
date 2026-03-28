@@ -376,9 +376,9 @@ const AdminUsers = () => {
         {users.filter(u => u.status === "pendente").length > 0 && (
           <Alert variant="default" className="bg-amber-50 border-amber-200">
             <Info className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-800">Novos Cadastros</AlertTitle>
+            <AlertTitle className="text-amber-800">Validações Pendentes</AlertTitle>
             <AlertDescription className="text-amber-700">
-              Existem {users.filter(u => u.status === "pendente").length} novos usuários aguardando sua validação para acessar o sistema. Revise-os abaixo na coluna "Controlar Acesso".
+              Existem {users.filter(u => u.status === "pendente").length} usuários aguardando sua validação (novos cadastros ou alterações de senha). Revise-os abaixo na coluna "Controlar Acesso".
             </AlertDescription>
           </Alert>
         )}
