@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal, Users, BarChart3, Filter } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal, Users, BarChart3, Filter, CalendarDays } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,6 +71,7 @@ const Reagenda = () => {
     
     // Filter state
     const [filterSetor, setFilterSetor] = useState<string>("__all__");
+    const [filterDate, setFilterDate] = useState<string>("");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
@@ -190,9 +191,20 @@ const Reagenda = () => {
 
     // Filtered data
     const filteredData = React.useMemo(() => {
-        if (filterSetor === "__all__") return data;
-        return data.filter(d => d.setor === filterSetor);
-    }, [data, filterSetor]);
+        let result = data;
+        
+        if (filterSetor !== "__all__") {
+            result = result.filter(d => d.setor === filterSetor);
+        }
+        
+        if (filterDate) {
+            const [year, month, day] = filterDate.split("-");
+            const formattedFilterDate = `${day}/${month}/${year}`;
+            result = result.filter(d => d.dataAgendamento === formattedFilterDate);
+        }
+        
+        return result;
+    }, [data, filterSetor, filterDate]);
 
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
@@ -906,6 +918,29 @@ Fico no aguardo!`;
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                    </div>
+
+                                    {/* Date Filter */}
+                                    <div className="flex items-center gap-2">
+                                        <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                                        <div className="flex items-center gap-1">
+                                            <Input 
+                                                type="date" 
+                                                value={filterDate} 
+                                                onChange={(e) => setFilterDate(e.target.value)}
+                                                className="h-8 w-[140px] text-xs"
+                                            />
+                                            {filterDate && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-muted-foreground"
+                                                    onClick={() => setFilterDate("")}
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <Checkbox checked={filteredData.every(i => i.selecionado)} onCheckedChange={toggleAll} />
