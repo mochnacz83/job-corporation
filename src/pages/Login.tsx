@@ -81,7 +81,7 @@ const Login = () => {
       await signIn(matricula.trim(), password);
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("status")
+        .select("status, must_change_password")
         .eq("matricula", matricula.trim())
         .single();
 
@@ -100,7 +100,12 @@ const Login = () => {
         });
         return;
       }
-      navigate("/dashboard");
+
+      if (profileData?.must_change_password) {
+        navigate("/alterar-senha");
+      } else {
+        navigate("/dashboard");
+      }
     } catch {
       toast({ title: "Erro no login", description: "Matrícula ou senha incorretos.", variant: "destructive" });
     } finally {

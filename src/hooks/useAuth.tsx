@@ -47,33 +47,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    const p = profileData as Profile | null;
-    setProfile(p);
-
-    if (p?.area) {
-      const { data: permData } = await supabase
-        .from("area_permissions" as any)
+    try {
+      const { data: profileData } = await supabase
+        .from("profiles")
         .select("*")
-        .eq("area", p.area)
-        .maybeSingle();
-      setAreaPermissions(permData as unknown as AreaPermissions | null);
-    } else {
-      setAreaPermissions(null);
-    }
+        .eq("user_id", userId)
+        .single();
+      const p = profileData as Profile | null;
+      setProfile(p);
 
-    // Check admin role
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    setIsAdmin(!!roleData);
+      if (p?.area) {
+        const { data: permData } = await supabase
+          .from("area_permissions" as any)
+          .select("*")
+          .eq("area", p.area)
+          .maybeSingle();
+        setAreaPermissions(permData as unknown as AreaPermissions | null);
+      } else {
+        setAreaPermissions(null);
+      }
+
+      // Check admin role
+      const { data: roleData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+      setIsAdmin(!!roleData);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
   };
 
   const refreshProfile = async () => {
@@ -83,23 +87,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        setLoading(true);
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
+          await fetchProfile(session.user.id);
         } else {
           setProfile(null);
+          setAreaPermissions(null);
+          setIsAdmin(false);
         }
         setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
 
     return () => subscription.unsubscribe();
   }, []);

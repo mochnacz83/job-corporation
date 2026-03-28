@@ -1,9 +1,10 @@
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -14,6 +15,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!session) return <Navigate to="/" replace />;
+
+  if (profile?.must_change_password && location.pathname !== "/alterar-senha") {
+    return <Navigate to="/alterar-senha" replace />;
+  }
 
   return <>{children}</>;
 };
