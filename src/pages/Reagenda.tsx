@@ -71,7 +71,9 @@ const Reagenda = () => {
     
     // Filter state
     const [filterSetor, setFilterSetor] = useState<string>("__all__");
-    const [filterDate, setFilterDate] = useState<string>("");
+    const [filterStartDate, setFilterStartDate] = useState<string>("");
+    const [filterEndDate, setFilterEndDate] = useState<string>("");
+    const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro">("todos");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
@@ -197,14 +199,39 @@ const Reagenda = () => {
             result = result.filter(d => d.setor === filterSetor);
         }
         
-        if (filterDate) {
-            const [year, month, day] = filterDate.split("-");
-            const formattedFilterDate = `${day}/${month}/${year}`;
-            result = result.filter(d => d.dataAgendamento === formattedFilterDate);
+        const parseDateOnly = (dateStr: string) => {
+            if (!dateStr) return new Date(0);
+            const [datePart] = dateStr.split(" ");
+            const [day, month, year] = datePart.split("/").map(Number);
+            return new Date(year, month - 1, day);
+        };
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (quickFilter === "hoje") {
+            result = result.filter(d => {
+                const dDate = parseDateOnly(d.dataAgendamento);
+                return dDate.getTime() === today.getTime();
+            });
+        } else if (quickFilter === "futuro") {
+            result = result.filter(d => {
+                const dDate = parseDateOnly(d.dataAgendamento);
+                return dDate.getTime() > today.getTime();
+            });
+        }
+
+        if (filterStartDate) {
+            const start = new Date(filterStartDate + "T00:00:00");
+            result = result.filter(d => parseDateOnly(d.dataAgendamento) >= start);
+        }
+        if (filterEndDate) {
+            const end = new Date(filterEndDate + "T00:00:00");
+            result = result.filter(d => parseDateOnly(d.dataAgendamento) <= end);
         }
         
         return result;
-    }, [data, filterSetor, filterDate]);
+    }, [data, filterSetor, quickFilter, filterStartDate, filterEndDate]);
 
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
@@ -921,25 +948,80 @@ Fico no aguardo!`;
                                     </div>
 
                                     {/* Date Filter */}
-                                    <div className="flex items-center gap-2">
-                                        <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                                        <div className="flex items-center gap-1">
-                                            <Input 
-                                                type="date" 
-                                                value={filterDate} 
-                                                onChange={(e) => setFilterDate(e.target.value)}
-                                                className="h-8 w-[140px] text-xs"
-                                            />
-                                            {filterDate && (
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-7 w-7 text-muted-foreground"
-                                                    onClick={() => setFilterDate("")}
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </Button>
-                                            )}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex bg-muted p-0.5 rounded-md">
+                                            <Button 
+                                                variant={quickFilter === "todos" ? "secondary" : "ghost"} 
+                                                size="sm" 
+                                                className="h-7 text-[10px] px-2"
+                                                onClick={() => {
+                                                    setQuickFilter("todos");
+                                                    setFilterStartDate("");
+                                                    setFilterEndDate("");
+                                                }}
+                                            >
+                                                Todos
+                                            </Button>
+                                            <Button 
+                                                variant={quickFilter === "hoje" ? "secondary" : "ghost"} 
+                                                size="sm" 
+                                                className="h-7 text-[10px] px-2"
+                                                onClick={() => setQuickFilter("hoje")}
+                                            >
+                                                Hoje
+                                            </Button>
+                                            <Button 
+                                                variant={quickFilter === "futuro" ? "secondary" : "ghost"} 
+                                                size="sm" 
+                                                className="h-7 text-[10px] px-2"
+                                                onClick={() => setQuickFilter("futuro")}
+                                            >
+                                                Futuro
+                                            </Button>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 border-l pl-3">
+                                            <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                                            <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[10px] text-muted-foreground">De:</span>
+                                                    <Input 
+                                                        type="date" 
+                                                        value={filterStartDate} 
+                                                        onChange={(e) => {
+                                                            setFilterStartDate(e.target.value);
+                                                            setQuickFilter("todos");
+                                                        }}
+                                                        className="h-7 w-[115px] text-[10px] px-1"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[10px] text-muted-foreground">Até:</span>
+                                                    <Input 
+                                                        type="date" 
+                                                        value={filterEndDate} 
+                                                        onChange={(e) => {
+                                                            setFilterEndDate(e.target.value);
+                                                            setQuickFilter("todos");
+                                                        }}
+                                                        className="h-7 w-[115px] text-[10px] px-1"
+                                                    />
+                                                </div>
+                                                {(filterStartDate || filterEndDate || quickFilter !== "todos") && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-7 w-7 text-muted-foreground"
+                                                        onClick={() => {
+                                                            setFilterStartDate("");
+                                                            setFilterEndDate("");
+                                                            setQuickFilter("todos");
+                                                        }}
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
