@@ -541,7 +541,7 @@ const Reagenda = () => {
 
         if (isToday) {
             return `Olá, ${item.nome}! Tudo bem?
-            
+
 Aqui é da equipe de agendamento da ${item.operadora}.
 
 Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} agendada para HOJE, dia ${dataSafelyFormatted}.
@@ -550,7 +550,7 @@ Estou entrando em contato apenas para confirmar o seu agendamento e garantir o d
 
 Caso não seja possível nos receber hoje, por favor, me informe qual seria a melhor DATA, TURNO e HORÁRIO para realizarmos o seu atendimento.
 
-Fico no aguardo!`.replace(/[ ]{2,}/g, ' ');
+Fico no aguardo!`;
         }
 
         return `Olá, ${item.nome}! Tudo bem?
@@ -590,17 +590,10 @@ Para seguirmos com o reagendamento, por favor, me informe:
         }
 
         const encodedMessage = encodeURIComponent(message);
-        const cleanContact = contact.replace(/\D/g, "");
-        const url = `https://api.whatsapp.com/send?phone=55${cleanContact}&text=${encodedMessage}`;
+        let cleanContact = contact.replace(/\D/g, "");
+        if (cleanContact.length <= 11) cleanContact = `55${cleanContact}`;
         
-        const link = document.createElement("a");
-        link.href = url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
+        window.open(`https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodedMessage}`, "_blank");
         trackAction(`Enviou resposta de ${type} para ${item.nome}`);
     };
 
@@ -620,17 +613,10 @@ Para seguirmos com o reagendamento, por favor, me informe:
         const message = getMessageTemplate(item);
         const contact = getActiveContact(item);
         const encodedMessage = encodeURIComponent(message);
-        const cleanContact = contact.replace(/\D/g, "");
-        const url = `https://api.whatsapp.com/send?phone=55${cleanContact}&text=${encodedMessage}`;
-        
-        const link = document.createElement("a");
-        link.href = url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        let cleanContact = contact.replace(/\D/g, "");
+        if (cleanContact.length <= 11) cleanContact = `55${cleanContact}`;
 
+        window.open(`https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodedMessage}`, "_blank");
         trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || cleanContact})`);
         startContactTimer(item.id, "Contatado");
     };
