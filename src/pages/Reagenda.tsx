@@ -3,7 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal, Users, BarChart3, Filter, CalendarDays } from "lucide-react";
+import { ArrowLeft, Upload, MessageSquare, FileSpreadsheet, Download, Trash2, Send, Copy, FileOutput, CheckSquare, Square, Info, X, GripHorizontal, Users, BarChart3, Filter, CalendarDays, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,9 +75,11 @@ const Reagenda = () => {
     
     // Filter state
     const [filterSetor, setFilterSetor] = useState<string>("__all__");
-    const [filterStartDate, setFilterStartDate] = useState<string>("");
-    const [filterEndDate, setFilterEndDate] = useState<string>("");
-    const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro">("todos");
+    const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+    const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+    const [tempStartDate, setTempStartDate] = useState<Date | undefined>(undefined);
+    const [tempEndDate, setTempEndDate] = useState<Date | undefined>(undefined);
+    const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro" | "passado">("todos");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
@@ -219,14 +225,21 @@ const Reagenda = () => {
                 const dDate = parseDateOnly(d.dataAgendamento);
                 return dDate.getTime() > today.getTime();
             });
+        } else if (quickFilter === "passado") {
+            result = result.filter(d => {
+                const dDate = parseDateOnly(d.dataAgendamento);
+                return dDate.getTime() < today.getTime();
+            });
         }
 
         if (filterStartDate) {
-            const start = new Date(filterStartDate + "T00:00:00");
+            const start = new Date(filterStartDate);
+            start.setHours(0, 0, 0, 0);
             result = result.filter(d => parseDateOnly(d.dataAgendamento) >= start);
         }
         if (filterEndDate) {
-            const end = new Date(filterEndDate + "T00:00:00");
+            const end = new Date(filterEndDate);
+            end.setHours(0, 0, 0, 0);
             result = result.filter(d => parseDateOnly(d.dataAgendamento) <= end);
         }
         
@@ -603,6 +616,26 @@ Fico no aguardo!`;
         }
     };
 
+    const deleteSelected = async () => {
+        const selectedItems = filteredData.filter(i => i.selecionado);
+        if (selectedItems.length === 0) {
+            toast({ title: "Nenhum registro selecionado", description: "Selecione os itens que deseja excluir.", variant: "destructive" });
+            return;
+        }
+        const confirmMsg = `Deseja excluir permanentemente ${selectedItems.length} registro(s) selecionado(s)?`;
+        if (!confirm(confirmMsg)) return;
+        
+        const ids = selectedItems.map(i => i.id);
+        setData(prev => prev.filter(item => !ids.includes(item.id)));
+        try {
+            await supabase.from("reagenda_history" as any).delete().in("id", ids);
+            toast({ title: "Registros excluídos", description: `${ids.length} registro(s) removido(s).` });
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Erro ao excluir", variant: "destructive" });
+        }
+    };
+
     const clearHistory = async () => {
         const confirmMsg = "Limpar sua base de contatos permanentemente? (Esta ação não pode ser desfeita e os dados serão excluídos definitivamente)";
         if (confirm(confirmMsg)) {
@@ -865,6 +898,9 @@ Fico no aguardo!`;
                                 <Button variant="default" size="sm" onClick={() => setExportDialogOpen(true)} className="bg-primary hover:bg-primary/90">
                                     <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados
                                 </Button>
+                                <Button variant="outline" size="sm" onClick={deleteSelected} className="text-destructive border-destructive/50 hover:bg-destructive/10">
+                                    <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionados
+                                </Button>
                                 <Button variant="destructive" size="sm" onClick={clearHistory}>
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
@@ -956,17 +992,27 @@ Fico no aguardo!`;
                                                 className="h-7 text-[10px] px-2"
                                                 onClick={() => {
                                                     setQuickFilter("todos");
-                                                    setFilterStartDate("");
-                                                    setFilterEndDate("");
+                                                    setFilterStartDate(undefined);
+                                                    setFilterEndDate(undefined);
+                                                    setTempStartDate(undefined);
+                                                    setTempEndDate(undefined);
                                                 }}
                                             >
                                                 Todos
                                             </Button>
                                             <Button 
+                                                variant={quickFilter === "passado" ? "secondary" : "ghost"} 
+                                                size="sm" 
+                                                className="h-7 text-[10px] px-2"
+                                                onClick={() => { setQuickFilter("passado"); setFilterStartDate(undefined); setFilterEndDate(undefined); }}
+                                            >
+                                                Passado
+                                            </Button>
+                                            <Button 
                                                 variant={quickFilter === "hoje" ? "secondary" : "ghost"} 
                                                 size="sm" 
                                                 className="h-7 text-[10px] px-2"
-                                                onClick={() => setQuickFilter("hoje")}
+                                                onClick={() => { setQuickFilter("hoje"); setFilterStartDate(undefined); setFilterEndDate(undefined); }}
                                             >
                                                 Hoje
                                             </Button>
@@ -974,54 +1020,76 @@ Fico no aguardo!`;
                                                 variant={quickFilter === "futuro" ? "secondary" : "ghost"} 
                                                 size="sm" 
                                                 className="h-7 text-[10px] px-2"
-                                                onClick={() => setQuickFilter("futuro")}
+                                                onClick={() => { setQuickFilter("futuro"); setFilterStartDate(undefined); setFilterEndDate(undefined); }}
                                             >
                                                 Futuro
                                             </Button>
                                         </div>
 
                                         <div className="flex items-center gap-2 border-l pl-3">
-                                            <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                                            <div className="flex items-center gap-1">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-[10px] text-muted-foreground">De:</span>
-                                                    <Input 
-                                                        type="date" 
-                                                        value={filterStartDate} 
-                                                        onChange={(e) => {
-                                                            setFilterStartDate(e.target.value);
-                                                            setQuickFilter("todos");
-                                                        }}
-                                                        className="h-7 w-[115px] text-[10px] px-1"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-[10px] text-muted-foreground">Até:</span>
-                                                    <Input 
-                                                        type="date" 
-                                                        value={filterEndDate} 
-                                                        onChange={(e) => {
-                                                            setFilterEndDate(e.target.value);
-                                                            setQuickFilter("todos");
-                                                        }}
-                                                        className="h-7 w-[115px] text-[10px] px-1"
-                                                    />
-                                                </div>
-                                                {(filterStartDate || filterEndDate || quickFilter !== "todos") && (
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="h-7 w-7 text-muted-foreground"
-                                                        onClick={() => {
-                                                            setFilterStartDate("");
-                                                            setFilterEndDate("");
-                                                            setQuickFilter("todos");
-                                                        }}
-                                                    >
-                                                        <X className="w-3 h-3" />
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-2 gap-1">
+                                                        <CalendarIcon className="w-3 h-3" />
+                                                        {tempStartDate ? format(tempStartDate, "dd/MM/yy") : "Início"}
                                                     </Button>
-                                                )}
-                                            </div>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={tempStartDate}
+                                                        onSelect={setTempStartDate}
+                                                        initialFocus
+                                                        className="p-3 pointer-events-auto"
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <Popover>
+                                                <PopoverTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-2 gap-1">
+                                                        <CalendarIcon className="w-3 h-3" />
+                                                        {tempEndDate ? format(tempEndDate, "dd/MM/yy") : "Fim"}
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar
+                                                        mode="single"
+                                                        selected={tempEndDate}
+                                                        onSelect={setTempEndDate}
+                                                        initialFocus
+                                                        className="p-3 pointer-events-auto"
+                                                    />
+                                                </PopoverContent>
+                                            </Popover>
+                                            <Button 
+                                                variant="secondary" 
+                                                size="sm" 
+                                                className="h-7 text-[10px] px-2"
+                                                onClick={() => {
+                                                    setFilterStartDate(tempStartDate);
+                                                    setFilterEndDate(tempEndDate);
+                                                    setQuickFilter("todos");
+                                                }}
+                                                disabled={!tempStartDate && !tempEndDate}
+                                            >
+                                                OK
+                                            </Button>
+                                            {(filterStartDate || filterEndDate || quickFilter !== "todos") && (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-muted-foreground"
+                                                    onClick={() => {
+                                                        setFilterStartDate(undefined);
+                                                        setFilterEndDate(undefined);
+                                                        setTempStartDate(undefined);
+                                                        setTempEndDate(undefined);
+                                                        setQuickFilter("todos");
+                                                    }}
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

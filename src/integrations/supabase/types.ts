@@ -826,6 +826,81 @@ export type Database = {
         }
         Relationships: []
       }
+      vistorias_campo: {
+        Row: {
+          assinatura_supervisor: string | null
+          assinatura_tecnico: string | null
+          avaliacao_qualidade: Json | null
+          created_at: string
+          ferramentas_faltantes: Json | null
+          foto_equipamentos_url: string | null
+          foto_execucao_url: string | null
+          foto_supervisor_url: string | null
+          foto_uniforme_url: string | null
+          id: string
+          indicador_dias_trabalhados: string | null
+          indicador_eficacia: string | null
+          indicador_infancia: string | null
+          indicador_produtividade: string | null
+          indicador_repetida: string | null
+          nome_tecnico: string | null
+          observacoes: string | null
+          supervisor_tecnico: string | null
+          tecnico_re: string | null
+          tecnico_tt: string | null
+          uniformes_faltantes: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          assinatura_supervisor?: string | null
+          assinatura_tecnico?: string | null
+          avaliacao_qualidade?: Json | null
+          created_at?: string
+          ferramentas_faltantes?: Json | null
+          foto_equipamentos_url?: string | null
+          foto_execucao_url?: string | null
+          foto_supervisor_url?: string | null
+          foto_uniforme_url?: string | null
+          id?: string
+          indicador_dias_trabalhados?: string | null
+          indicador_eficacia?: string | null
+          indicador_infancia?: string | null
+          indicador_produtividade?: string | null
+          indicador_repetida?: string | null
+          nome_tecnico?: string | null
+          observacoes?: string | null
+          supervisor_tecnico?: string | null
+          tecnico_re?: string | null
+          tecnico_tt?: string | null
+          uniformes_faltantes?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          assinatura_supervisor?: string | null
+          assinatura_tecnico?: string | null
+          avaliacao_qualidade?: Json | null
+          created_at?: string
+          ferramentas_faltantes?: Json | null
+          foto_equipamentos_url?: string | null
+          foto_execucao_url?: string | null
+          foto_supervisor_url?: string | null
+          foto_uniforme_url?: string | null
+          id?: string
+          indicador_dias_trabalhados?: string | null
+          indicador_eficacia?: string | null
+          indicador_infancia?: string | null
+          indicador_produtividade?: string | null
+          indicador_repetida?: string | null
+          nome_tecnico?: string | null
+          observacoes?: string | null
+          supervisor_tecnico?: string | null
+          tecnico_re?: string | null
+          tecnico_tt?: string | null
+          uniformes_faltantes?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
