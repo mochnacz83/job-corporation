@@ -64,6 +64,29 @@ const VistoriaCampo = () => {
   const [fotoEquipamentos, setFotoEquipamentos] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
   const [fotoExecucao, setFotoExecucao] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
 
+  // Quality Check State
+  const [atividadeCorreta, setAtividadeCorreta] = useState<string>("");
+  const [obsAtividadeCorreta, setObsAtividadeCorreta] = useState("");
+  const [atendimentoCliente, setAtendimentoCliente] = useState<string>("");
+  const [obsAtendimentoCliente, setObsAtendimentoCliente] = useState("");
+  const [procedimentoSeguranca, setProcedimentoSeguranca] = useState<string>("");
+  const [obsProcedimentoSeguranca, setObsProcedimentoSeguranca] = useState("");
+  const [dominaTecnicas, setDominaTecnicas] = useState<string>("");
+  const [obsDominaTecnicas, setObsDominaTecnicas] = useState("");
+  const [comunicacaoCliente, setComunicacaoCliente] = useState<string>("");
+  const [obsComunicacaoCliente, setObsComunicacaoCliente] = useState("");
+
+  // Checklists Físicos
+  const [ferramentalOk, setFerramentalOk] = useState<string>("");
+  const [necessidadesFerramentas, setNecessidadesFerramentas] = useState<{ equipamento: string; quantidade: string }[]>([]);
+
+  const [uniformeOk, setUniformeOk] = useState<string>("");
+  const [necessidadesUniforme, setNecessidadesUniforme] = useState<{ calca: boolean; tamanhoCalca: string; camisa: boolean; tamanhoCamisa: string; sapato: boolean; tamanhoSapato: string }>({
+    calca: false, tamanhoCalca: "",
+    camisa: false, tamanhoCamisa: "",
+    sapato: false, tamanhoSapato: ""
+  });
+
   const fileInputSupervisor = useRef<HTMLInputElement>(null);
   const fileInputEquipamentos = useRef<HTMLInputElement>(null);
   const fileInputExecucao = useRef<HTMLInputElement>(null);
@@ -261,6 +284,84 @@ const VistoriaCampo = () => {
     reader.readAsDataURL(file);
   };
 
+  const generateNecessidadesPDF = (data: any) => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    let y = 10;
+
+    try {
+      const logoImg = new Image();
+      logoImg.src = "/ability-logo.png";
+      doc.addImage(logoImg, "PNG", margin, y, 25, 12);
+    } catch { }
+
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("SOLICITAÇÃO DE REPOSIÇÃO - MATERIAIS", pageW / 2, y + 8, { align: "center" });
+    
+    y += 20;
+    doc.setDrawColor(0, 80, 150);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageW - margin, y);
+    y += 8;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("INFORMAÇÕES DO COLABORADOR", margin, y);
+    y += 6;
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Nome: ${data.nome}`, margin, y);
+    y += 5;
+    doc.text(`Matrícula (RE): ${data.re}`, margin, y);
+    doc.text(`Técnico (TT): ${data.tt}`, margin + 90, y);
+    y += 10;
+
+    if (data.necessidadesFerramentas && data.necessidadesFerramentas.length > 0) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("FERRAMENTAS E EQUIPAMENTOS SOLICITADOS:", margin, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      data.necessidadesFerramentas.forEach((f: any) => {
+        doc.text(`- ${f.equipamento} (Qtd: ${f.quantidade})`, margin + 5, y);
+        y += 5;
+      });
+      y += 5;
+    }
+
+    if (data.necessidadesUniforme && (data.necessidadesUniforme.calca || data.necessidadesUniforme.camisa || data.necessidadesUniforme.sapato)) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("UNIFORME SOLICITADO:", margin, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      
+      const u = data.necessidadesUniforme;
+      if (u.calca) { doc.text(`- Calça (Tamanho: ${u.tamanhoCalca || 'Não informado'})`, margin + 5, y); y += 5; }
+      if (u.camisa) { doc.text(`- Camisa (Tamanho: ${u.tamanhoCamisa || 'Não informado'})`, margin + 5, y); y += 5; }
+      if (u.sapato) { doc.text(`- Sapato (Tamanho: ${u.tamanhoSapato || 'Não informado'})`, margin + 5, y); y += 5; }
+    }
+
+    y += 15;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("Documento gerado automaticamente pelo sistema de Vistoria de Qualidade.", margin, y);
+
+    const pdfBlob = doc.output("blob");
+    const downloadUrl = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = `Reposicao_${data.nome?.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(downloadUrl);
+  };
+
   const generatePDF = (data: any) => {
     const doc = new jsPDF("p", "mm", "a4");
     const pageW = doc.internal.pageSize.getWidth();
@@ -326,8 +427,43 @@ const VistoriaCampo = () => {
       if (i > 0) doc.line(margin + i * colW, tableY, margin + i * colW, y + 8);
     });
 
-    y += 15;
+    y += 10;
+    
+    const checkSpace = (h: number) => { if (y + h > 280) { doc.addPage(); y = 20; } };
 
+    // --- Nova Sessao de Qualidade ---
+    checkSpace(15);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("AVALIAÇÃO DE QUALIDADE E SEGURANÇA", margin, y);
+    y += 6;
+    doc.setFontSize(9);
+    
+    const addQuestion = (q: string, val: string, obs: string) => {
+      checkSpace(8);
+      doc.setFont("helvetica", "bold");
+      doc.text(q, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Resp: ${val || "-"}`, margin + 120, y);
+      y += 5;
+      if (obs && val !== "Sim" && val !== "Excelente") {
+         checkSpace(5);
+         doc.text(`Obs: ${obs}`, margin + 5, y);
+         y += 5;
+      }
+    };
+
+    addQuestion("1. Técnico executou a atividade correta?", data.atividadeCorreta, data.obsAtividadeCorreta);
+    addQuestion("2. Técnico atendeu bem o cliente?", data.atendimentoCliente, data.obsAtendimentoCliente);
+    addQuestion("3. Realizou todos os proc. de segurança?", data.procedimentoSeguranca, data.obsProcedimentoSeguranca);
+    addQuestion("4. Domina todas as técnicas?", data.dominaTecnicas, data.obsDominaTecnicas);
+    addQuestion("5. Avalie a comunicação com o cliente:", data.comunicacaoCliente, data.obsComunicacaoCliente);
+    addQuestion("6. Ferramental OK?", data.ferramentalOk, "");
+    addQuestion("7. Uniforme OK?", data.uniformeOk, "");
+
+    y += 10;
+
+    checkSpace(10);
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     const splitPhrase = doc.splitTextToSize(FRASE_COMPROMISSO, pageW - 2 * margin);
@@ -346,7 +482,6 @@ const VistoriaCampo = () => {
 
     const photoSize = 50;
     let photoX = margin;
-    const checkSpace = (h: number) => { if (y + h > 280) { doc.addPage(); y = 20; } };
 
     const photos = [
       { label: "Supervisor c/ Técnico", url: data.fotoSupervisor },
@@ -444,7 +579,19 @@ const VistoriaCampo = () => {
         foto_equipamentos_url: urlEquipamentos,
         foto_execucao_url: urlExecucao,
         assinatura_supervisor: sigSupervisor,
-        assinatura_tecnico: sigTecnico
+        assinatura_tecnico: sigTecnico,
+        // Adicionando os novos campos JSONB que foram criados no banco de dados via SQL:
+        avaliacao_qualidade: {
+           atividadeCorreta, obsAtividadeCorreta,
+           atendimentoCliente, obsAtendimentoCliente,
+           procedimentoSeguranca, obsProcedimentoSeguranca,
+           dominaTecnicas, obsDominaTecnicas,
+           comunicacaoCliente, obsComunicacaoCliente,
+           ferramentalOk,
+           uniformeOk
+        },
+        ferramentas_faltantes: necessidadesFerramentas,
+        uniformes_faltantes: necessidadesUniforme
       });
 
       if (error) throw error;
@@ -452,16 +599,36 @@ const VistoriaCampo = () => {
       toast.success("Vistoria salva com sucesso!");
       trackAction("salvar_vistoria");
 
-      generatePDF({
+      const vistoriaData = {
         ...indicadores,
         observacoes,
         fotoSupervisor: fotoSupervisor.preview,
         fotoEquipamentos: fotoEquipamentos.preview,
         fotoExecucao: fotoExecucao.preview,
         sigSupervisor,
-        sigTecnico
-      });
+        sigTecnico,
+        atividadeCorreta, obsAtividadeCorreta,
+        atendimentoCliente, obsAtendimentoCliente,
+        procedimentoSeguranca, obsProcedimentoSeguranca,
+        dominaTecnicas, obsDominaTecnicas,
+        comunicacaoCliente, obsComunicacaoCliente,
+        ferramentalOk,
+        uniformeOk,
+        necessidadesFerramentas,
+        necessidadesUniforme
+      };
 
+      // Gerar PDF da Vistoria geral
+      generatePDF(vistoriaData);
+
+      // Gerar PDF de Necessidades se ferramentas/uniforme negativados
+      if (ferramentalOk === "Não" || uniformeOk === "Não") {
+        setTimeout(() => {
+          generateNecessidadesPDF(vistoriaData);
+        }, 1000); // 1 segundo de folga pro navegador não barrar 2 downloads
+      }
+
+      // Reset Form State
       setRe("");
       setIndicadores(null);
       setObservacoes("");
@@ -470,6 +637,14 @@ const VistoriaCampo = () => {
       setFotoExecucao({ preview: null, file: null });
       clearCanvas(sigSupervisorCanvasRef.current);
       clearCanvas(sigTecnicoCanvasRef.current);
+      setAtividadeCorreta(""); setObsAtividadeCorreta("");
+      setAtendimentoCliente(""); setObsAtendimentoCliente("");
+      setProcedimentoSeguranca(""); setObsProcedimentoSeguranca("");
+      setDominaTecnicas(""); setObsDominaTecnicas("");
+      setComunicacaoCliente(""); setObsComunicacaoCliente("");
+      setFerramentalOk(""); setNecessidadesFerramentas([]);
+      setUniformeOk(""); setNecessidadesUniforme({ calca: false, tamanhoCalca: "", camisa: false, tamanhoCamisa: "", sapato: false, tamanhoSapato: "" });
+      
     } catch (err: any) {
       toast.error("Erro ao salvar vistoria: " + err.message);
     } finally {
@@ -772,9 +947,9 @@ const VistoriaCampo = () => {
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   {[
-                    { label: "Supervisor com Técnico", state: fotoSupervisor, setter: setFotoSupervisor, ref: fileInputSupervisor, icon: <Camera className="w-8 h-8 text-muted-foreground mb-2" /> },
+                    { label: "Supervisor com Técnico", state: fotoSupervisor, setter: setFotoSupervisor, ref: fileInputSupervisor, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
                     { label: "Equipamentos e Ferramentas", state: fotoEquipamentos, setter: setFotoEquipamentos, ref: fileInputEquipamentos, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
-                    { label: "Execução do Serviço", state: fotoExecucao, setter: setFotoExecucao, ref: fileInputExecucao, icon: <CheckCircle2 className="w-8 h-8 text-muted-foreground mb-2" /> }
+                    { label: "Execução do Serviço", state: fotoExecucao, setter: setFotoExecucao, ref: fileInputExecucao, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> }
                   ].map((photo, idx) => (
                     <div key={idx} className="space-y-2">
                       <Label className="text-sm font-semibold">{photo.label}</Label>
@@ -807,6 +982,187 @@ const VistoriaCampo = () => {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Section: Quality evaluation */}
+            <Card className="glass-card">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                  <CheckCircle2 className="w-5 h-5" /> Avaliação de Qualidade
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                
+                {/* Atividade Correta */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground">1. Técnico executou a atividade correta?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={atividadeCorreta === "Sim" ? "default" : "outline"} onClick={() => setAtividadeCorreta("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={atividadeCorreta === "Não" ? "destructive" : "outline"} onClick={() => setAtividadeCorreta("Não")} className="flex-1">Não</Button>
+                  </div>
+                  {atividadeCorreta === "Não" && (
+                    <div className="mt-2">
+                      <Input placeholder="Qual foi o desvio na atividade?" value={obsAtividadeCorreta} onChange={e => setObsAtividadeCorreta(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Atendimento Cliente */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground">2. Técnico atendeu bem o cliente?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={atendimentoCliente === "Sim" ? "default" : "outline"} onClick={() => setAtendimentoCliente("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={atendimentoCliente === "Não" ? "destructive" : "outline"} onClick={() => setAtendimentoCliente("Não")} className="flex-1">Não</Button>
+                  </div>
+                  {atendimentoCliente === "Não" && (
+                    <div className="mt-2">
+                      <Input placeholder="O que ocorreu no atendimento?" value={obsAtendimentoCliente} onChange={e => setObsAtendimentoCliente(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Segurança */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground">3. Realizou todos os procedimentos de segurança?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={procedimentoSeguranca === "Sim" ? "default" : "outline"} onClick={() => setProcedimentoSeguranca("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={procedimentoSeguranca === "Não" ? "destructive" : "outline"} onClick={() => setProcedimentoSeguranca("Não")} className="flex-1">Não</Button>
+                  </div>
+                  {procedimentoSeguranca === "Não" && (
+                    <div className="mt-2">
+                      <Input placeholder="Quais procedimentos faltaram?" value={obsProcedimentoSeguranca} onChange={e => setObsProcedimentoSeguranca(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Domina Técnicas */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground">4. Domina todas as técnicas da operação?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={dominaTecnicas === "Sim" ? "default" : "outline"} onClick={() => setDominaTecnicas("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={dominaTecnicas === "Não" ? "destructive" : "outline"} onClick={() => setDominaTecnicas("Não")} className="flex-1">Não</Button>
+                  </div>
+                  {dominaTecnicas === "Não" && (
+                    <div className="mt-2">
+                      <Input placeholder="Quais técnicas precisam de reforço?" value={obsDominaTecnicas} onChange={e => setObsDominaTecnicas(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Comunicação */}
+                <div className="space-y-3 border-t pt-4">
+                  <Label className="text-sm font-semibold text-foreground">5. Avalie a comunicação com o cliente:</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {["Excelente", "Boa", "Média", "Ruim"].map(opt => (
+                      <Button key={opt} type="button" variant={comunicacaoCliente === opt ? (opt === "Média" || opt === "Ruim" ? "destructive" : "default") : "outline"} onClick={() => setComunicacaoCliente(opt)}>
+                        {opt}
+                      </Button>
+                    ))}
+                  </div>
+                  {(comunicacaoCliente === "Média" || comunicacaoCliente === "Ruim") && (
+                    <div className="mt-2">
+                      <Input placeholder="Explique o motivo da nota para a comunicação" value={obsComunicacaoCliente} onChange={e => setObsComunicacaoCliente(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+
+              </CardContent>
+            </Card>
+
+            {/* Section: Materiais e Uniforme */}
+            <Card className="glass-card">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                  <FileText className="w-5 h-5" /> Checklist Físico (Ferramentas e Uniforme)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-8">
+                
+                {/* Ferramentas */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold text-foreground">As ferramentas estão OK e completas?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={ferramentalOk === "Sim" ? "default" : "outline"} onClick={() => setFerramentalOk("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={ferramentalOk === "Não" ? "destructive" : "outline"} onClick={() => setFerramentalOk("Não")} className="flex-1">Não (Solicitar Reposição)</Button>
+                  </div>
+                  
+                  {ferramentalOk === "Não" && (
+                    <div className="bg-destructive/5 p-4 rounded-lg mt-3 space-y-4 border border-destructive/20">
+                      <Label className="font-semibold text-destructive">Adicionar ferramentas necessárias:</Label>
+                      {necessidadesFerramentas.map((nf, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Input className="flex-1 bg-white" placeholder="Nome do Equipamento" value={nf.equipamento} onChange={e => {
+                            const newNf = [...necessidadesFerramentas];
+                            newNf[idx].equipamento = e.target.value;
+                            setNecessidadesFerramentas(newNf);
+                          }} />
+                          <Input className="w-24 bg-white" placeholder="Qtd" type="number" min="1" value={nf.quantidade} onChange={e => {
+                            const newNf = [...necessidadesFerramentas];
+                            newNf[idx].quantidade = e.target.value;
+                            setNecessidadesFerramentas(newNf);
+                          }} />
+                          <Button size="icon" variant="outline" className="text-destructive border-destructive shrink-0 bg-white" onClick={() => {
+                            setNecessidadesFerramentas(necessidadesFerramentas.filter((_, i) => i !== idx));
+                          }}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setNecessidadesFerramentas([...necessidadesFerramentas, { equipamento: "", quantidade: "1" }])}>
+                        + Adicionar Ferramenta
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Uniforme */}
+                <div className="space-y-3 border-t pt-4">
+                  <Label className="text-sm font-semibold text-foreground">O Uniforme está OK e em bom estado?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={uniformeOk === "Sim" ? "default" : "outline"} onClick={() => setUniformeOk("Sim")} className="flex-1">Sim</Button>
+                    <Button type="button" variant={uniformeOk === "Não" ? "destructive" : "outline"} onClick={() => setUniformeOk("Não")} className="flex-1">Não (Solicitar Peças)</Button>
+                  </div>
+
+                  {uniformeOk === "Não" && (
+                    <div className="bg-destructive/5 p-4 rounded-lg mt-3 space-y-4 border border-destructive/20">
+                      <Label className="font-semibold text-destructive">Selecione as peças para reposição e o tamanho:</Label>
+                      
+                      {/* Calça */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Button type="button" variant={necessidadesUniforme.calca ? "default" : "outline"} 
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, calca: !prev.calca }))} className="w-full sm:w-32 bg-white">
+                           Calça
+                        </Button>
+                        {necessidadesUniforme.calca && (
+                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: 42)" value={necessidadesUniforme.tamanhoCalca} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCalca: e.target.value }))} />
+                        )}
+                      </div>
+
+                      {/* Camisa */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Button type="button" variant={necessidadesUniforme.camisa ? "default" : "outline"} 
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, camisa: !prev.camisa }))} className="w-full sm:w-32 bg-white">
+                           Camisa
+                        </Button>
+                        {necessidadesUniforme.camisa && (
+                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: M, G...)" value={necessidadesUniforme.tamanhoCamisa} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCamisa: e.target.value }))} />
+                        )}
+                      </div>
+
+                      {/* Sapato */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Button type="button" variant={necessidadesUniforme.sapato ? "default" : "outline"} 
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, sapato: !prev.sapato }))} className="w-full sm:w-32 bg-white">
+                           Sapato
+                        </Button>
+                        {necessidadesUniforme.sapato && (
+                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: 40)" value={necessidadesUniforme.tamanhoSapato} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoSapato: e.target.value }))} />
+                        )}
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
               </CardContent>
             </Card>
 
