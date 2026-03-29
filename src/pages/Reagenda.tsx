@@ -541,7 +541,7 @@ const Reagenda = () => {
 
         if (isToday) {
             return `Olá, ${item.nome}! Tudo bem?
-
+            
 Aqui é da equipe de agendamento da ${item.operadora}.
 
 Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} agendada para HOJE, dia ${dataSafelyFormatted}.
@@ -590,10 +590,7 @@ Para seguirmos com o reagendamento, por favor, me informe:
         }
 
         const encodedMessage = encodeURIComponent(message);
-        let cleanContact = contact.replace(/\D/g, "");
-        if (cleanContact.length <= 11) cleanContact = `55${cleanContact}`;
-        
-        window.open(`https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodedMessage}`, "_blank");
+        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
         trackAction(`Enviou resposta de ${type} para ${item.nome}`);
     };
 
@@ -613,11 +610,8 @@ Para seguirmos com o reagendamento, por favor, me informe:
         const message = getMessageTemplate(item);
         const contact = getActiveContact(item);
         const encodedMessage = encodeURIComponent(message);
-        let cleanContact = contact.replace(/\D/g, "");
-        if (cleanContact.length <= 11) cleanContact = `55${cleanContact}`;
-
-        window.open(`https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodedMessage}`, "_blank");
-        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || cleanContact})`);
+        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || contact})`);
         startContactTimer(item.id, "Contatado");
     };
 
