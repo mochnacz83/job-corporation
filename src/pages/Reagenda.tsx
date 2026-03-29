@@ -80,6 +80,7 @@ const Reagenda = () => {
     const [tempStartDate, setTempStartDate] = useState<Date | undefined>(undefined);
     const [tempEndDate, setTempEndDate] = useState<Date | undefined>(undefined);
     const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro" | "passado">("todos");
+    const [filterTurno, setFilterTurno] = useState<"todos" | "manha" | "tarde">("todos");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
