@@ -75,9 +75,11 @@ const Reagenda = () => {
     
     // Filter state
     const [filterSetor, setFilterSetor] = useState<string>("__all__");
-    const [filterStartDate, setFilterStartDate] = useState<string>("");
-    const [filterEndDate, setFilterEndDate] = useState<string>("");
-    const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro">("todos");
+    const [filterStartDate, setFilterStartDate] = useState<Date | undefined>(undefined);
+    const [filterEndDate, setFilterEndDate] = useState<Date | undefined>(undefined);
+    const [tempStartDate, setTempStartDate] = useState<Date | undefined>(undefined);
+    const [tempEndDate, setTempEndDate] = useState<Date | undefined>(undefined);
+    const [quickFilter, setQuickFilter] = useState<"todos" | "hoje" | "futuro" | "passado">("todos");
     
     // Admin & Metrics state
     const [globalAdminView, setGlobalAdminView] = useState(false);
