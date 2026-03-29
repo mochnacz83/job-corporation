@@ -477,15 +477,56 @@ const VistoriaCampo = () => {
     doc.setFont("helvetica", "bold");
     doc.text("AVALIAÇÃO DE QUALIDADE E SEGURANÇA", margin, y);
     y += 6;
-    doc.setFontSize(9);
     
+    // Calcular a Nota
+    let score = 0;
+    const calcScore = (val: string) => {
+      if (val === "Sim" || val === "Excelente" || val === "Boa") return 20;
+      if (val === "Média") return 10;
+      return 0; // Não, Ruim, Não avaliado
+    };
+    
+    score += calcScore(data.atividadeCorreta);
+    score += calcScore(data.atendimentoCliente);
+    score += calcScore(data.procedimentoSeguranca);
+    score += calcScore(data.dominaTecnicas);
+    score += calcScore(data.comunicacaoCliente);
+
+    const tableW = pageW - 2 * margin;
+
+    // Função de Cabeçalho da Tabela
+    const drawTableHeader = (titleLeft: string, titleRight: string) => {
+      doc.setFillColor(240, 240, 240);
+      doc.rect(margin, y, tableW, 7, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text(titleLeft, margin + 2, y + 5);
+      
+      doc.line(margin + tableW * 0.7, y, margin + tableW * 0.7, y + 7);
+      doc.text(titleRight, margin + tableW * 0.85, y + 5, { align: "center" });
+      y += 7;
+    };
+
     const addQuestion = (q: string, val: string, obs: string, isChecklistFisico = false) => {
       let printedVal = val || "-";
       let observationText = "";
 
       if (val && val !== "Não avaliado") {
         if (isChecklistFisico && val === "Não") {
-          printedVal = "Não (Encaminhado p/ Logística)";
+           // Checklist Fisico: Falhou
+           observationText = "Gerado doc para encaminhar a Logística.";
+           const faltantes: string[] = [];
+           if (q.includes("Ferramental")) {
+             data.necessidadesFerramentas?.forEach((f: any) => faltantes.push(f.equipamento));
+           } else if (q.includes("Uniforme")) {
+             const u = data.necessidadesUniforme;
+             if (u?.calca) faltantes.push("Calça");
+             if (u?.camisa) faltantes.push("Camisa");
+             if (u?.sapato) faltantes.push("Sapato");
+           }
+           if (faltantes.length > 0) {
+             observationText += ` Faltas: ${faltantes.join(", ")}`;
+           }
         } else if (val === "Sim" || val === "Excelente" || val === "Boa") {
           observationText = "Conforme com Processo";
         } else {
@@ -493,17 +534,15 @@ const VistoriaCampo = () => {
         }
       }
 
-      const tableW = pageW - 2 * margin;
-      doc.setFont("helvetica", "bold");
-      const splitQ = doc.splitTextToSize(q, tableW * 0.55);
       doc.setFont("helvetica", "normal");
-      const splitV = doc.splitTextToSize(printedVal, tableW * 0.40);
+      doc.setFontSize(9);
+      const splitQ = doc.splitTextToSize(q, tableW * 0.68);
       
-      const mainRowH = Math.max(splitQ.length, splitV.length) * 5 + 4;
+      const mainRowH = Math.max(splitQ.length, 1) * 5 + 4;
       
       let obsH = 0;
       let splitObs: string[] = [];
-      if (observationText && !isChecklistFisico) { // Físico = Sem observação na tabela geral
+      if (observationText) {
         doc.setFont("helvetica", "italic");
         splitObs = doc.splitTextToSize(observationText, tableW - 4);
         obsH = splitObs.length * 5 + 4;
@@ -516,20 +555,26 @@ const VistoriaCampo = () => {
       doc.setLineWidth(0.1);
       doc.rect(margin, y, tableW, mainRowH, "S");
       
-      doc.setFont("helvetica", "bold");
-      doc.text(splitQ, margin + 2, y + 5);
       doc.setFont("helvetica", "normal");
-      doc.text(splitV, margin + tableW * 0.6, y + 5);
+      doc.text(splitQ, margin + 2, y + 5);
+      
+      // Divisória Vertical da Resposta
+      doc.line(margin + tableW * 0.7, y, margin + tableW * 0.7, y + mainRowH);
+      
+      // Texto Resposta Centralizado
+      doc.setFont("helvetica", "bold");
+      const textWidth = doc.getTextWidth(printedVal);
+      doc.text(printedVal, margin + tableW * 0.85, y + mainRowH / 2 + 1.5, { align: "center", baseline: "middle" });
       
       y += mainRowH;
       
       // Linha Secundária (Observação)
-      if (observationText && !isChecklistFisico) {
+      if (observationText) {
         doc.setFillColor(val === "Sim" || val === "Excelente" || val === "Boa" ? 245 : 255, val === "Sim" || val === "Excelente" || val === "Boa" ? 255 : 240, 245);
         if (val !== "Sim" && val !== "Excelente" && val !== "Boa") {
-            doc.setFillColor(255, 245, 245); // Red tint
+            doc.setFillColor(255, 245, 245); // Fundo Vermelho
         } else {
-            doc.setFillColor(245, 255, 245); // Green tint
+            doc.setFillColor(245, 255, 245); // Fundo Verde
         }
 
         doc.rect(margin, y, tableW, obsH, "FD");
@@ -542,11 +587,34 @@ const VistoriaCampo = () => {
       }
     };
 
+    // Imprimir Tabela de Qualidade (Q1 a Q5)
+    drawTableHeader("Itens Avaliados", "Resposta");
     addQuestion("1. Técnico executou a atividade correta?", data.atividadeCorreta, data.obsAtividadeCorreta);
     addQuestion("2. Técnico atendeu bem o cliente?", data.atendimentoCliente, data.obsAtendimentoCliente);
     addQuestion("3. Realizou todos os proc. de segurança?", data.procedimentoSeguranca, data.obsProcedimentoSeguranca);
     addQuestion("4. Domina todas as técnicas?", data.dominaTecnicas, data.obsDominaTecnicas);
     addQuestion("5. Avalie a comunicação com o cliente:", data.comunicacaoCliente, data.obsComunicacaoCliente);
+
+    // Desenhar Bloco de Nota Final
+    y += 2;
+    doc.setFillColor(230, 240, 255);
+    doc.rect(margin, y, tableW, 8, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 80, 150);
+    doc.text(`NOTA FINAL DE QUALIDADE: ${score}%`, margin + tableW / 2, y + 5.5, { align: "center" });
+    doc.setTextColor(0, 0, 0); // Reset color
+    
+    y += 12;
+
+    // --- Nova Sessao Ferramental ---
+    checkSpace(20);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("CHECKLIST FERRAMENTAL E UNIFORME", margin, y);
+    y += 6;
+    
+    drawTableHeader("Itens Avaliados", "Resposta");
     addQuestion("6. Ferramental OK?", data.ferramentalOk, "", true);
     addQuestion("7. Uniforme OK?", data.uniformeOk, "", true);
 
