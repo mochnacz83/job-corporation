@@ -605,7 +605,7 @@ const VistoriaCampo = () => {
     doc.text(`NOTA FINAL DE QUALIDADE: ${score}%`, margin + tableW / 2, y + 5.5, { align: "center" });
     doc.setTextColor(0, 0, 0); // Reset color
     
-    y += 22;
+    y += 18; // Ajustado espaço entre Nota de Qualidade e Checklist
 
     // --- Nova Sessao Ferramental ---
     checkSpace(20);
@@ -618,7 +618,7 @@ const VistoriaCampo = () => {
     addQuestion("6. Ferramental OK?", data.ferramentalOk, "", true);
     addQuestion("7. Uniforme OK?", data.uniformeOk, "", true);
 
-    y += 10;
+    y += 6;
 
     if (data.observacoes) {
       doc.setFont("helvetica", "bold");
@@ -627,10 +627,10 @@ const VistoriaCampo = () => {
       doc.setFont("helvetica", "normal");
       const splitObs = doc.splitTextToSize(data.observacoes, pageW - 2 * margin);
       doc.text(splitObs, margin, y);
-      y += (splitObs.length * 5) + 10;
+      y += (splitObs.length * 5) + 6;
     }
 
-    const photoSize = 73; // Reduzido para encaixar na folha 2 c/ assinatura
+    const photoSize = 68; // Cravar tamanho para garantir 2 páginas finais
     let photoX = margin;
 
     const photos = [
@@ -652,39 +652,39 @@ const VistoriaCampo = () => {
           doc.setFontSize(8);
           doc.text(p.label, photoX + photoSize / 2, y + photoSize + 4, { align: "center" });
           
-          photoX += photoSize + 10;
+          photoX += photoSize + 8; // Compactado de 10 para 8
           
-          if ((idx + 1) % 2 === 0) { // Duas fotos por linha garantidas
+          if ((idx + 1) % 2 === 0) {
             photoX = margin;
-            y += photoSize + 15;
+            y += photoSize + 12; // Compactado de 15 para 12
             checkSpace(photoSize + 10);
           }
         } catch { }
       });
-      if (photoX !== margin) y += photoSize + 15;
+      if (photoX !== margin) y += photoSize + 12;
     }
 
     checkSpace(10);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     const splitPhrase = doc.splitTextToSize(FRASE_COMPROMISSO, pageW - 2 * margin);
     doc.text(splitPhrase, margin, y);
-    y += (splitPhrase.length * 5) + 5;
+    y += (splitPhrase.length * 4) + 4; // Compactado de 5 para 4
 
-    checkSpace(25);
-    y += 15;
+    checkSpace(20);
+    y += 12;
     
     doc.setLineWidth(0.2);
     doc.setDrawColor(0);
 
-    doc.line(margin, y, margin + 70, y);
+    doc.line(margin, y, margin + 65, y); // Reduzido de 70 para 65
     doc.setFontSize(8);
-    doc.text("Assinatura do Supervisor", margin + 35, y + 5, { align: "center" });
+    doc.text("Assinatura do Supervisor", margin + 32, y + 5, { align: "center" });
     if (data.sigSupervisor) {
-      doc.addImage(data.sigSupervisor, "PNG", margin + 10, y - 15, 50, 15);
+      doc.addImage(data.sigSupervisor, "PNG", margin + 7, y - 12, 50, 12);
     }
 
-    doc.line(pageW - margin - 70, y, pageW - margin, y);
+    doc.line(pageW - margin - 65, y, pageW - margin, y);
     doc.text("Assinatura do Técnico", pageW - margin - 35, y + 5, { align: "center" });
     if (data.sigTecnico) {
       doc.addImage(data.sigTecnico, "PNG", pageW - margin - 60, y - 15, 50, 15);
