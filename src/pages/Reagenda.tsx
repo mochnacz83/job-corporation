@@ -997,6 +997,20 @@ Fico no aguardo!`;
                                         </Select>
                                     </div>
 
+                                    {/* Turno Filter */}
+                                    <div className="flex items-center gap-2">
+                                        <Select value={filterTurno} onValueChange={(v: any) => setFilterTurno(v)}>
+                                            <SelectTrigger className="h-8 w-[130px] text-xs">
+                                                <SelectValue placeholder="Turno" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="todos">Todos Turnos</SelectItem>
+                                                <SelectItem value="manha">☀️ Manhã</SelectItem>
+                                                <SelectItem value="tarde">🌙 Tarde</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     {/* Date Filter */}
                                     <div className="flex items-center gap-3">
                                         <div className="flex bg-muted p-0.5 rounded-md">
