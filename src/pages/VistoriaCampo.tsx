@@ -631,7 +631,9 @@ const VistoriaCampo = () => {
     }
 
     const photoSize = 68; // Cravar tamanho para garantir 2 páginas finais
-    let photoX = margin;
+    const photoGap = 8;
+    const startX = (pageW - (photoSize * 2 + photoGap)) / 2;
+    let photoX = startX;
 
     const photos = [
       { label: "Supervisor c/ Técnico", url: data.fotoSupervisor },
@@ -647,21 +649,25 @@ const VistoriaCampo = () => {
       y += 5;
 
       photos.forEach((p, idx) => {
+        // Se for a última foto de uma lista ímpar, centraliza ela sozinha na linha
+        const isSingleRow = (idx === photos.length - 1 && (idx + 1) % 2 !== 0);
+        const currentX = isSingleRow ? (pageW - photoSize) / 2 : photoX;
+
         try {
-          doc.addImage(p.url, "JPEG", photoX, y, photoSize, photoSize);
+          doc.addImage(p.url, "JPEG", currentX, y, photoSize, photoSize);
           doc.setFontSize(8);
-          doc.text(p.label, photoX + photoSize / 2, y + photoSize + 4, { align: "center" });
+          doc.text(p.label, currentX + photoSize / 2, y + photoSize + 4, { align: "center" });
           
-          photoX += photoSize + 8; // Compactado de 10 para 8
+          photoX += photoSize + photoGap;
           
           if ((idx + 1) % 2 === 0) {
-            photoX = margin;
-            y += photoSize + 12; // Compactado de 15 para 12
+            photoX = startX;
+            y += photoSize + 12;
             checkSpace(photoSize + 10);
           }
         } catch { }
       });
-      if (photoX !== margin) y += photoSize + 12;
+      if (photos.length % 2 !== 0) y += photoSize + 12;
     }
 
     checkSpace(10);
