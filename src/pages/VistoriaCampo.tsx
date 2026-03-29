@@ -455,7 +455,7 @@ const VistoriaCampo = () => {
       if (i > 0) doc.line(margin + i * colW, tableY, margin + i * colW, y + 8);
     });
 
-    y += 10;
+    y += 20; // Aumentado o espaço entre Indicadores e Avaliação
     
     const checkSpace = (h: number) => { if (y + h > 280) { doc.addPage(); y = 20; } };
 
@@ -491,13 +491,6 @@ const VistoriaCampo = () => {
 
     y += 10;
 
-    checkSpace(10);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    const splitPhrase = doc.splitTextToSize(FRASE_COMPROMISSO, pageW - 2 * margin);
-    doc.text(splitPhrase, margin, y);
-    y += (splitPhrase.length * 5) + 5;
-
     if (data.observacoes) {
       doc.setFont("helvetica", "bold");
       doc.text("OBSERVAÇÕES:", margin, y);
@@ -508,7 +501,7 @@ const VistoriaCampo = () => {
       y += (splitObs.length * 5) + 10;
     }
 
-    const photoSize = 50;
+    const photoSize = 85; // Aumentado de 50 para 85 para forçar 2 fotos grandonas por linha
     let photoX = margin;
 
     const photos = [
@@ -524,13 +517,15 @@ const VistoriaCampo = () => {
       doc.text("EVIDÊNCIAS FOTOGRÁFICAS:", margin, y);
       y += 5;
 
-      photos.forEach((p) => {
+      photos.forEach((p, idx) => {
         try {
           doc.addImage(p.url, "JPEG", photoX, y, photoSize, photoSize);
-          doc.setFontSize(7);
+          doc.setFontSize(8);
           doc.text(p.label, photoX + photoSize / 2, y + photoSize + 4, { align: "center" });
+          
           photoX += photoSize + 10;
-          if (photoX + photoSize > pageW - margin) {
+          
+          if ((idx + 1) % 2 === 0) { // Duas fotos por linha garantidas
             photoX = margin;
             y += photoSize + 15;
             checkSpace(photoSize + 10);
@@ -540,7 +535,16 @@ const VistoriaCampo = () => {
       if (photoX !== margin) y += photoSize + 15;
     }
 
-    y = Math.max(y, 250);
+    checkSpace(15);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    const splitPhrase = doc.splitTextToSize(FRASE_COMPROMISSO, pageW - 2 * margin);
+    doc.text(splitPhrase, margin, y);
+    y += (splitPhrase.length * 5) + 10;
+
+    checkSpace(35);
+    y += 20;
+    
     doc.setLineWidth(0.2);
     doc.setDrawColor(0);
 
