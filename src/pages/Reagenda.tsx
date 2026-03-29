@@ -1235,6 +1235,21 @@ Para seguirmos com o reagendamento, por favor, me informe:
                                                 const contactOptions = getContactOptions(item);
                                                 const hasMultipleContacts = contactOptions.length > 1;
 
+                                                // Preparação de URLs para links nativos (evita bloqueio COOP)
+                                                const message = getMessageTemplate(item);
+                                                const encodedMessage = encodeURIComponent(message);
+                                                const rawContact = item.contatoSelecionado || item.contato || "";
+                                                let cleanContact = rawContact.replace(/\D/g, "");
+                                                if (cleanContact.length !== 0 && cleanContact.length <= 11) cleanContact = `55${cleanContact}`;
+                                                
+                                                const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodedMessage}`;
+                                                
+                                                const confirmText = `Obrigado pela confirmação, ${item.nome}! ✅\n\nNosso técnico logo entrará em contato com você e fará o serviço solicitado.`;
+                                                const confirmUrl = `https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodeURIComponent(confirmText)}`;
+                                                
+                                                const rescheduleText = `Entendido, ${item.nome}! Sem problemas. 📅\n\nPara seguirmos com o reagendamento, por favor, me informe:\n- Qual a melhor DATA?\n- Qual o PERÍODO (Manhã ou Tarde)?\n- Qual o HORÁRIO de preferência?`;
+                                                const rescheduleUrl = `https://api.whatsapp.com/send?phone=${cleanContact}&text=${encodeURIComponent(rescheduleText)}`;
+
                                                 return (
                                                     <TableRow key={item.id} className={rowColorClass}>
                                                         <TableCell>
@@ -1348,7 +1363,19 @@ Para seguirmos com o reagendamento, por favor, me informe:
                                                             <div className="flex flex-col gap-1 items-center">
                                                                 <div className="flex justify-center gap-1">
                                                                     <Tooltip><TooltipTrigger asChild>
-                                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)} title="WhatsApp e iniciar Timer!"><MessageSquare className="w-4 h-4" /></Button>
+                                                                        <a 
+                                                                            href={whatsappUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-7 w-7 text-green-600"
+                                                                            onClick={() => {
+                                                                                trackAction(`Iniciou contato via WhatsApp para ${item.nome}`);
+                                                                                startContactTimer(item.id, "Contatado");
+                                                                            }}
+                                                                            title="WhatsApp e iniciar Timer!"
+                                                                        >
+                                                                            <MessageSquare className="w-4 h-4" />
+                                                                        </a>
                                                                     </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
 
                                                                     <Tooltip><TooltipTrigger asChild>
@@ -1366,22 +1393,31 @@ Para seguirmos com o reagendamento, por favor, me informe:
                                                                 
                                                                 {item.status !== "Pendente" && (
                                                                     <div className="flex gap-1 mt-1">
-                                                                        <Button 
-                                                                            size="sm" 
-                                                                            variant="outline" 
-                                                                            className="h-6 text-[9px] px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                                                            onClick={() => handleFollowUp(item, "confirmar")}
+                                                                        <a 
+                                                                            href={confirmUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="h-6 text-[9px] px-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded inline-flex items-center justify-center font-medium transition-colors"
+                                                                            onClick={() => {
+                                                                                updateField(item.id, "decisao", "Confirmada");
+                                                                                updateStatus(item.id, "Contatado");
+                                                                                trackAction(`Confirmou agendamento para ${item.nome}`);
+                                                                            }}
                                                                         >
                                                                             Confirmou ✅
-                                                                        </Button>
-                                                                        <Button 
-                                                                            size="sm" 
-                                                                            variant="outline" 
-                                                                            className="h-6 text-[9px] px-1.5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-                                                                            onClick={() => handleFollowUp(item, "reagendar")}
+                                                                        </a>
+                                                                        <a 
+                                                                            href={rescheduleUrl}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="h-6 text-[9px] px-1.5 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 rounded inline-flex items-center justify-center font-medium transition-colors"
+                                                                            onClick={() => {
+                                                                                updateStatus(item.id, "Aguardando retorno");
+                                                                                trackAction(`Solicitou reagendamento para ${item.nome}`);
+                                                                            }}
                                                                         >
                                                                             Reagendar 📅
-                                                                        </Button>
+                                                                        </a>
                                                                     </div>
                                                                 )}
                                                             </div>
