@@ -550,7 +550,7 @@ Estou entrando em contato apenas para confirmar o seu agendamento e garantir o d
 
 Caso não seja possível nos receber hoje, por favor, me informe qual seria a melhor DATA, TURNO e HORÁRIO para realizarmos o seu atendimento.
 
-Fico no aguardo!`;
+Fico no aguardo!`.replace(/[ ]{2,}/g, ' ');
         }
 
         return `Olá, ${item.nome}! Tudo bem?
@@ -591,7 +591,16 @@ Para seguirmos com o reagendamento, por favor, me informe:
 
         const encodedMessage = encodeURIComponent(message);
         const cleanContact = contact.replace(/\D/g, "");
-        window.open(`https://wa.me/55${cleanContact}?text=${encodedMessage}`, "_blank");
+        const url = `https://api.whatsapp.com/send?phone=55${cleanContact}&text=${encodedMessage}`;
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
         trackAction(`Enviou resposta de ${type} para ${item.nome}`);
     };
 
@@ -612,7 +621,16 @@ Para seguirmos com o reagendamento, por favor, me informe:
         const contact = getActiveContact(item);
         const encodedMessage = encodeURIComponent(message);
         const cleanContact = contact.replace(/\D/g, "");
-        window.open(`https://wa.me/55${cleanContact}?text=${encodedMessage}`, "_blank");
+        const url = `https://api.whatsapp.com/send?phone=55${cleanContact}&text=${encodedMessage}`;
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
         trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || cleanContact})`);
         startContactTimer(item.id, "Contatado");
     };
