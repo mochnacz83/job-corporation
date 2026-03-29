@@ -526,6 +526,33 @@ const Reagenda = () => {
 
     const getMessageTemplate = (item: ReagendaData) => {
         const dataSafelyFormatted = formatDate(item.dataAgendamento);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let isToday = false;
+        try {
+            const [datePart] = (item.dataAgendamento || "").split(" ");
+            const [day, month, year] = datePart.split("/").map(Number);
+            if (day && month && year) {
+                const itemDate = new Date(year, month - 1, day);
+                isToday = itemDate.getTime() === today.getTime();
+            }
+        } catch (e) { }
+
+        if (isToday) {
+            return `Olá, ${item.nome}! Tudo bem?
+            
+Aqui é da equipe de agendamento da ${item.operadora}.
+
+Identificamos aqui no sistema que você possui uma solicitação de ${item.tipoAtividade} agendada para HOJE, dia ${dataSafelyFormatted}.
+
+Estou entrando em contato apenas para confirmar o seu agendamento e garantir o deslocamento do nosso técnico! ✅
+
+Caso não seja possível nos receber hoje, por favor, me informe qual seria a melhor DATA, TURNO e HORÁRIO para realizarmos o seu atendimento.
+
+Fico no aguardo!`;
+        }
+
         return `Olá, ${item.nome}! Tudo bem?
 
 Aqui é da equipe de agendamento da ${item.operadora}.
@@ -539,6 +566,32 @@ Você teria interesse em realizar esse serviço antes do prazo?
 Se sim, por favor, me confirme qual Data, período (manhã ou tarde) e horário você teria disponibilidade para nos receber.
 
 Fico no aguardo!`;
+    };
+
+    const handleFollowUp = async (item: ReagendaData, type: "confirmar" | "reagendar") => {
+        let message = "";
+        const contact = getActiveContact(item);
+
+        if (type === "confirmar") {
+            message = `Obrigado pela confirmação, ${item.nome}! ✅
+
+Nosso técnico logo entrará em contato com você e fará o serviço solicitado.`;
+            await updateField(item.id, "decisao", "Confirmada");
+            await updateStatus(item.id, "Contatado");
+        } else {
+            message = `Entendido, ${item.nome}! Sem problemas. 📅
+
+Para seguirmos com o reagendamento, por favor, me informe:
+- Qual a melhor DATA?
+- Qual o PERÍODO (Manhã ou Tarde)?
+- Qual o HORÁRIO de preferência?`;
+            // Mantém como pendente ou coloca em aguardando retorno para o operador preencher os dados depois
+            await updateStatus(item.id, "Aguardando retorno");
+        }
+
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou resposta de ${type} para ${item.nome}`);
     };
 
     const startContactTimer = async (id: string, contactStatus: ReagendaData["status"] = "Contatado") => {
@@ -1270,22 +1323,45 @@ Fico no aguardo!`;
                                                             />
                                                         </TableCell>
                                                         <TableCell>
-                                                            <div className="flex justify-center gap-1">
-                                                                <Tooltip><TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)} title="WhatsApp e iniciar Timer!"><MessageSquare className="w-4 h-4" /></Button>
-                                                                </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
+                                                            <div className="flex flex-col gap-1 items-center">
+                                                                <div className="flex justify-center gap-1">
+                                                                    <Tooltip><TooltipTrigger asChild>
+                                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => openWhatsApp(item)} title="WhatsApp e iniciar Timer!"><MessageSquare className="w-4 h-4" /></Button>
+                                                                    </TooltipTrigger><TooltipContent>WhatsApp</TooltipContent></Tooltip>
 
-                                                                <Tooltip><TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)} title="Telegram e iniciar Timer!"><Send className="w-4 h-4" /></Button>
-                                                                </TooltipTrigger><TooltipContent>Telegram</TooltipContent></Tooltip>
+                                                                    <Tooltip><TooltipTrigger asChild>
+                                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-blue-500" onClick={() => openTelegram(item)} title="Telegram e iniciar Timer!"><Send className="w-4 h-4" /></Button>
+                                                                    </TooltipTrigger><TooltipContent>Telegram</TooltipContent></Tooltip>
 
-                                                                <Tooltip><TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
-                                                                </TooltipTrigger><TooltipContent>Copiar</TooltipContent></Tooltip>
+                                                                    <Tooltip><TooltipTrigger asChild>
+                                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => copyToClipboard(item)}><Copy className="w-4 h-4" /></Button>
+                                                                    </TooltipTrigger><TooltipContent>Copiar Texto</TooltipContent></Tooltip>
 
-                                                                <Tooltip><TooltipTrigger asChild>
-                                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
-                                                                </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+                                                                    <Tooltip><TooltipTrigger asChild>
+                                                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteEntry(item.id)}><Trash2 className="w-4 h-4" /></Button>
+                                                                    </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+                                                                </div>
+                                                                
+                                                                {item.status !== "Pendente" && (
+                                                                    <div className="flex gap-1 mt-1">
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline" 
+                                                                            className="h-6 text-[9px] px-1.5 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                                                            onClick={() => handleFollowUp(item, "confirmar")}
+                                                                        >
+                                                                            Confirmou ✅
+                                                                        </Button>
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline" 
+                                                                            className="h-6 text-[9px] px-1.5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                                                            onClick={() => handleFollowUp(item, "reagendar")}
+                                                                        >
+                                                                            Reagendar 📅
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </TableCell>
                                                     </TableRow>
