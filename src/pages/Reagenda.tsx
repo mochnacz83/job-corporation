@@ -225,14 +225,21 @@ const Reagenda = () => {
                 const dDate = parseDateOnly(d.dataAgendamento);
                 return dDate.getTime() > today.getTime();
             });
+        } else if (quickFilter === "passado") {
+            result = result.filter(d => {
+                const dDate = parseDateOnly(d.dataAgendamento);
+                return dDate.getTime() < today.getTime();
+            });
         }
 
         if (filterStartDate) {
-            const start = new Date(filterStartDate + "T00:00:00");
+            const start = new Date(filterStartDate);
+            start.setHours(0, 0, 0, 0);
             result = result.filter(d => parseDateOnly(d.dataAgendamento) >= start);
         }
         if (filterEndDate) {
-            const end = new Date(filterEndDate + "T00:00:00");
+            const end = new Date(filterEndDate);
+            end.setHours(0, 0, 0, 0);
             result = result.filter(d => parseDateOnly(d.dataAgendamento) <= end);
         }
         
