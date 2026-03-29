@@ -605,7 +605,7 @@ const VistoriaCampo = () => {
     doc.text(`NOTA FINAL DE QUALIDADE: ${score}%`, margin + tableW / 2, y + 5.5, { align: "center" });
     doc.setTextColor(0, 0, 0); // Reset color
     
-    y += 12;
+    y += 22;
 
     // --- Nova Sessao Ferramental ---
     checkSpace(20);
@@ -630,7 +630,7 @@ const VistoriaCampo = () => {
       y += (splitObs.length * 5) + 10;
     }
 
-    const photoSize = 85; // Aumentado de 50 para 85 para forçar 2 fotos grandonas por linha
+    const photoSize = 73; // Reduzido para encaixar na folha 2 c/ assinatura
     let photoX = margin;
 
     const photos = [
@@ -664,15 +664,15 @@ const VistoriaCampo = () => {
       if (photoX !== margin) y += photoSize + 15;
     }
 
-    checkSpace(15);
+    checkSpace(10);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     const splitPhrase = doc.splitTextToSize(FRASE_COMPROMISSO, pageW - 2 * margin);
     doc.text(splitPhrase, margin, y);
-    y += (splitPhrase.length * 5) + 10;
+    y += (splitPhrase.length * 5) + 5;
 
-    checkSpace(35);
-    y += 20;
+    checkSpace(25);
+    y += 15;
     
     doc.setLineWidth(0.2);
     doc.setDrawColor(0);
