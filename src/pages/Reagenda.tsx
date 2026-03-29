@@ -616,6 +616,26 @@ Fico no aguardo!`;
         }
     };
 
+    const deleteSelected = async () => {
+        const selectedItems = filteredData.filter(i => i.selecionado);
+        if (selectedItems.length === 0) {
+            toast({ title: "Nenhum registro selecionado", description: "Selecione os itens que deseja excluir.", variant: "destructive" });
+            return;
+        }
+        const confirmMsg = `Deseja excluir permanentemente ${selectedItems.length} registro(s) selecionado(s)?`;
+        if (!confirm(confirmMsg)) return;
+        
+        const ids = selectedItems.map(i => i.id);
+        setData(prev => prev.filter(item => !ids.includes(item.id)));
+        try {
+            await supabase.from("reagenda_history" as any).delete().in("id", ids);
+            toast({ title: "Registros excluídos", description: `${ids.length} registro(s) removido(s).` });
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Erro ao excluir", variant: "destructive" });
+        }
+    };
+
     const clearHistory = async () => {
         const confirmMsg = "Limpar sua base de contatos permanentemente? (Esta ação não pode ser desfeita e os dados serão excluídos definitivamente)";
         if (confirm(confirmMsg)) {
