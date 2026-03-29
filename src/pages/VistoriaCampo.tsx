@@ -82,10 +82,14 @@ const VistoriaCampo = () => {
   const [necessidadesFerramentas, setNecessidadesFerramentas] = useState<{ equipamento: string; quantidade: string }[]>([]);
 
   const [uniformeOk, setUniformeOk] = useState<string>("");
-  const [necessidadesUniforme, setNecessidadesUniforme] = useState<{ calca: boolean; tamanhoCalca: string; camisa: boolean; tamanhoCamisa: string; sapato: boolean; tamanhoSapato: string }>({
-    calca: false, tamanhoCalca: "",
-    camisa: false, tamanhoCamisa: "",
-    sapato: false, tamanhoSapato: ""
+  const [necessidadesUniforme, setNecessidadesUniforme] = useState<{ 
+    calca: boolean; tamanhoCalca: string; qtdCalca: string;
+    camisa: boolean; tamanhoCamisa: string; qtdCamisa: string;
+    sapato: boolean; tamanhoSapato: string; qtdSapato: string;
+  }>({
+    calca: false, tamanhoCalca: "", qtdCalca: "",
+    camisa: false, tamanhoCamisa: "", qtdCamisa: "",
+    sapato: false, tamanhoSapato: "", qtdSapato: ""
   });
 
   const fileInputSupervisor = useRef<HTMLInputElement>(null);
@@ -377,9 +381,9 @@ const VistoriaCampo = () => {
       doc.setFont("helvetica", "normal");
       
       const u = data.necessidadesUniforme;
-      if (u.calca) { doc.text(`- Calça (Tamanho: ${u.tamanhoCalca || 'Não informado'})`, margin + 5, y); y += 5; }
-      if (u.camisa) { doc.text(`- Camisa (Tamanho: ${u.tamanhoCamisa || 'Não informado'})`, margin + 5, y); y += 5; }
-      if (u.sapato) { doc.text(`- Sapato (Tamanho: ${u.tamanhoSapato || 'Não informado'})`, margin + 5, y); y += 5; }
+      if (u.calca) { doc.text(`- Calça (Tamanho: ${u.tamanhoCalca || 'Não inf.'} | Qtd: ${u.qtdCalca || '1'})`, margin + 5, y); y += 5; }
+      if (u.camisa) { doc.text(`- Camisa (Tamanho: ${u.tamanhoCamisa || 'Não inf.'} | Qtd: ${u.qtdCamisa || '1'})`, margin + 5, y); y += 5; }
+      if (u.sapato) { doc.text(`- Sapato (Tamanho: ${u.tamanhoSapato || 'Não inf.'} | Qtd: ${u.qtdSapato || '1'})`, margin + 5, y); y += 5; }
     }
 
     y += 15;
@@ -475,17 +479,66 @@ const VistoriaCampo = () => {
     y += 6;
     doc.setFontSize(9);
     
-    const addQuestion = (q: string, val: string, obs: string) => {
-      checkSpace(8);
+    const addQuestion = (q: string, val: string, obs: string, isChecklistFisico = false) => {
+      let printedVal = val || "-";
+      let observationText = "";
+
+      if (val && val !== "Não avaliado") {
+        if (isChecklistFisico && val === "Não") {
+          printedVal = "Não (Encaminhado p/ Logística)";
+        } else if (val === "Sim" || val === "Excelente" || val === "Boa") {
+          observationText = "Conforme com Processo";
+        } else {
+          observationText = obs ? `Problema Identificado: ${obs}` : "Problema Identificado.";
+        }
+      }
+
+      const tableW = pageW - 2 * margin;
       doc.setFont("helvetica", "bold");
-      doc.text(q, margin, y);
+      const splitQ = doc.splitTextToSize(q, tableW * 0.55);
       doc.setFont("helvetica", "normal");
-      doc.text(`Resp: ${val || "-"}`, margin + 120, y);
-      y += 5;
-      if (obs && val !== "Sim" && val !== "Excelente") {
-         checkSpace(5);
-         doc.text(`Obs: ${obs}`, margin + 5, y);
-         y += 5;
+      const splitV = doc.splitTextToSize(printedVal, tableW * 0.40);
+      
+      const mainRowH = Math.max(splitQ.length, splitV.length) * 5 + 4;
+      
+      let obsH = 0;
+      let splitObs: string[] = [];
+      if (observationText && !isChecklistFisico) { // Físico = Sem observação na tabela geral
+        doc.setFont("helvetica", "italic");
+        splitObs = doc.splitTextToSize(observationText, tableW - 4);
+        obsH = splitObs.length * 5 + 4;
+      }
+      
+      checkSpace(mainRowH + obsH + 2);
+      
+      // Linha Principal
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.1);
+      doc.rect(margin, y, tableW, mainRowH, "S");
+      
+      doc.setFont("helvetica", "bold");
+      doc.text(splitQ, margin + 2, y + 5);
+      doc.setFont("helvetica", "normal");
+      doc.text(splitV, margin + tableW * 0.6, y + 5);
+      
+      y += mainRowH;
+      
+      // Linha Secundária (Observação)
+      if (observationText && !isChecklistFisico) {
+        doc.setFillColor(val === "Sim" || val === "Excelente" || val === "Boa" ? 245 : 255, val === "Sim" || val === "Excelente" || val === "Boa" ? 255 : 240, 245);
+        if (val !== "Sim" && val !== "Excelente" && val !== "Boa") {
+            doc.setFillColor(255, 245, 245); // Red tint
+        } else {
+            doc.setFillColor(245, 255, 245); // Green tint
+        }
+
+        doc.rect(margin, y, tableW, obsH, "FD");
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(8);
+        doc.text(splitObs, margin + 2, y + 5);
+        
+        y += obsH;
+        doc.setFontSize(9);
       }
     };
 
@@ -494,8 +547,8 @@ const VistoriaCampo = () => {
     addQuestion("3. Realizou todos os proc. de segurança?", data.procedimentoSeguranca, data.obsProcedimentoSeguranca);
     addQuestion("4. Domina todas as técnicas?", data.dominaTecnicas, data.obsDominaTecnicas);
     addQuestion("5. Avalie a comunicação com o cliente:", data.comunicacaoCliente, data.obsComunicacaoCliente);
-    addQuestion("6. Ferramental OK?", data.ferramentalOk, "");
-    addQuestion("7. Uniforme OK?", data.uniformeOk, "");
+    addQuestion("6. Ferramental OK?", data.ferramentalOk, "", true);
+    addQuestion("7. Uniforme OK?", data.uniformeOk, "", true);
 
     y += 10;
 
@@ -688,7 +741,7 @@ const VistoriaCampo = () => {
       setDominaTecnicas(""); setObsDominaTecnicas("");
       setComunicacaoCliente(""); setObsComunicacaoCliente("");
       setFerramentalOk(""); setNecessidadesFerramentas([]);
-      setUniformeOk(""); setNecessidadesUniforme({ calca: false, tamanhoCalca: "", camisa: false, tamanhoCamisa: "", sapato: false, tamanhoSapato: "" });
+      setUniformeOk(""); setNecessidadesUniforme({ calca: false, tamanhoCalca: "", qtdCalca: "", camisa: false, tamanhoCamisa: "", qtdCamisa: "", sapato: false, tamanhoSapato: "", qtdSapato: "" });
       
     } catch (err: any) {
       toast.error("Erro ao salvar vistoria: " + err.message);
@@ -1203,33 +1256,42 @@ const VistoriaCampo = () => {
                       {/* Calça */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <Button type="button" variant={necessidadesUniforme.calca ? "default" : "outline"} 
-                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, calca: !prev.calca }))} className="w-full sm:w-32 bg-white">
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, calca: !prev.calca }))} className="w-full sm:w-32">
                            Calça
                         </Button>
                         {necessidadesUniforme.calca && (
-                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: 42)" value={necessidadesUniforme.tamanhoCalca} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCalca: e.target.value }))} />
+                          <>
+                            <Input className="flex-1 bg-white" placeholder="Tamanho (Ex: 42)" value={necessidadesUniforme.tamanhoCalca} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCalca: e.target.value }))} />
+                            <Input type="number" min="1" className="w-full sm:w-[100px] bg-white" placeholder="Qtd" value={necessidadesUniforme.qtdCalca} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, qtdCalca: e.target.value }))} />
+                          </>
                         )}
                       </div>
 
                       {/* Camisa */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <Button type="button" variant={necessidadesUniforme.camisa ? "default" : "outline"} 
-                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, camisa: !prev.camisa }))} className="w-full sm:w-32 bg-white">
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, camisa: !prev.camisa }))} className="w-full sm:w-32">
                            Camisa
                         </Button>
                         {necessidadesUniforme.camisa && (
-                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: M, G...)" value={necessidadesUniforme.tamanhoCamisa} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCamisa: e.target.value }))} />
+                          <>
+                            <Input className="flex-1 bg-white" placeholder="Tamanho (Ex: M, G...)" value={necessidadesUniforme.tamanhoCamisa} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoCamisa: e.target.value }))} />
+                            <Input type="number" min="1" className="w-full sm:w-[100px] bg-white" placeholder="Qtd" value={necessidadesUniforme.qtdCamisa} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, qtdCamisa: e.target.value }))} />
+                          </>
                         )}
                       </div>
 
                       {/* Sapato */}
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <Button type="button" variant={necessidadesUniforme.sapato ? "default" : "outline"} 
-                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, sapato: !prev.sapato }))} className="w-full sm:w-32 bg-white">
+                           onClick={() => setNecessidadesUniforme(prev => ({ ...prev, sapato: !prev.sapato }))} className="w-full sm:w-32">
                            Sapato
                         </Button>
                         {necessidadesUniforme.sapato && (
-                          <Input className="flex-1 bg-white" placeholder="Digite o Tamanho (Ex: 40)" value={necessidadesUniforme.tamanhoSapato} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoSapato: e.target.value }))} />
+                          <>
+                            <Input className="flex-1 bg-white" placeholder="Tamanho (Ex: 40)" value={necessidadesUniforme.tamanhoSapato} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, tamanhoSapato: e.target.value }))} />
+                            <Input type="number" min="1" className="w-full sm:w-[100px] bg-white" placeholder="Qtd" value={necessidadesUniforme.qtdSapato} onChange={e => setNecessidadesUniforme(prev => ({ ...prev, qtdSapato: e.target.value }))} />
+                          </>
                         )}
                       </div>
 
