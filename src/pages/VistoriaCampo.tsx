@@ -63,6 +63,7 @@ const VistoriaCampo = () => {
   const [fotoSupervisor, setFotoSupervisor] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
   const [fotoEquipamentos, setFotoEquipamentos] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
   const [fotoExecucao, setFotoExecucao] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
+  const [fotoUniforme, setFotoUniforme] = useState<{ preview: string | null; file: File | null }>({ preview: null, file: null });
 
   // Quality Check State
   const [atividadeCorreta, setAtividadeCorreta] = useState<string>("");
@@ -90,6 +91,7 @@ const VistoriaCampo = () => {
   const fileInputSupervisor = useRef<HTMLInputElement>(null);
   const fileInputEquipamentos = useRef<HTMLInputElement>(null);
   const fileInputExecucao = useRef<HTMLInputElement>(null);
+  const fileInputUniforme = useRef<HTMLInputElement>(null);
 
   // Signatures State
   const sigSupervisorCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -485,8 +487,9 @@ const VistoriaCampo = () => {
 
     const photos = [
       { label: "Supervisor c/ Técnico", url: data.fotoSupervisor },
-      { label: "Equipamentos", url: data.fotoEquipamentos },
-      { label: "Execução", url: data.fotoExecucao }
+      { label: "Execução do Serviço", url: data.fotoExecucao },
+      { label: "Equipamentos e Ferr.", url: data.fotoEquipamentos },
+      { label: "Técnico Uniformizado", url: data.fotoUniforme }
     ].filter(p => p.url);
 
     if (photos.length > 0) {
@@ -562,6 +565,7 @@ const VistoriaCampo = () => {
       const urlSupervisor = await uploadPhoto(fotoSupervisor.file, "sup");
       const urlEquipamentos = await uploadPhoto(fotoEquipamentos.file, "equip");
       const urlExecucao = await uploadPhoto(fotoExecucao.file, "exec");
+      const urlUniforme = await uploadPhoto(fotoUniforme.file, "unif");
 
       const { error } = await supabase.from("vistorias_campo" as any).insert({
         user_id: user?.id,
@@ -578,6 +582,7 @@ const VistoriaCampo = () => {
         foto_supervisor_url: urlSupervisor,
         foto_equipamentos_url: urlEquipamentos,
         foto_execucao_url: urlExecucao,
+        foto_uniforme_url: urlUniforme,
         assinatura_supervisor: sigSupervisor,
         assinatura_tecnico: sigTecnico,
         // Adicionando os novos campos JSONB que foram criados no banco de dados via SQL:
@@ -605,6 +610,7 @@ const VistoriaCampo = () => {
         fotoSupervisor: fotoSupervisor.preview,
         fotoEquipamentos: fotoEquipamentos.preview,
         fotoExecucao: fotoExecucao.preview,
+        fotoUniforme: fotoUniforme.preview,
         sigSupervisor,
         sigTecnico,
         atividadeCorreta, obsAtividadeCorreta,
@@ -635,6 +641,7 @@ const VistoriaCampo = () => {
       setFotoSupervisor({ preview: null, file: null });
       setFotoEquipamentos({ preview: null, file: null });
       setFotoExecucao({ preview: null, file: null });
+      setFotoUniforme({ preview: null, file: null });
       clearCanvas(sigSupervisorCanvasRef.current);
       clearCanvas(sigTecnicoCanvasRef.current);
       setAtividadeCorreta(""); setObsAtividadeCorreta("");
@@ -928,65 +935,8 @@ const VistoriaCampo = () => {
               </Card>
             )}
 
-            {/* Section: Quality Phrase */}
-            <Card className="bg-primary/10 border-primary/30 border-l-4 border-l-primary">
-              <CardContent className="py-5">
-                <p className="text-base text-foreground font-semibold italic leading-relaxed text-center">
-                  "{FRASE_COMPROMISSO}"
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Section: Photos */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                  <Camera className="w-5 h-5" /> Evidências da Vistoria
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                  {[
-                    { label: "Supervisor com Técnico", state: fotoSupervisor, setter: setFotoSupervisor, ref: fileInputSupervisor, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
-                    { label: "Equipamentos e Ferramentas", state: fotoEquipamentos, setter: setFotoEquipamentos, ref: fileInputEquipamentos, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
-                    { label: "Execução do Serviço", state: fotoExecucao, setter: setFotoExecucao, ref: fileInputExecucao, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> }
-                  ].map((photo, idx) => (
-                    <div key={idx} className="space-y-2">
-                      <Label className="text-sm font-semibold">{photo.label}</Label>
-                      <div className="relative group">
-                        <div
-                          onClick={() => photo.ref.current?.click()}
-                          className={`aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${photo.state.preview ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5'}`}
-                        >
-                          {photo.state.preview ? (
-                            <img src={photo.state.preview} className="w-full h-full object-cover rounded-md" alt="Preview" />
-                          ) : (
-                            <>
-                              {photo.icon}
-                              <span className="text-xs text-muted-foreground">Clique para capturar</span>
-                            </>
-                          )}
-                        </div>
-                        {photo.state.preview && (
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg"
-                            onClick={() => photo.setter({ preview: null, file: null })}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        )}
-                        <input ref={photo.ref} type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoChange(e, photo.setter)} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Section: Quality evaluation */}
-            <Card className="glass-card">
+            <Card className="glass-card mt-2">
               <CardHeader className="pb-3 border-b">
                 <CardTitle className="text-lg flex items-center gap-2 text-primary">
                   <CheckCircle2 className="w-5 h-5" /> Avaliação de Qualidade
@@ -1070,8 +1020,44 @@ const VistoriaCampo = () => {
               </CardContent>
             </Card>
 
-            {/* Section: Materiais e Uniforme */}
+            {/* Photos - Qualidade */}
             <Card className="glass-card">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-base font-bold text-primary flex items-center gap-2">
+                   <Camera className="w-4 h-4" /> Qualidade da Execução
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[
+                    { label: "1. Supervisor com Técnico", state: fotoSupervisor, setter: setFotoSupervisor, ref: fileInputSupervisor, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
+                    { label: "2. Execução do Serviço", state: fotoExecucao, setter: setFotoExecucao, ref: fileInputExecucao, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> }
+                  ].map((photo, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">{photo.label}</Label>
+                      <div className="relative group">
+                        <div onClick={() => photo.ref.current?.click()} className={`aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${photo.state.preview ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5'}`}>
+                          {photo.state.preview ? (
+                            <img src={photo.state.preview} className="w-full h-full object-cover rounded-md" alt="Preview" />
+                          ) : (
+                            <>{photo.icon}<span className="text-xs text-muted-foreground">Clique para capturar</span></>
+                          )}
+                        </div>
+                        {photo.state.preview && (
+                          <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg" onClick={() => photo.setter({ preview: null, file: null })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <input ref={photo.ref} type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoChange(e, photo.setter)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Section: Materiais e Uniforme */}
+            <Card className="glass-card mt-2">
               <CardHeader className="pb-3 border-b">
                 <CardTitle className="text-lg flex items-center gap-2 text-primary">
                   <FileText className="w-5 h-5" /> Checklist Físico (Ferramentas e Uniforme)
@@ -1166,8 +1152,44 @@ const VistoriaCampo = () => {
               </CardContent>
             </Card>
 
-            {/* Section: Observations */}
+            {/* Photos - Fisicos */}
             <Card className="glass-card">
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-base font-bold text-primary flex items-center gap-2">
+                   <Camera className="w-4 h-4" /> Checklist Físico e Uniforme
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[
+                    { label: "1. Equipamentos e Ferramentas", state: fotoEquipamentos, setter: setFotoEquipamentos, ref: fileInputEquipamentos, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> },
+                    { label: "2. Técnico com Uniforme", state: fotoUniforme, setter: setFotoUniforme, ref: fileInputUniforme, icon: <ImageIcon className="w-8 h-8 text-muted-foreground mb-2" /> }
+                  ].map((photo, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <Label className="text-sm font-semibold text-muted-foreground">{photo.label}</Label>
+                      <div className="relative group">
+                        <div onClick={() => photo.ref.current?.click()} className={`aspect-video rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${photo.state.preview ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5'}`}>
+                          {photo.state.preview ? (
+                            <img src={photo.state.preview} className="w-full h-full object-cover rounded-md" alt="Preview" />
+                          ) : (
+                            <>{photo.icon}<span className="text-xs text-muted-foreground">Clique para capturar</span></>
+                          )}
+                        </div>
+                        {photo.state.preview && (
+                          <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg" onClick={() => photo.setter({ preview: null, file: null })}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
+                        <input ref={photo.ref} type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoChange(e, photo.setter)} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Section: Observations */}
+            <Card className="glass-card mt-2">
               <CardHeader className="pb-3 border-b">
                 <CardTitle className="text-base font-bold text-primary">Observações de Campo</CardTitle>
               </CardHeader>
