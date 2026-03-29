@@ -898,6 +898,9 @@ Fico no aguardo!`;
                                 <Button variant="default" size="sm" onClick={() => setExportDialogOpen(true)} className="bg-primary hover:bg-primary/90">
                                     <FileOutput className="w-4 h-4 mr-2" /> Exportar Selecionados
                                 </Button>
+                                <Button variant="outline" size="sm" onClick={deleteSelected} className="text-destructive border-destructive/50 hover:bg-destructive/10">
+                                    <Trash2 className="w-4 h-4 mr-1" /> Excluir Selecionados
+                                </Button>
                                 <Button variant="destructive" size="sm" onClick={clearHistory}>
                                     <Trash2 className="w-4 h-4" />
                                 </Button>
