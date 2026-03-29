@@ -590,7 +590,8 @@ Para seguirmos com o reagendamento, por favor, me informe:
         }
 
         const encodedMessage = encodeURIComponent(message);
-        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
+        const cleanContact = contact.replace(/\D/g, "");
+        window.open(`https://wa.me/55${cleanContact}?text=${encodedMessage}`, "_blank");
         trackAction(`Enviou resposta de ${type} para ${item.nome}`);
     };
 
@@ -610,8 +611,9 @@ Para seguirmos com o reagendamento, por favor, me informe:
         const message = getMessageTemplate(item);
         const contact = getActiveContact(item);
         const encodedMessage = encodeURIComponent(message);
-        window.open(`https://api.whatsapp.com/send?phone=55${contact}&text=${encodedMessage}`, "_blank");
-        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || contact})`);
+        const cleanContact = contact.replace(/\D/g, "");
+        window.open(`https://wa.me/55${cleanContact}?text=${encodedMessage}`, "_blank");
+        trackAction(`Enviou mensagem via WhatsApp para ${item.nome} (${item.sa || cleanContact})`);
         startContactTimer(item.id, "Contatado");
     };
 
