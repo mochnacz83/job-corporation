@@ -243,9 +243,22 @@ const Reagenda = () => {
             end.setHours(0, 0, 0, 0);
             result = result.filter(d => parseDateOnly(d.dataAgendamento) <= end);
         }
+
+        // Turno filter based on time portion of dataAgendamento (e.g. "10/03/2026 08:00")
+        if (filterTurno !== "todos") {
+            result = result.filter(d => {
+                if (!d.dataAgendamento) return false;
+                const parts = d.dataAgendamento.split(" ");
+                if (parts.length < 2) return false;
+                const timePart = parts[1]; // "08:00" or "14:30"
+                const [hours] = timePart.split(":").map(Number);
+                if (isNaN(hours)) return false;
+                return filterTurno === "manha" ? hours < 12 : hours >= 12;
+            });
+        }
         
         return result;
-    }, [data, filterSetor, quickFilter, filterStartDate, filterEndDate]);
+    }, [data, filterSetor, quickFilter, filterStartDate, filterEndDate, filterTurno]);
 
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
