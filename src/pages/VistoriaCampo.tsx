@@ -106,6 +106,32 @@ const VistoriaCampo = () => {
   const [editForm, setEditForm] = useState<TecnicoIndicadores | null>(null);
   const [filterIndicadores, setFilterIndicadores] = useState("");
 
+  // Histórico state
+  const [historicoData, setHistoricoData] = useState<any[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
+
+  const loadHistorico = useCallback(async () => {
+    setLoadingHistorico(true);
+    try {
+      const { data, error } = await supabase
+        .from("vistorias_campo" as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setHistoricoData(data || []);
+    } catch (err: any) {
+      console.error("Error loading historico:", err);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "historico") {
+      loadHistorico();
+    }
+  }, [activeTab, loadHistorico]);
+
   // Evolução state
   const [evolucaoRe, setEvolucaoRe] = useState("");
   const [evolucaoData, setEvolucaoData] = useState<EvolucaoRecord[]>([]);
@@ -837,6 +863,55 @@ const VistoriaCampo = () => {
     }
   };
 
+  const handleDownloadHistorico = (item: any) => {
+    try {
+      const mappedData = {
+        nome: item.nome_tecnico,
+        re: item.tecnico_re,
+        tt: item.tecnico_tt,
+        supervisor: item.supervisor_tecnico,
+        eficacia: item.indicador_eficacia,
+        produtividade: item.indicador_produtividade,
+        dias_trabalhados: item.indicador_dias_trabalhados,
+        repetida: item.indicador_repetida,
+        infancia: item.indicador_infancia,
+        observacoes: item.observacoes,
+        fotoSupervisor: item.foto_supervisor_url,
+        fotoEquipamentos: item.foto_equipamentos_url,
+        fotoExecucao: item.foto_execucao_url,
+        fotoUniforme: item.foto_uniforme_url,
+        sigSupervisor: item.assinatura_supervisor,
+        sigTecnico: item.assinatura_tecnico,
+        // Qualidade
+        atividadeCorreta: item.avaliacao_qualidade?.atividadeCorreta || "Não avaliado",
+        obsAtividadeCorreta: item.avaliacao_qualidade?.obsAtividadeCorreta || "",
+        atendimentoCliente: item.avaliacao_qualidade?.atendimentoCliente || "Não avaliado",
+        obsAtendimentoCliente: item.avaliacao_qualidade?.obsAtendimentoCliente || "",
+        procedimentoSeguranca: item.avaliacao_qualidade?.procedimentoSeguranca || "Não avaliado",
+        obsProcedimentoSeguranca: item.avaliacao_qualidade?.obsProcedimentoSeguranca || "",
+        dominaTecnicas: item.avaliacao_qualidade?.dominaTecnicas || "Não avaliado",
+        obsDominaTecnicas: item.avaliacao_qualidade?.obsDominaTecnicas || "",
+        comunicacaoCliente: item.avaliacao_qualidade?.comunicacaoCliente || "Não avaliado",
+        obsComunicacaoCliente: item.avaliacao_qualidade?.obsComunicacaoCliente || "",
+        ferramentalOk: item.avaliacao_qualidade?.ferramentalOk || "Não avaliado",
+        uniformeOk: item.avaliacao_qualidade?.uniformeOk || "Não avaliado",
+        necessidadesFerramentas: item.ferramentas_faltantes || [],
+        necessidadesUniforme: item.uniformes_faltantes || {}
+      };
+
+      generatePDF(mappedData);
+      
+      if (mappedData.ferramentalOk === "Não" || mappedData.uniformeOk === "Não") {
+        setTimeout(() => {
+          generateNecessidadesPDF(mappedData);
+        }, 1000);
+      }
+    } catch (error) {
+       toast.error("Erro ao gerar PDF desta vistoria.");
+       console.error(error);
+    }
+  };
+
   const filteredIndicadores = allIndicadores.filter(ind => {
     if (!filterIndicadores) return true;
     const q = filterIndicadores.toLowerCase();
@@ -863,6 +938,7 @@ const VistoriaCampo = () => {
             <TabsTrigger value="formulario">Realizar Vistoria</TabsTrigger>
             <TabsTrigger value="indicadores">Indicadores / Importar</TabsTrigger>
             <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+            <TabsTrigger value="historico">Histórico e Acervo</TabsTrigger>
           </TabsList>
 
           {/* ========== TAB: FORMULÁRIO ========== */}
@@ -1461,6 +1537,67 @@ const VistoriaCampo = () => {
                 {evolucaoRe && evolucaoData.length === 0 && !loadingEvolucao && (
                   <p className="text-sm text-muted-foreground text-center py-4">Nenhum registro de evolução encontrado para esta RE.</p>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ========== TAB: HISTÓRICO ========== */}
+          <TabsContent value="historico" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader className="pb-3 border-b">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                    <FileText className="w-5 h-5" /> Acervo de Vistorias Salvas
+                  </CardTitle>
+                  <Button variant="ghost" size="icon" onClick={loadHistorico} title="Recarregar">
+                    <RefreshCw className={`w-4 h-4 ${loadingHistorico ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="overflow-x-auto rounded-lg border max-h-[600px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-primary/5">
+                        <TableHead className="font-bold text-foreground text-xs whitespace-nowrap">Data</TableHead>
+                        <TableHead className="font-bold text-foreground text-xs">RE / TT</TableHead>
+                        <TableHead className="font-bold text-foreground text-xs">Técnico</TableHead>
+                        <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
+                        <TableHead className="font-bold text-foreground text-xs">EPIs Solicitados?</TableHead>
+                        <TableHead className="text-center font-bold text-foreground text-xs w-[120px]">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historicoData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            {loadingHistorico ? "Carregando histórico..." : "Nenhuma vistoria salva encontrada."}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        historicoData.map((item) => {
+                           const temEpi = item.avaliacao_qualidade?.ferramentalOk === "Não" || item.avaliacao_qualidade?.uniformeOk === "Não";
+                           return (
+                            <TableRow key={item.id} className="hover:bg-muted/30">
+                              <TableCell className="text-xs whitespace-nowrap">{new Date(item.created_at).toLocaleDateString("pt-BR")} {new Date(item.created_at).toLocaleTimeString("pt-BR", {hour: '2-digit', minute:'2-digit'})}</TableCell>
+                              <TableCell className="text-xs font-mono">{item.tecnico_re} / {item.tecnico_tt}</TableCell>
+                              <TableCell className="text-xs font-medium">{item.nome_tecnico}</TableCell>
+                              <TableCell className="text-xs">{item.supervisor_tecnico}</TableCell>
+                              <TableCell className="text-xs">
+                                {temEpi ? <span className="text-destructive font-semibold">Sim (Reposição)</span> : <span className="text-green-600">Não (Tudo OK)</span>}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Button size="sm" variant="outline" className="h-8 gap-1 w-full text-xs" onClick={() => handleDownloadHistorico(item)}>
+                                  <Download className="w-3.5 h-3.5" /> PDF {temEpi && '(+ Recibo)'}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
