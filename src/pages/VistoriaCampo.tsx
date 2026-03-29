@@ -221,7 +221,15 @@ const VistoriaCampo = () => {
     const rect = canvas.getBoundingClientRect();
     const clientX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    
+    // Fator de escala garante que o traço acompanhe o zoom e os redimensionamentos CSS da tela:
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    return { 
+      x: (clientX - rect.left) * scaleX, 
+      y: (clientY - rect.top) * scaleY 
+    };
   };
 
   const initCanvas = (canvas: HTMLCanvasElement | null) => {
