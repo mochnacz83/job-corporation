@@ -10,7 +10,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, ScanBarcode, CheckCircle2, AlertTriangle, AlertCircle, RefreshCw, X, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { 
+  ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, 
+  ScanBarcode, CheckCircle2, AlertTriangle, AlertCircle, 
+  RefreshCw, X, Check, BarChart3, ChevronRight, ClipboardCheck, 
+  CornerDownRight, Filter, History, LayoutDashboard, Package, 
+  UserCheck 
+} from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Html5Qrcode } from "html5-qrcode";
@@ -19,6 +27,7 @@ interface InventoryBaseItem {
   id: string;
   serial: string;
   modelo: string | null;
+  codigo_material: string | null;
   nome_tecnico: string;
   matricula_tt: string;
   setor: string | null;
@@ -26,15 +35,24 @@ interface InventoryBaseItem {
   coordenador: string | null;
 }
 
+interface GroupedCategory {
+  codigo: string;
+  nome: string;
+  items: InventoryBaseItem[];
+  total: number;
+  validated: number;
+}
+
 interface SubmissionItem {
   id?: string;
   serial: string;
   modelo: string | null;
+  codigo_material: string | null;
   status: 'presente' | 'falta' | 'extra';
 }
 
 const Inventory = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { trackAction } = useAccessTracking("/inventario");
 
@@ -43,16 +61,28 @@ const Inventory = () => {
   // Colaborador State
   const [tt, setTt] = useState("");
   const [nomeTecnico, setNomeTecnico] = useState("");
+  const [supervisor, setSupervisor] = useState("");
+  const [coordenador, setCoordenador] = useState("");
   const [baseItems, setBaseItems] = useState<InventoryBaseItem[]>([]);
   const [submissionItems, setSubmissionItems] = useState<Record<string, 'presente' | 'falta' | null>>({});
   const [extraItems, setExtraItems] = useState<SubmissionItem[]>([]);
   const [loadingBase, setLoadingBase] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Grouping State
+  const [selectedCategory, setSelectedCategory] = useState<GroupedCategory | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  // Admin State
+  // Admin/Dashboard State
+  const [activeAdminTab, setActiveAdminTab] = useState("tracking");
   const [uploading, setUploading] = useState(false);
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
+  const [allBaseTechnicians, setAllBaseTechnicians] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  
+  // Filters
+  const [filterSupervisor, setFilterSupervisor] = useState("todos");
+  const [filterCoordenador, setFilterCoordenador] = useState("todos");
 
   // Scanner State
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -77,6 +107,8 @@ const Inventory = () => {
       setBaseItems(data || []);
       if (data && data.length > 0) {
         setNomeTecnico(data[0].nome_tecnico);
+        setSupervisor(data[0].supervisor || "");
+        setCoordenador(data[0].coordenador || "");
         // Initialize submission items
         const initial: Record<string, 'presente' | 'falta' | null> = {};
         data.forEach((item: any) => {
@@ -86,19 +118,45 @@ const Inventory = () => {
       } else {
         toast.info("Nenhum item encontrado para esta matrícula.");
         setNomeTecnico("");
+        setSupervisor("");
+        setCoordenador("");
       }
     } catch (err: any) {
-      toast.error("Erro ao carger carga: " + err.message);
+      toast.error("Erro ao carregar carga: " + err.message);
     } finally {
       setLoadingBase(false);
     }
+  };
+
+  const getGroupedItems = (): GroupedCategory[] => {
+    const groups: Record<string, GroupedCategory> = {};
+    
+    baseItems.forEach(item => {
+      const key = item.codigo_material || 'S/C';
+      if (!groups[key]) {
+        groups[key] = {
+          codigo: key,
+          nome: item.modelo || "Equipamento",
+          items: [],
+          total: 0,
+          validated: 0
+        };
+      }
+      groups[key].items.push(item);
+      groups[key].total++;
+      if (submissionItems[item.id] !== null) {
+        groups[key].validated++;
+      }
+    });
+
+    return Object.values(groups);
   };
 
   const handleStatusChange = (id: string, status: 'presente' | 'falta') => {
     setSubmissionItems(prev => ({ ...prev, [id]: status }));
   };
 
-  const handleAddExtra = (serial: string, modelo: string) => {
+  const handleAddExtra = (serial: string, modelo: string, codigo: string | null = null) => {
     const upperSerial = serial.toUpperCase();
     // Check if it's already in base
     const inBase = baseItems.find(item => item.serial.toUpperCase() === upperSerial);
@@ -113,7 +171,7 @@ const Inventory = () => {
       return;
     }
 
-    setExtraItems(prev => [...prev, { serial: upperSerial, modelo, status: 'extra' }]);
+    setExtraItems(prev => [...prev, { serial: upperSerial, modelo, codigo_material: codigo, status: 'extra' }]);
     toast.success("Item extra adicionado.");
   };
 
@@ -136,6 +194,8 @@ const Inventory = () => {
         .insert({
           matricula_tt: tt.toUpperCase(),
           nome_tecnico: nomeTecnico,
+          supervisor: supervisor,
+          coordenador: coordenador,
           status: 'finalizado',
           data_fim: new Date().toISOString(),
           user_id: user?.id
@@ -151,12 +211,14 @@ const Inventory = () => {
           submission_id: subData.id,
           serial: item.serial,
           modelo: item.modelo,
+          codigo_material: item.codigo_material,
           status: submissionItems[item.id] as string
         })),
         ...extraItems.map(item => ({
           submission_id: subData.id,
           serial: item.serial,
           modelo: item.modelo,
+          codigo_material: item.codigo_material,
           status: 'extra'
         }))
       ];
@@ -174,6 +236,9 @@ const Inventory = () => {
       setSubmissionItems({});
       setExtraItems([]);
       setNomeTecnico("");
+      setSupervisor("");
+      setCoordenador("");
+      setActiveTab("colaborador");
     } catch (err: any) {
       toast.error("Erro ao salvar inventário: " + err.message);
     } finally {
@@ -195,10 +260,11 @@ const Inventory = () => {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // Expected columns: Serial, Modelo, Técnico, TT, Setor, Supervisor, Coordenador
+      // Expected columns: Serial, Modelo, Código, Técnico, TT, Setor, Supervisor, Coordenador
       const mappedData = jsonData.map((row: any) => ({
         serial: String(row.Serial || row.serial || "").trim(),
         modelo: String(row.Modelo || row.modelo || "").trim(),
+        codigo_material: String(row["Código"] || row["Codigo"] || row.codigo || "").trim(),
         nome_tecnico: String(row["Nome Técnico"] || row["Nome Tecnico"] || row.tecnico || "").trim(),
         matricula_tt: String(row["Matrícula TT"] || row["Matricula TT"] || row.tt || "").trim().toUpperCase(),
         setor: String(row.Setor || row.setor || "").trim(),
@@ -225,28 +291,44 @@ const Inventory = () => {
     }
   };
 
-  const fetchSubmissions = async () => {
+  const fetchDashboardData = async () => {
     setLoadingReports(true);
     try {
-      const { data, error } = await (supabase.from as any)("inventory_submissions")
-        .select(`
-          *,
-          inventory_submission_items(*)
-        `)
-        .order("created_at", { ascending: false });
+      const [submissionsRes, baseTechsRes] = await Promise.all([
+        (supabase.from as any)("inventory_submissions")
+          .select(`
+            *,
+            inventory_submission_items(*)
+          `)
+          .order("created_at", { ascending: false }),
+        (supabase.from as any)("inventory_base")
+          .select("matricula_tt, nome_tecnico, supervisor, coordenador")
+      ]);
 
-      if (error) throw error;
-      setAllSubmissions(data || []);
+      if (submissionsRes.error) throw submissionsRes.error;
+      if (baseTechsRes.error) throw baseTechsRes.error;
+
+      setAllSubmissions(submissionsRes.data || []);
+      
+      // Get unique technicians from base
+      const techMap: Record<string, any> = {};
+      (baseTechsRes.data || []).forEach((item: any) => {
+        if (!techMap[item.matricula_tt]) {
+          techMap[item.matricula_tt] = item;
+        }
+      });
+      setAllBaseTechnicians(Object.values(techMap));
+
     } catch (err: any) {
-      toast.error("Erro ao carregar envios: " + err.message);
+      toast.error("Erro ao carregar dados do dashboard: " + err.message);
     } finally {
       setLoadingReports(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === "admin" && isAdmin) {
-      fetchSubmissions();
+    if (activeTab === "admin" && (isAdmin || profile?.cargo === "Gerente" || profile?.cargo === "Coordenador" || profile?.cargo === "Supervisor")) {
+      fetchDashboardData();
     }
   }, [activeTab]);
 
@@ -340,32 +422,39 @@ const Inventory = () => {
 
           {baseItems.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {baseItems.map((item) => (
-                <Card key={item.id} className={`transition-all ${submissionItems[item.id] === 'presente' ? 'border-success/50 bg-success/5' : submissionItems[item.id] === 'falta' ? 'border-destructive/50 bg-destructive/5' : ''}`}>
+              {getGroupedItems().map((cat) => (
+                <Card 
+                  key={cat.codigo} 
+                  className="cursor-pointer hover:border-primary/50 transition-all group"
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setIsDetailOpen(true);
+                  }}
+                >
                   <CardContent className="p-4 space-y-4">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase font-semibold">Serial</p>
-                        <p className="text-lg font-bold">{item.serial}</p>
-                        <p className="text-sm text-muted-foreground">{item.modelo || "ONT"}</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-primary" />
+                          <p className="text-xs text-muted-foreground uppercase font-semibold">Código: {cat.codigo}</p>
+                        </div>
+                        <p className="text-lg font-bold leading-tight">{cat.nome}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant={submissionItems[item.id] === 'presente' ? 'default' : 'outline'}
-                          className={submissionItems[item.id] === 'presente' ? 'bg-success hover:bg-success/90' : ''}
-                          onClick={() => handleStatusChange(item.id, 'presente')}
-                        >
-                          <Check className="w-4 h-4 mr-1" /> Possuo
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant={submissionItems[item.id] === 'falta' ? 'destructive' : 'outline'}
-                          onClick={() => handleStatusChange(item.id, 'falta')}
-                        >
-                          <X className="w-4 h-4 mr-1" /> Falta
-                        </Button>
+                      <div className={`px-2 py-1 rounded text-xs font-bold ${cat.validated === cat.total ? 'bg-success/20 text-success' : 'bg-primary/10 text-primary'}`}>
+                        {cat.validated}/{cat.total}
                       </div>
+                    </div>
+                    
+                    <div className="w-full bg-secondary/30 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-primary h-full transition-all duration-500" 
+                        style={{ width: `${(cat.validated / cat.total) * 100}%` }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{cat.validated < cat.total ? 'Validação pendente' : 'Tudo validado'}</span>
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </CardContent>
                 </Card>
@@ -423,96 +512,229 @@ const Inventory = () => {
         </TabsContent>
 
         <TabsContent value="admin" className="m-0 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Carga de Materiais</CardTitle>
-                <CardDescription>Importe a base de equipamentos esperada para cada técnico.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 space-y-4 hover:bg-secondary/10 transition-colors">
-                  <Upload className="w-10 h-10 text-muted-foreground" />
-                  <div className="text-center">
-                    <p className="font-medium">Clique para fazer upload</p>
-                    <p className="text-xs text-muted-foreground">XLSX com Serial, TT, Técnico, Setor, etc.</p>
-                  </div>
-                  <Input 
-                    type="file" 
-                    accept=".xlsx, .xls" 
-                    className="hidden" 
-                    id="base-upload" 
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                  />
-                  <Button asChild disabled={uploading}>
-                    <label htmlFor="base-upload" className="cursor-pointer">
-                      {uploading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                      Selecionar Planilha
-                    </label>
+          <Tabs value={activeAdminTab} onValueChange={setActiveAdminTab}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+              <TabsList>
+                <TabsTrigger value="tracking">Acompanhamento</TabsTrigger>
+                <TabsTrigger value="upload">Carga de Base</TabsTrigger>
+              </TabsList>
+              
+              {activeAdminTab === "tracking" && (
+                <div className="flex gap-2">
+                  <Select value={filterCoordenador} onValueChange={setFilterCoordenador}>
+                    <SelectTrigger className="w-[200px] h-9">
+                      <Filter className="w-3 h-3 mr-2" />
+                      <SelectValue placeholder="Coordenador" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos Coordenadores</SelectItem>
+                      {Array.from(new Set(allBaseTechnicians.map(t => t.coordenador).filter(Boolean))).map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filterSupervisor} onValueChange={setFilterSupervisor}>
+                    <SelectTrigger className="w-[200px] h-9">
+                      <Filter className="w-3 h-3 mr-2" />
+                      <SelectValue placeholder="Supervisor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos Supervisores</SelectItem>
+                      {Array.from(new Set(allBaseTechnicians.map(t => t.supervisor).filter(Boolean))).map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button variant="outline" size="sm" onClick={fetchDashboardData} disabled={loadingReports}>
+                    <RefreshCw className={`w-4 h-4 ${loadingReports ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Histórico e Relatórios</CardTitle>
-                <CardDescription>Veja os inventários realizados e as divergências encontradas.</CardDescription>
-              </CardHeader>
-              <CardContent className="h-full flex flex-col justify-between">
-                <p className="text-sm text-muted-foreground">Total de envios realizados: {allSubmissions.length}</p>
-                <Button variant="outline" className="mt-4" onClick={fetchSubmissions}>
-                  <RefreshCw className="w-4 h-4 mr-2" /> Atualizar Lista
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+            <TabsContent value="tracking" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="glass-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Inventários Fechados</p>
+                        <h3 className="text-2xl font-bold">{allSubmissions.filter(s => {
+                          const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
+                          if (!tech) return true;
+                          const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
+                          const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
+                          return matchCoord && matchSuper;
+                        }).length}</h3>
+                      </div>
+                      <div className="p-2 bg-success/10 rounded-full">
+                        <ClipboardCheck className="w-5 h-5 text-success" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Divergências Registradas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Técnico</TableHead>
-                    <TableHead>TT</TableHead>
-                    <TableHead>Faltas</TableHead>
-                    <TableHead>Extras</TableHead>
-                    <TableHead>Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allSubmissions.map((sub) => {
-                    const faltas = sub.inventory_submission_items.filter((i: any) => i.status === 'falta').length;
-                    const extras = sub.inventory_submission_items.filter((i: any) => i.status === 'extra').length;
-                    
-                    return (
-                      <TableRow key={sub.id}>
-                        <TableCell>{new Date(sub.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>{sub.nome_tecnico}</TableCell>
-                        <TableCell>{sub.matricula_tt}</TableCell>
-                        <TableCell className="text-destructive font-medium">{faltas}</TableCell>
-                        <TableCell className="text-warning font-medium">{extras}</TableCell>
-                        <TableCell>
-                          <Button size="sm" variant="ghost">Ver Detalhes</Button>
-                        </TableCell>
+                <Card className="glass-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
+                        <h3 className="text-2xl font-bold">
+                          {allBaseTechnicians.filter(t => {
+                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t.matricula_tt);
+                            return matchCoord && matchSuper && !alreadyDone;
+                          }).length}</h3>
+                      </div>
+                      <div className="p-2 bg-warning/10 rounded-full">
+                        <History className="w-5 h-5 text-warning" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Itens Faltantes</p>
+                        <h3 className="text-2xl font-bold">
+                          {allSubmissions.reduce((acc, sub) => {
+                            const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
+                            if (tech) {
+                              const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
+                              const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
+                              if (!matchCoord || !matchSuper) return acc;
+                            }
+                            return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'falta').length || 0);
+                          }, 0)}
+                        </h3>
+                      </div>
+                      <div className="p-2 bg-destructive/10 rounded-full">
+                        <AlertCircle className="w-5 h-5 text-destructive" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Novos Seriais</p>
+                        <h3 className="text-2xl font-bold">
+                          {allSubmissions.reduce((acc, sub) => {
+                            const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
+                            if (tech) {
+                              const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
+                              const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
+                              if (!matchCoord || !matchSuper) return acc;
+                            }
+                            return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'extra').length || 0);
+                          }, 0)}
+                        </h3>
+                      </div>
+                      <div className="p-2 bg-blue-500/10 rounded-full">
+                        <Plus className="w-5 h-5 text-blue-500" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acompanhamento por Técnico</CardTitle>
+                  <CardDescription>Status geral do inventário em tempo real.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Técnico</TableHead>
+                        <TableHead>Supervisor</TableHead>
+                        <TableHead>Coordenador</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data/Hora</TableHead>
+                        <TableHead className="text-right">Ação</TableHead>
                       </TableRow>
-                    );
-                  })}
-                  {allSubmissions.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        Nenhum inventário finalizado encontrado.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {allBaseTechnicians
+                        .filter(t => {
+                          const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                          const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                          return matchCoord && matchSuper;
+                        })
+                        .map(tech => {
+                          const sub = allSubmissions.find(s => s.matricula_tt === tech.matricula_tt);
+                          return (
+                            <TableRow key={tech.matricula_tt}>
+                              <TableCell>
+                                <div className="font-medium">{tech.nome_tecnico}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{tech.matricula_tt}</div>
+                              </TableCell>
+                              <TableCell className="text-sm">{tech.supervisor || "—"}</TableCell>
+                              <TableCell className="text-sm">{tech.coordenador || "—"}</TableCell>
+                              <TableCell>
+                                {sub ? (
+                                  <Badge className="bg-success text-success-foreground">Finalizado</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-muted-foreground border-dashed">Pendente</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {sub ? new Date(sub.data_fim).toLocaleString('pt-BR') : "—"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {sub && (
+                                  <Button size="sm" variant="ghost">Ver Detalhes</Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="upload" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Carga de Materiais (Administrador)</CardTitle>
+                  <CardDescription>Importe a base de equipamentos esperada para cada técnico.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 space-y-4 hover:bg-secondary/10 transition-colors">
+                    <Upload className="w-10 h-10 text-muted-foreground" />
+                    <div className="text-center">
+                      <p className="font-medium">Clique para fazer upload</p>
+                      <p className="text-xs text-muted-foreground">XLSX com Serial, Modelo, Código, TT, Técnico, Supervisor, etc.</p>
+                    </div>
+                    <Input 
+                      type="file" 
+                      accept=".xlsx, .xls" 
+                      className="hidden" 
+                      id="base-upload" 
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                    />
+                    <Button asChild disabled={uploading}>
+                      <label htmlFor="base-upload" className="cursor-pointer">
+                        {uploading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                        Selecionar Planilha
+                      </label>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </div>
 
@@ -528,6 +750,111 @@ const Inventory = () => {
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={stopScanner}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Category Details (Drill-down) */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-primary" />
+              {selectedCategory?.nome}
+            </DialogTitle>
+            <DialogDescription>
+              Valide os seriais deste material (Código: {selectedCategory?.codigo})
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {selectedCategory?.items.map((item) => (
+                <div 
+                  key={item.id} 
+                  className={`p-3 rounded-lg border transition-all flex items-center justify-between ${
+                    submissionItems[item.id] === 'presente' ? 'bg-success/10 border-success/30' : 
+                    submissionItems[item.id] === 'falta' ? 'bg-destructive/10 border-destructive/30' : 
+                    'bg-secondary/20 border-border'
+                  }`}
+                >
+                  <div>
+                    <p className="font-mono text-sm font-bold">{item.serial}</p>
+                    <p className="text-[10px] text-muted-foreground uppercase">Serial do sistema</p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button 
+                      size="sm" 
+                      variant={submissionItems[item.id] === 'presente' ? 'default' : 'outline'}
+                      className={`h-8 w-8 p-0 ${submissionItems[item.id] === 'presente' ? 'bg-success hover:bg-success/90' : ''}`}
+                      onClick={() => handleStatusChange(item.id, 'presente')}
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant={submissionItems[item.id] === 'falta' ? 'destructive' : 'outline'}
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleStatusChange(item.id, 'falta')}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Extras of this category */}
+              {extraItems
+                .filter(i => i.codigo_material === selectedCategory?.codigo)
+                .map((item, idx) => (
+                  <div key={`extra-${idx}`} className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 flex items-center justify-between">
+                    <div>
+                      <p className="font-mono text-sm font-bold">{item.serial}</p>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-[8px] h-3 px-1 border-blue-500 text-blue-500">INCLUÍDA</Badge>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveExtra(extraItems.indexOf(item))}>
+                      <X className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+            </div>
+
+            <div className="pt-4 border-t border-dashed">
+              <Label className="text-xs text-muted-foreground mb-2 block">Deseja incluir um novo serial neste grupo?</Label>
+              <div className="flex gap-2">
+                <Input 
+                  id="modal-extra-serial" 
+                  placeholder="Novo Serial" 
+                  className="h-9 font-mono" 
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const input = e.currentTarget;
+                      if (input.value) {
+                        handleAddExtra(input.value, selectedCategory?.nome || "ONT", selectedCategory?.codigo);
+                        input.value = "";
+                      }
+                    }
+                  }}
+                />
+                <Button size="sm" onClick={() => {
+                  const input = document.getElementById('modal-extra-serial') as HTMLInputElement;
+                  if (input.value) {
+                    handleAddExtra(input.value, selectedCategory?.nome || "ONT", selectedCategory?.codigo);
+                    input.value = "";
+                  }
+                }}>
+                  <Plus className="w-4 h-4 mr-1" /> Incluir
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="w-full" onClick={() => setIsDetailOpen(false)}>
+              Fechar Detalhamento
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -628,6 +628,7 @@ const AdminUsers = () => {
                   <SelectItem value="Coordenador">Coordenador</SelectItem>
                   <SelectItem value="Supervisor">Supervisor</SelectItem>
                   <SelectItem value="Apoio CL">Apoio CL</SelectItem>
+                  <SelectItem value="Técnico">Técnico</SelectItem>
                   <SelectItem value="Técnico Dados">Técnico Dados</SelectItem>
                   <SelectItem value="Técnico Home">Técnico Home</SelectItem>
                 </SelectContent>
