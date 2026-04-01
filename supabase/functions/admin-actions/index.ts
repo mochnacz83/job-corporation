@@ -64,42 +64,42 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify the caller is an admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user: caller }, error: userError } = await anonClient.auth.getUser();
-    if (userError || !caller) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { data: roleData } = await serviceClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', caller.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    const isAdmin = !!roleData;
-
     const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
-    console.log(`[AUTH] Action: ${action} | Caller: ${caller.id} | Target: ${userId} | isAdmin: ${isAdmin}`);
-
-    // Verify admin role ONLY for privileged actions
     const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user'];
     const publicActions = ['get-user-status', 'reset-my-ghost', 'finalize-signup'];
+
+    const authHeader = req.headers.get('Authorization');
+    let caller: { id: string } | null = null;
+    let isAdmin = false;
+
+    if (authHeader) {
+      const anonClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: userError } = await anonClient.auth.getUser();
+      if (!userError && user) {
+        caller = { id: user.id };
+
+        const { data: roleData } = await serviceClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        isAdmin = !!roleData;
+      }
+    }
+
+    if (!authHeader && !publicActions.includes(action)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`[AUTH] Action: ${action} | Caller: ${caller?.id ?? 'anonymous'} | Target: ${userId} | isAdmin: ${isAdmin}`);
 
     // Authorization logic
     let authorized = false;
@@ -110,10 +110,10 @@ serve(async (req) => {
       authorized = true;
     } else if (action === 'complete-signup') {
       // Allow user to complete their own signup
-      authorized = caller.id === userId;
+      authorized = caller?.id === userId;
     } else if (action === 'update-profile') {
       // Allow user to update their own profile OR admin to update any
-      authorized = isAdmin || caller.id === userId;
+      authorized = isAdmin || caller?.id === userId;
     } else if (adminActions.includes(action)) {
       // Require admin for these actions
       authorized = isAdmin;
@@ -123,7 +123,7 @@ serve(async (req) => {
     }
 
     if (!authorized) {
-      console.warn(`[AUTH] Unauthorized ${action} attempt by ${caller.id} for ${userId}`);
+      console.warn(`[AUTH] Unauthorized ${action} attempt by ${caller?.id ?? 'anonymous'} for ${userId}`);
       const errorMsg = isAdmin ? 'Permission denied' : 'Forbidden: admin role required';
       return new Response(JSON.stringify({ error: errorMsg }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
