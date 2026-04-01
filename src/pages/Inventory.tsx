@@ -248,6 +248,26 @@ const Inventory = () => {
 
   // --- Admin Functions ---
 
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        "Serial": "Ex: SN123456",
+        "Modelo": "Ex: ONT HG8245H",
+        "Código": "Ex: 100200",
+        "Nome Técnico": "João da Silva",
+        "Matrícula TT": "TT12345",
+        "Setor": "Operacional",
+        "Supervisor": "Supervisor Exemplo",
+        "Coordenador": "Coordenador Exemplo"
+      }
+    ];
+    
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "modelo_importacao_inventario.xlsx");
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -724,12 +744,18 @@ const Inventory = () => {
                       onChange={handleFileUpload}
                       disabled={uploading}
                     />
-                    <Button asChild disabled={uploading}>
-                      <label htmlFor="base-upload" className="cursor-pointer">
-                        {uploading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                        Selecionar Planilha
-                      </label>
-                    </Button>
+                    <div className="flex gap-4">
+                      <Button asChild disabled={uploading}>
+                        <label htmlFor="base-upload" className="cursor-pointer">
+                          {uploading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                          Selecionar Planilha
+                        </label>
+                      </Button>
+                      <Button variant="outline" onClick={downloadTemplate} disabled={uploading}>
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Baixar Modelo (.xlsx)
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
