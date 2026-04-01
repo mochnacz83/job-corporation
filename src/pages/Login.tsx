@@ -49,6 +49,10 @@ const Login = () => {
   const [telefone, setTelefone] = useState("");
   const [cargo, setCargo] = useState("");
   const [area, setArea] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupPasswordConfirm, setSignupPasswordConfirm] = useState("");
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showSignupPasswordConfirm, setShowSignupPasswordConfirm] = useState(false);
   // Signup-specific
   const [forgotMatricula, setForgotMatricula] = useState("");
   const [forgotPassword, setForgotPassword] = useState("");
@@ -145,7 +149,14 @@ const Login = () => {
       return;
     }
 
-    const signupPassword = "12346@Ab";
+    if (!PASSWORD_REGEX.test(signupPassword)) {
+      toast({ title: "Senha inválida", description: "A senha deve ter no mínimo 6 caracteres, com letra maiúscula, minúscula, número e caractere especial.", variant: "destructive" });
+      return;
+    }
+    if (signupPassword !== signupPasswordConfirm) {
+      toast({ title: "Senhas não conferem", description: "Confirme a mesma senha informada no cadastro.", variant: "destructive" });
+      return;
+    }
 
 
     setLoading(true);
@@ -249,6 +260,21 @@ const Login = () => {
 
       console.log("[Signup] Usuário criado com sucesso:", signUpData.user.id);
 
+      try {
+        const { data: finalizeRes, error: finalizeErr } = await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "finalize-signup",
+            userId: signUpData.user.id,
+          },
+        });
+
+        if (finalizeErr || finalizeRes?.error) {
+          console.warn("[Signup] finalize-signup warning:", finalizeErr || finalizeRes?.error);
+        }
+      } catch (err) {
+        console.warn("[Signup] finalize-signup failed (non-blocking):", err);
+      }
+
       // Failsafe: Create/Complete profile via Edge Function to ensure Area and Cargo are saved
       try {
         console.log("[Signup] Criando perfil via Edge Function...");
@@ -280,12 +306,12 @@ const Login = () => {
 
       toast({
         title: "✅ Cadastro realizado com sucesso!",
-        description: `Sua solicitação foi enviada. Senha Provisória: 12346@Ab. Aguarde a aprovação do administrador para acessar.`,
+        description: "Sua solicitação foi enviada. Aguarde a aprovação do administrador para acessar com a senha que você acabou de cadastrar.",
         duration: 15000
       });
       setView("login");
       setNome(""); setEmailContato(""); setEmpresa(""); setTelefone("");
-      setCargo(""); setArea(""); setMatricula("");
+      setCargo(""); setArea(""); setMatricula(""); setSignupPassword(""); setSignupPasswordConfirm("");
     } catch (err: any) {
       console.error("[Signup] Erro final:", err);
       
@@ -555,15 +581,58 @@ const Login = () => {
                   />
                 </div>
 
-                <div className="space-y-1 pt-2 border-t border-border">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                    Senha Temporária
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Senha de Acesso
                   </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        type={showSignupPassword ? "text" : "password"}
+                        value={signupPassword}
+                        onChange={(e) => setSignupPassword(e.target.value)}
+                        placeholder="Crie sua senha"
+                        className="pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showSignupPassword ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password-confirm">Confirmar senha</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password-confirm"
+                        type={showSignupPasswordConfirm ? "text" : "password"}
+                        value={signupPasswordConfirm}
+                        onChange={(e) => setSignupPasswordConfirm(e.target.value)}
+                        placeholder="Repita sua senha"
+                        className="pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSignupPasswordConfirm((prev) => !prev)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={showSignupPasswordConfirm ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
+                      >
+                        {showSignupPasswordConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
                   <Alert variant="default" className="bg-blue-50 border-blue-200 py-2">
                     <Info className="h-4 w-4 text-blue-600" />
                     <AlertDescription className="text-blue-700 text-[11px] leading-tight">
-                      Sua senha provisória será <strong className="font-bold">12346@Ab</strong>.
-                      Após o administrador aprovar seu acesso, você deverá alterá-la no primeiro login.
+                      Após a aprovação do administrador, você acessará com esta mesma senha; só haverá senha temporária em caso de reset solicitado.
                     </AlertDescription>
                   </Alert>
                 </div>

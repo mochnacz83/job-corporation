@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { KeyRound, Loader2, Check, X, ShieldAlert, Info } from "lucide-react";
+import { KeyRound, Loader2, Check, X, ShieldAlert, Info, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -21,6 +21,8 @@ import {
 const ChangePassword = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const { profile, signOut } = useAuth();
@@ -109,14 +111,25 @@ const ChangePassword = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">Nova Senha</Label>
-              <Input 
-                id="new-password" 
-                type="password" 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
-                placeholder="Insira sua nova senha" 
-                required 
-              />
+              <div className="relative">
+                <Input 
+                  id="new-password" 
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword} 
+                  onChange={(e) => setNewPassword(e.target.value)} 
+                  placeholder="Insira sua nova senha" 
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showNewPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="bg-muted/30 p-3 rounded-lg border border-border/50 space-y-2">
@@ -137,14 +150,25 @@ const ChangePassword = () => {
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirmar Senha</Label>
-              <Input 
-                id="confirm-password" 
-                type="password" 
-                value={confirmPassword} 
-                onChange={(e) => setConfirmPassword(e.target.value)} 
-                placeholder="Repita a nova senha" 
-                required 
-              />
+              <div className="relative">
+                <Input 
+                  id="confirm-password" 
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                  placeholder="Repita a nova senha" 
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showConfirmPassword ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading || !passwordValid || newPassword !== confirmPassword}>

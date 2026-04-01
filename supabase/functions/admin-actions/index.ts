@@ -64,42 +64,42 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify the caller is an admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user: caller }, error: userError } = await anonClient.auth.getUser();
-    if (userError || !caller) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { data: roleData } = await serviceClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', caller.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    const isAdmin = !!roleData;
-
     const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
-    console.log(`[AUTH] Action: ${action} | Caller: ${caller.id} | Target: ${userId} | isAdmin: ${isAdmin}`);
-
-    // Verify admin role ONLY for privileged actions
     const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user'];
-    const publicActions = ['get-user-status', 'reset-my-ghost'];
+    const publicActions = ['get-user-status', 'reset-my-ghost', 'finalize-signup'];
+
+    const authHeader = req.headers.get('Authorization');
+    let caller: { id: string } | null = null;
+    let isAdmin = false;
+
+    if (authHeader) {
+      const anonClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: userError } = await anonClient.auth.getUser();
+      if (!userError && user) {
+        caller = { id: user.id };
+
+        const { data: roleData } = await serviceClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle();
+
+        isAdmin = !!roleData;
+      }
+    }
+
+    if (!authHeader && !publicActions.includes(action)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log(`[AUTH] Action: ${action} | Caller: ${caller?.id ?? 'anonymous'} | Target: ${userId} | isAdmin: ${isAdmin}`);
 
     // Authorization logic
     let authorized = false;
@@ -110,10 +110,10 @@ serve(async (req) => {
       authorized = true;
     } else if (action === 'complete-signup') {
       // Allow user to complete their own signup
-      authorized = caller.id === userId;
+      authorized = caller?.id === userId;
     } else if (action === 'update-profile') {
       // Allow user to update their own profile OR admin to update any
-      authorized = isAdmin || caller.id === userId;
+      authorized = isAdmin || caller?.id === userId;
     } else if (adminActions.includes(action)) {
       // Require admin for these actions
       authorized = isAdmin;
@@ -123,7 +123,7 @@ serve(async (req) => {
     }
 
     if (!authorized) {
-      console.warn(`[AUTH] Unauthorized ${action} attempt by ${caller.id} for ${userId}`);
+      console.warn(`[AUTH] Unauthorized ${action} attempt by ${caller?.id ?? 'anonymous'} for ${userId}`);
       const errorMsg = isAdmin ? 'Permission denied' : 'Forbidden: admin role required';
       return new Response(JSON.stringify({ error: errorMsg }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,6 +159,7 @@ serve(async (req) => {
 
       const { error: updateError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: passwordToUse,
+        email_confirm: true,
       });
 
       if (updateError) {
@@ -239,6 +240,7 @@ serve(async (req) => {
       const defaultPassword = '12346@Ab';
       const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
         password: defaultPassword,
+        email_confirm: true,
       });
 
       if (authError) {
@@ -319,12 +321,24 @@ serve(async (req) => {
 
       if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
 
-      const updateData: any = { status: newStatus };
+      const updateData: any = {
+        status: newStatus,
+        reset_password_pending: false,
+      };
       let emailSent = false;
 
-      // If activating: mark must_change_password and notify via email
+      // If activating: keep the original signup password and just release access
       if (newStatus === 'ativo') {
-        updateData.must_change_password = true;
+        updateData.must_change_password = false;
+        updateData.requested_password = null;
+
+        const { error: authActivationError } = await serviceClient.auth.admin.updateUserById(userId, {
+          email_confirm: true,
+        });
+
+        if (authActivationError) {
+          throw new Error(`Auth activation failed: ${authActivationError.message}`);
+        }
 
         if (profile?.email) {
           const activationEmail = await sendEmail(
@@ -336,8 +350,8 @@ serve(async (req) => {
               <p>Boa notícia! Sua conta no <strong>Portal Corporativo da Ability Tecnologia</strong> foi aprovada e já está ativa.</p>
               <div style="background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bfdbfe;">
                 <p style="margin: 0; font-size: 15px; font-weight: bold; color: #1a1a2e;">Como acessar:</p>
-                <p style="margin: 8px 0 0 0; color: #374151;">Sua senha provisória de acesso é: <strong style="color: #4361ee; font-family: monospace;">12346@Ab</strong></p>
-                <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">⚠️ No primeiro acesso, você será solicitado a criar uma nova senha permanente.</p>
+                <p style="margin: 8px 0 0 0; color: #374151;">Use a <strong>mesma senha cadastrada no seu registro inicial</strong> para entrar no portal.</p>
+                <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">Se precisar de uma nova senha futuramente, solicite a recuperação para que o administrador gere uma senha temporária.</p>
               </div>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
               <p style="font-size: 12px; color: #999;">Em caso de dúvidas, entre em contato:<br/>
@@ -516,6 +530,63 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'finalize-signup') {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: 'userId required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: existingProfile, error: existingProfileError } = await serviceClient
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (existingProfileError) {
+        throw new Error(`Failed to check existing profile: ${existingProfileError.message}`);
+      }
+
+      if (existingProfile) {
+        return new Response(JSON.stringify({ success: true, alreadyCompleted: true }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: authUserData, error: authUserError } = await serviceClient.auth.admin.getUserById(userId);
+      if (authUserError || !authUserData?.user) {
+        throw new Error(`Failed to fetch auth user: ${authUserError?.message || 'User not found'}`);
+      }
+
+      const authUser = authUserData.user;
+      const metadata = authUser.user_metadata || {};
+
+      const mappedData = {
+        user_id: userId,
+        nome: metadata.nome || '',
+        matricula: metadata.matricula || '',
+        email: metadata.email_contato || authUser.email || '',
+        empresa: metadata.empresa || '',
+        telefone: metadata.telefone || '',
+        cargo: metadata.reg_cargo || metadata.cargo || '',
+        area: metadata.reg_area || metadata.area || '',
+        status: 'pendente',
+        must_change_password: false,
+      };
+
+      const { error: upsertError } = await serviceClient
+        .from('profiles')
+        .upsert(mappedData, { onConflict: 'user_id' });
+
+      if (upsertError) {
+        throw new Error(`Failed to finalize signup: ${upsertError.message}`);
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'complete-signup') {
       if (!userId || !profileData) {
         return new Response(JSON.stringify({ error: 'userId and profileData required' }), {
@@ -536,7 +607,7 @@ serve(async (req) => {
         cargo: profileData.reg_cargo || profileData.cargo || '',
         area: profileData.reg_area || profileData.area || '',
         status: 'pendente',
-        must_change_password: true
+        must_change_password: false
       };
 
       // Use upsert to handle cases where the trigger might have already created a partial profile
