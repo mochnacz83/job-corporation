@@ -249,6 +249,21 @@ const Login = () => {
 
       console.log("[Signup] Usuário criado com sucesso:", signUpData.user.id);
 
+      try {
+        const { data: finalizeRes, error: finalizeErr } = await supabase.functions.invoke("admin-actions", {
+          body: {
+            action: "finalize-signup",
+            userId: signUpData.user.id,
+          },
+        });
+
+        if (finalizeErr || finalizeRes?.error) {
+          console.warn("[Signup] finalize-signup warning:", finalizeErr || finalizeRes?.error);
+        }
+      } catch (err) {
+        console.warn("[Signup] finalize-signup failed (non-blocking):", err);
+      }
+
       // Failsafe: Create/Complete profile via Edge Function to ensure Area and Cargo are saved
       try {
         console.log("[Signup] Criando perfil via Edge Function...");
