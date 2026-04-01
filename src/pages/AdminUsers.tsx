@@ -129,14 +129,14 @@ const AdminUsers = () => {
 
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
 
-      const { emailSent, passwordUsed } = data;
+      const { emailSent } = data;
       let successMsg = `Usuário ${newStatus === "ativo" ? "ativado" : "bloqueado"} com sucesso.`;
 
       if (newStatus === "ativo") {
         if (emailSent) {
-          successMsg = "Usuário ativado e senha inicial (12346@Ab) enviada por e-mail.";
+          successMsg = "Usuário ativado com sucesso e notificado para acessar com a senha cadastrada inicialmente.";
         } else {
-          successMsg = "Usuário ativado. Senha definida como: 12346@Ab (E-mail não pôde ser enviado).";
+          successMsg = "Usuário ativado com sucesso. A senha cadastrada inicialmente foi mantida.";
         }
       }
 
@@ -550,8 +550,8 @@ const AdminUsers = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
-            <Label>Nova Senha</Label>
-            <Input type="text" placeholder={resetUser?.requested_password ? "Senha solicitada" : (resetUser?.email ? "Nova senha" : "12345@Ab")} value={newPassword}
+            <Label>Nova Senha Temporária</Label>
+            <Input type="text" placeholder={resetUser?.requested_password ? "Senha solicitada" : (resetUser?.email ? "Nova senha temporária" : "12345@Ab")} value={newPassword}
               disabled={!resetUser?.email && !resetUser?.requested_password}
               onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }} />
             {resetUser?.requested_password ? (
@@ -564,7 +564,7 @@ const AdminUsers = () => {
               </p>
             ) : (
               <p className="text-[10px] text-blue-600 font-medium">
-                A senha será enviada para: {resetUser.email}
+                A senha temporária será enviada para: {resetUser.email}
               </p>
             )}
           </div>
