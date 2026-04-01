@@ -369,24 +369,23 @@ const Inventory = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
-            </div>
-            <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs</p>
-          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Button>
+                  <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
+                </div>
+                <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs</p>
+              </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="grid grid-cols-2 w-full md:w-[400px]">
-              <TabsTrigger value="colaborador">Colaborador</TabsTrigger>
-              <TabsTrigger value="admin" disabled={!isAdmin}>Admin</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </header>
+              <TabsList className="grid grid-cols-2 w-full md:w-[400px]">
+                <TabsTrigger value="colaborador">Colaborador</TabsTrigger>
+                <TabsTrigger value="admin" disabled={!isAdmin && profile?.cargo !== "Gerente" && profile?.cargo !== "Coordenador" && profile?.cargo !== "Supervisor"}>Admin</TabsTrigger>
+              </TabsList>
+            </header>
 
         <TabsContent value="colaborador" className="m-0 space-y-6">
           <Card className="glass-card">
@@ -563,9 +562,8 @@ const Inventory = () => {
                         <p className="text-sm font-medium text-muted-foreground">Inventários Fechados</p>
                         <h3 className="text-2xl font-bold">{allSubmissions.filter(s => {
                           const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
-                          if (!tech) return true;
-                          const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
-                          const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
+                          const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+                          const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
                           return matchCoord && matchSuper;
                         }).length}</h3>
                       </div>
@@ -583,9 +581,9 @@ const Inventory = () => {
                         <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
                         <h3 className="text-2xl font-bold">
                           {allBaseTechnicians.filter(t => {
-                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
-                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
-                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t.matricula_tt);
+                            const matchCoord = filterCoordenador === "todos" || t?.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t?.supervisor === filterSupervisor;
+                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t?.matricula_tt);
                             return matchCoord && matchSuper && !alreadyDone;
                           }).length}</h3>
                       </div>
@@ -604,12 +602,13 @@ const Inventory = () => {
                         <h3 className="text-2xl font-bold">
                           {allSubmissions.reduce((acc, sub) => {
                             const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
-                            if (tech) {
-                              const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
-                              const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
-                              if (!matchCoord || !matchSuper) return acc;
+                            const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
+                            
+                            if (matchCoord && matchSuper) {
+                              return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'falta')?.length || 0);
                             }
-                            return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'falta').length || 0);
+                            return acc;
                           }, 0)}
                         </h3>
                       </div>
@@ -628,12 +627,13 @@ const Inventory = () => {
                         <h3 className="text-2xl font-bold">
                           {allSubmissions.reduce((acc, sub) => {
                             const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
-                            if (tech) {
-                              const matchCoord = filterCoordenador === "todos" || tech.coordenador === filterCoordenador;
-                              const matchSuper = filterSupervisor === "todos" || tech.supervisor === filterSupervisor;
-                              if (!matchCoord || !matchSuper) return acc;
+                            const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
+                            
+                            if (matchCoord && matchSuper) {
+                              return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'extra')?.length || 0);
                             }
-                            return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'extra').length || 0);
+                            return acc;
                           }, 0)}
                         </h3>
                       </div>
@@ -665,20 +665,20 @@ const Inventory = () => {
                     <TableBody>
                       {allBaseTechnicians
                         .filter(t => {
-                          const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
-                          const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                          const matchCoord = filterCoordenador === "todos" || t?.coordenador === filterCoordenador;
+                          const matchSuper = filterSupervisor === "todos" || t?.supervisor === filterSupervisor;
                           return matchCoord && matchSuper;
                         })
                         .map(tech => {
-                          const sub = allSubmissions.find(s => s.matricula_tt === tech.matricula_tt);
+                          const sub = allSubmissions.find(s => s.matricula_tt === tech?.matricula_tt);
                           return (
-                            <TableRow key={tech.matricula_tt}>
+                            <TableRow key={tech?.matricula_tt}>
                               <TableCell>
-                                <div className="font-medium">{tech.nome_tecnico}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{tech.matricula_tt}</div>
+                                <div className="font-medium">{tech?.nome_tecnico}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{tech?.matricula_tt}</div>
                               </TableCell>
-                              <TableCell className="text-sm">{tech.supervisor || "—"}</TableCell>
-                              <TableCell className="text-sm">{tech.coordenador || "—"}</TableCell>
+                              <TableCell className="text-sm">{tech?.supervisor || "—"}</TableCell>
+                              <TableCell className="text-sm">{tech?.coordenador || "—"}</TableCell>
                               <TableCell>
                                 {sub ? (
                                   <Badge className="bg-success text-success-foreground">Finalizado</Badge>
@@ -736,6 +736,7 @@ const Inventory = () => {
             </TabsContent>
           </Tabs>
         </TabsContent>
+      </Tabs>
       </div>
 
       {/* Dialog for Scanner */}
