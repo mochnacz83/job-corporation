@@ -327,13 +327,12 @@ serve(async (req) => {
       };
       let emailSent = false;
 
-      // If activating: mark must_change_password and notify via email
+      // If activating: keep the original signup password and just release access
       if (newStatus === 'ativo') {
-        updateData.must_change_password = true;
+        updateData.must_change_password = false;
         updateData.requested_password = null;
 
         const { error: authActivationError } = await serviceClient.auth.admin.updateUserById(userId, {
-          password: '12346@Ab',
           email_confirm: true,
         });
 
@@ -351,8 +350,8 @@ serve(async (req) => {
               <p>Boa notícia! Sua conta no <strong>Portal Corporativo da Ability Tecnologia</strong> foi aprovada e já está ativa.</p>
               <div style="background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bfdbfe;">
                 <p style="margin: 0; font-size: 15px; font-weight: bold; color: #1a1a2e;">Como acessar:</p>
-                <p style="margin: 8px 0 0 0; color: #374151;">Sua senha provisória de acesso é: <strong style="color: #4361ee; font-family: monospace;">12346@Ab</strong></p>
-                <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">⚠️ No primeiro acesso, você será solicitado a criar uma nova senha permanente.</p>
+                <p style="margin: 8px 0 0 0; color: #374151;">Use a <strong>mesma senha cadastrada no seu registro inicial</strong> para entrar no portal.</p>
+                <p style="margin: 8px 0 0 0; color: #374151; font-size: 13px;">Se precisar de uma nova senha futuramente, solicite a recuperação para que o administrador gere uma senha temporária.</p>
               </div>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
               <p style="font-size: 12px; color: #999;">Em caso de dúvidas, entre em contato:<br/>
@@ -572,7 +571,7 @@ serve(async (req) => {
         cargo: metadata.reg_cargo || metadata.cargo || '',
         area: metadata.reg_area || metadata.area || '',
         status: 'pendente',
-        must_change_password: true,
+        must_change_password: false,
       };
 
       const { error: upsertError } = await serviceClient
@@ -608,7 +607,7 @@ serve(async (req) => {
         cargo: profileData.reg_cargo || profileData.cargo || '',
         area: profileData.reg_area || profileData.area || '',
         status: 'pendente',
-        must_change_password: true
+        must_change_password: false
       };
 
       // Use upsert to handle cases where the trigger might have already created a partial profile
