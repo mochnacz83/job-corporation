@@ -15,6 +15,7 @@ import AdminPermissions from "./pages/AdminPermissions";
 import Reagenda from "./pages/Reagenda";
 import MaterialColeta from "./pages/MaterialColeta";
 import VistoriaCampo from "./pages/VistoriaCampo";
+import Inventory from "./pages/Inventory";
 import NotFound from "./pages/NotFound";
 import { useEffect, useState, ReactNode } from "react";
 
@@ -56,6 +57,7 @@ const persistentPages = [
   { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
   { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
   { path: "/vistoria-campo", element: <ProtectedRoute><VistoriaCampo /></ProtectedRoute> },
+  { path: "/inventario", element: <ProtectedRoute><Inventory /></ProtectedRoute> },
 ];
 
 const AppRoutes = () => {
