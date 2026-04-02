@@ -110,17 +110,19 @@ const ChangePassword = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800 text-sm font-semibold">Validação do Administrador</AlertTitle>
-            <AlertDescription className="text-blue-700 text-xs leading-tight mt-1">
-              Sua nova senha será salva, mas o acesso completo só será liberado após a validação manual do administrador:
-              <div className="mt-2 font-bold text-blue-900">
-                Juniomar Alex Mochnacz<br/>
-                📱 48 99146-1983
-              </div>
-            </AlertDescription>
-          </Alert>
+          {isFirstRegistration && (
+            <Alert variant="default" className="bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="text-blue-800 text-sm font-semibold">Validação do Administrador</AlertTitle>
+              <AlertDescription className="text-blue-700 text-xs leading-tight mt-1">
+                Sua nova senha será salva, mas o acesso completo só será liberado após a validação manual do administrador:
+                <div className="mt-2 font-bold text-blue-900">
+                  Juniomar Alex Mochnacz<br/>
+                  📱 48 99146-1983
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
