@@ -17,8 +17,14 @@ import {
   ScanBarcode, CheckCircle2, AlertTriangle, AlertCircle, 
   RefreshCw, X, Check, BarChart3, ChevronRight, ClipboardCheck, 
   CornerDownRight, Filter, History, LayoutDashboard, Package, 
-  UserCheck 
+  UserCheck, Download, FileText, Save
 } from "lucide-react";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Html5Qrcode } from "html5-qrcode";
@@ -266,6 +272,52 @@ const Inventory = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, "modelo_importacao_inventario.xlsx");
+  };
+
+  const downloadInventoryResults = (format: 'xlsx' | 'csv') => {
+    const dataToExport: any[] = [];
+
+    allSubmissions.forEach(sub => {
+      const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
+      const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+      const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
+
+      if (!matchCoord || !matchSuper) return;
+
+      if (sub.inventory_submission_items && sub.inventory_submission_items.length > 0) {
+        sub.inventory_submission_items.forEach((item: any) => {
+          dataToExport.push({
+            "Data Envio": new Date(sub.created_at).toLocaleString('pt-BR'),
+            "Técnico": sub.nome_tecnico,
+            "Matrícula TT": sub.matricula_tt,
+            "Supervisor": tech?.supervisor || sub.supervisor || "—",
+            "Coordenador": tech?.coordenador || sub.coordenador || "—",
+            "Serial": item.serial,
+            "Modelo": item.modelo || "—",
+            "Código Material": item.codigo_material || "—",
+            "Status": item.status === 'presente' ? 'Possuo' : item.status === 'falta' ? 'Faltante' : 'Extra (Incluído)'
+          });
+        });
+      }
+    });
+
+    if (dataToExport.length === 0) {
+      toast.info("Nenhum dado para exportar com os filtros atuais.");
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventário Tratado");
+    
+    const fileName = `resultado_inventario_${new Date().toISOString().split('T')[0]}`;
+    
+    if (format === 'xlsx') {
+      XLSX.writeFile(wb, `${fileName}.xlsx`);
+    } else {
+      XLSX.writeFile(wb, `${fileName}.csv`, { bookType: 'csv' });
+    }
+    toast.success("Arquivo gerado com sucesso!");
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -566,10 +618,26 @@ const Inventory = () => {
                     </SelectContent>
                   </Select>
                   
-                  <Button variant="outline" size="sm" onClick={fetchDashboardData} disabled={loadingReports}>
-                    <RefreshCw className={`w-4 h-4 ${loadingReports ? 'animate-spin' : ''}`} />
-                  </Button>
-                </div>
+                    <Button variant="outline" size="sm" onClick={fetchDashboardData} disabled={loadingReports}>
+                      <RefreshCw className={`w-4 h-4 ${loadingReports ? 'animate-spin' : ''}`} />
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="secondary" size="sm" disabled={allSubmissions.length === 0}>
+                          <Download className="w-4 h-4 mr-2" /> Exportar
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => downloadInventoryResults('xlsx')}>
+                          <FileSpreadsheet className="w-4 h-4 mr-2" /> XLSX (Excel)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => downloadInventoryResults('csv')}>
+                          <FileText className="w-4 h-4 mr-2" /> CSV (Texto)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
               )}
             </div>
 
