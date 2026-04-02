@@ -29,6 +29,8 @@ const ChangePassword = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const isFirstRegistration = profile?.status === 'pendente' && profile?.must_change_password;
+
   const requirements = useMemo(() => [
     { label: "Mínimo 6 caracteres", valid: newPassword.length >= 6 },
     { label: "Pelo menos uma letra maiúscula", valid: /[A-Z]/.test(newPassword) },
@@ -55,21 +57,35 @@ const ChangePassword = () => {
       const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
       if (pwError) throw pwError;
 
-      // 2. Bloquear conta para validação do Admin
+      // 2. Atualizar perfil
       if (profile) {
+        const isFirstRegistration = profile.status === 'pendente';
+        const updateData: any = { 
+          must_change_password: false,
+          reset_password_pending: false,
+        };
+        
+        // Só bloqueia para aprovação no PRIMEIRO cadastro
+        if (isFirstRegistration) {
+          updateData.status = 'pendente';
+        }
+
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({ 
-            must_change_password: false,
-            status: 'pendente'
-          })
+          .update(updateData)
           .eq("id", profile.id);
         
         if (profileError) throw profileError;
       }
 
-      // 3. Mostrar diálogo de sucesso antes de deslogar
-      setShowSuccessDialog(true);
+      if (profile?.status === 'pendente' && profile?.must_change_password) {
+        // Primeiro cadastro — precisa aprovação
+        setShowSuccessDialog(true);
+      } else {
+        // Usuário ativo trocando senha — sem aprovação
+        toast({ title: "Senha alterada com sucesso!", description: "Sua nova senha já está ativa." });
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       toast({ title: "Erro ao alterar senha", description: err.message, variant: "destructive" });
     } finally {
@@ -92,21 +108,23 @@ const ChangePassword = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Alterar Senha</h1>
-            <p className="text-muted-foreground text-sm mt-1">Defina sua nova senha definitiva</p>
+            <p className="text-muted-foreground text-sm mt-1">{isFirstRegistration ? "Defina sua nova senha definitiva" : "Altere sua senha de acesso"}</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Alert variant="default" className="bg-blue-50 border-blue-200">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertTitle className="text-blue-800 text-sm font-semibold">Validação do Administrador</AlertTitle>
-            <AlertDescription className="text-blue-700 text-xs leading-tight mt-1">
-              Sua nova senha será salva, mas o acesso completo só será liberado após a validação manual do administrador:
-              <div className="mt-2 font-bold text-blue-900">
-                Juniomar Alex Mochnacz<br/>
-                📱 48 99146-1983
-              </div>
-            </AlertDescription>
-          </Alert>
+          {isFirstRegistration && (
+            <Alert variant="default" className="bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-600" />
+              <AlertTitle className="text-blue-800 text-sm font-semibold">Validação do Administrador</AlertTitle>
+              <AlertDescription className="text-blue-700 text-xs leading-tight mt-1">
+                Sua nova senha será salva, mas o acesso completo só será liberado após a validação manual do administrador:
+                <div className="mt-2 font-bold text-blue-900">
+                  Juniomar Alex Mochnacz<br/>
+                  📱 48 99146-1983
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
@@ -173,7 +191,7 @@ const ChangePassword = () => {
 
             <Button type="submit" className="w-full" disabled={loading || !passwordValid || newPassword !== confirmPassword}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar e Solicitar Ativação
+              {isFirstRegistration ? "Salvar e Solicitar Ativação" : "Salvar Nova Senha"}
             </Button>
           </form>
         </CardContent>
