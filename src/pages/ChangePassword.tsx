@@ -29,6 +29,8 @@ const ChangePassword = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const isFirstRegistration = profile?.status === 'pendente' && profile?.must_change_password;
+
   const requirements = useMemo(() => [
     { label: "Mínimo 6 caracteres", valid: newPassword.length >= 6 },
     { label: "Pelo menos uma letra maiúscula", valid: /[A-Z]/.test(newPassword) },
