@@ -106,7 +106,7 @@ const ChangePassword = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Alterar Senha</h1>
-            <p className="text-muted-foreground text-sm mt-1">Defina sua nova senha definitiva</p>
+            <p className="text-muted-foreground text-sm mt-1">{isFirstRegistration ? "Defina sua nova senha definitiva" : "Altere sua senha de acesso"}</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
