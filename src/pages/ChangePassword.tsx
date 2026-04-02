@@ -191,7 +191,7 @@ const ChangePassword = () => {
 
             <Button type="submit" className="w-full" disabled={loading || !passwordValid || newPassword !== confirmPassword}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar e Solicitar Ativação
+              {isFirstRegistration ? "Salvar e Solicitar Ativação" : "Salvar Nova Senha"}
             </Button>
           </form>
         </CardContent>
