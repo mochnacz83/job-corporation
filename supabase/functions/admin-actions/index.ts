@@ -412,7 +412,7 @@ serve(async (req) => {
     }
 
     if (action === 'cleanup-ghosts') {
-      console.log(`[CLEANUP] Starting global ghost cleanup initiated by ${caller.id}`);
+      console.log(`[CLEANUP] Starting global ghost cleanup initiated by ${caller?.id ?? 'unknown'}`);
       
       // 1. Get all users from auth.users
       const { data: { users }, error: listError } = await serviceClient.auth.admin.listUsers();

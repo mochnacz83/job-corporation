@@ -55,21 +55,35 @@ const ChangePassword = () => {
       const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
       if (pwError) throw pwError;
 
-      // 2. Bloquear conta para validação do Admin
+      // 2. Atualizar perfil
       if (profile) {
+        const isFirstRegistration = profile.status === 'pendente';
+        const updateData: any = { 
+          must_change_password: false,
+          reset_password_pending: false,
+        };
+        
+        // Só bloqueia para aprovação no PRIMEIRO cadastro
+        if (isFirstRegistration) {
+          updateData.status = 'pendente';
+        }
+
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({ 
-            must_change_password: false,
-            status: 'pendente'
-          })
+          .update(updateData)
           .eq("id", profile.id);
         
         if (profileError) throw profileError;
       }
 
-      // 3. Mostrar diálogo de sucesso antes de deslogar
-      setShowSuccessDialog(true);
+      if (profile?.status === 'pendente' && profile?.must_change_password) {
+        // Primeiro cadastro — precisa aprovação
+        setShowSuccessDialog(true);
+      } else {
+        // Usuário ativo trocando senha — sem aprovação
+        toast({ title: "Senha alterada com sucesso!", description: "Sua nova senha já está ativa." });
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       toast({ title: "Erro ao alterar senha", description: err.message, variant: "destructive" });
     } finally {
