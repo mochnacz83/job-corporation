@@ -1071,19 +1071,32 @@ const MaterialColeta = () => {
     }
   };
 
-  // Load all coletas
+  // Load all coletas with pagination to get ALL records
   const loadAllColetas = async () => {
     setSearching(true);
     try {
-      const { data, error } = await (supabase
-        .from("material_coletas")
-        .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
-        .order("created_at", { ascending: false })
-        .limit(500) as any);
-      if (error) throw error;
-      const records = (data || []) as unknown as ColetaRecord[];
-      setAllColetas(records);
-      setColetas(records);
+      const PAGE_SIZE = 1000;
+      let allRecords: ColetaRecord[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data, error } = await (supabase
+          .from("material_coletas")
+          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+          .order("created_at", { ascending: false })
+          .range(from, to) as any);
+        if (error) throw error;
+        const records = (data || []) as unknown as ColetaRecord[];
+        allRecords = [...allRecords, ...records];
+        hasMore = records.length === PAGE_SIZE;
+        page++;
+      }
+
+      setAllColetas(allRecords);
+      setColetas(allRecords);
       setColetasLoaded(true);
     } catch (err: any) {
       toast.error("Erro ao carregar coletas: " + err.message);
