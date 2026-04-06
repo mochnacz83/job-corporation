@@ -2289,6 +2289,11 @@ const MaterialColeta = () => {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  {isAdmin && selectedColetaIds.size > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleResetGestechStatus} title="Resetar status de exportação Gestech dos selecionados">
+                      <RefreshCw className="w-4 h-4 mr-1" /> Resetar Status ({selectedColetaIds.size})
+                    </Button>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
