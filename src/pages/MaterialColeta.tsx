@@ -1071,19 +1071,32 @@ const MaterialColeta = () => {
     }
   };
 
-  // Load all coletas
+  // Load all coletas with pagination to get ALL records
   const loadAllColetas = async () => {
     setSearching(true);
     try {
-      const { data, error } = await (supabase
-        .from("material_coletas")
-        .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
-        .order("created_at", { ascending: false })
-        .limit(500) as any);
-      if (error) throw error;
-      const records = (data || []) as unknown as ColetaRecord[];
-      setAllColetas(records);
-      setColetas(records);
+      const PAGE_SIZE = 1000;
+      let allRecords: ColetaRecord[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data, error } = await (supabase
+          .from("material_coletas")
+          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+          .order("created_at", { ascending: false })
+          .range(from, to) as any);
+        if (error) throw error;
+        const records = (data || []) as unknown as ColetaRecord[];
+        allRecords = [...allRecords, ...records];
+        hasMore = records.length === PAGE_SIZE;
+        page++;
+      }
+
+      setAllColetas(allRecords);
+      setColetas(allRecords);
       setColetasLoaded(true);
     } catch (err: any) {
       toast.error("Erro ao carregar coletas: " + err.message);
@@ -1545,6 +1558,28 @@ const MaterialColeta = () => {
       trackAction("exportar_gestech");
     } catch (err: any) {
       toast.error("Erro ao atualizar registros: " + err.message);
+    }
+  };
+
+  // Reset Gestech export status (admin only)
+  const handleResetGestechStatus = async () => {
+    if (selectedColetaIds.size === 0) {
+      toast.error("Selecione os registros que deseja resetar o status de exportação.");
+      return;
+    }
+    const idsToReset = Array.from(selectedColetaIds);
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({ last_exported_at: null } as any)
+        .in("id", idsToReset);
+      if (error) throw error;
+      setAllColetas(prev => prev.map(c => idsToReset.includes(c.id) ? { ...c, last_exported_at: null } : c));
+      setColetas(prev => prev.map(c => idsToReset.includes(c.id) ? { ...c, last_exported_at: null } : c));
+      setSelectedColetaIds(new Set());
+      toast.success(`Status de exportação resetado para ${idsToReset.length} registro(s).`);
+    } catch (err: any) {
+      toast.error("Erro ao resetar status: " + err.message);
     }
   };
 
@@ -2254,6 +2289,11 @@ const MaterialColeta = () => {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  {isAdmin && selectedColetaIds.size > 0 && (
+                    <Button variant="outline" size="sm" onClick={handleResetGestechStatus} title="Resetar status de exportação Gestech dos selecionados">
+                      <RefreshCw className="w-4 h-4 mr-1" /> Resetar Status ({selectedColetaIds.size})
+                    </Button>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {coletas.length} registro(s) {searchBa || searchCircuito || searchTecnico ? "(filtrado)" : ""}
