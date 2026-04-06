@@ -1561,6 +1561,28 @@ const MaterialColeta = () => {
     }
   };
 
+  // Reset Gestech export status (admin only)
+  const handleResetGestechStatus = async () => {
+    if (selectedColetaIds.size === 0) {
+      toast.error("Selecione os registros que deseja resetar o status de exportação.");
+      return;
+    }
+    const idsToReset = Array.from(selectedColetaIds);
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({ last_exported_at: null } as any)
+        .in("id", idsToReset);
+      if (error) throw error;
+      setAllColetas(prev => prev.map(c => idsToReset.includes(c.id) ? { ...c, last_exported_at: null } : c));
+      setColetas(prev => prev.map(c => idsToReset.includes(c.id) ? { ...c, last_exported_at: null } : c));
+      setSelectedColetaIds(new Set());
+      toast.success(`Status de exportação resetado para ${idsToReset.length} registro(s).`);
+    } catch (err: any) {
+      toast.error("Erro ao resetar status: " + err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
