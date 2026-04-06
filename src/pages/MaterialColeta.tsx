@@ -1376,39 +1376,41 @@ const MaterialColeta = () => {
     }
   };
 
-   // Export Excel
+  const buildExportRows = (records: ColetaRecord[]) => records.flatMap((c) => {
+    const items = c.material_coleta_items.length > 0
+      ? c.material_coleta_items
+      : [{ codigo_material: "", nome_material: "", quantidade: "" as number | "", unidade: "", serial: null }];
+
+    return items.map((item) => ({
+      "MATRÍCULA (TT)": c.matricula_tt || "",
+      BA: c.ba || "",
+      CIRCUITO: c.circuito || "",
+      TÉCNICO: c.nome_tecnico,
+      CIDADE: c.cidade || "",
+      SIGLA: c.sigla_cidade || "",
+      UF: c.uf || "",
+      ATIVIDADE: c.atividade,
+      "TIPO APLICAÇÃO": c.tipo_aplicacao,
+      "CÓDIGO MATERIAL": item.codigo_material,
+      "NOME MATERIAL": item.nome_material,
+      QUANTIDADE: item.quantidade,
+      UNIDADE: item.unidade,
+      SERIAL: item.serial || "",
+      "DATA EXECUÇÃO": c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "",
+      "DATA REGISTRO": new Date(c.created_at).toLocaleDateString("pt-BR"),
+    }));
+  });
+
+  // Export Excel / CSV com todos os registros carregados, incluindo reversa/logística
   const handleExport = (format: "xlsx" | "csv") => {
-    // Gestech Sync Trigger: 2026-03-11 17:25
     if (coletas.length === 0) { toast.error("Nenhum dado para exportar"); return; }
-    
-    // Filtrar para excluir Logística Reversa das exportações
-    const coletasToExport = coletas.filter(c => !(c.atividade === "RETIRADA" && c.tipo_aplicacao === "REVERSA"));
-    
-    if (coletasToExport.length === 0) {
-      toast.warning("Os registros selecionados são de Logística Reversa e não serão incluídos no relatório.");
+
+    const rows = buildExportRows(coletas);
+    if (rows.length === 0) {
+      toast.error("Nenhum dado para exportar");
       return;
     }
 
-    const rows = coletasToExport.flatMap((c) =>
-      c.material_coleta_items.map((item) => ({
-        "MATRÍCULA (TT)": c.matricula_tt || "",
-        BA: c.ba || "",
-        CIRCUITO: c.circuito || "",
-        TÉCNICO: c.nome_tecnico,
-        CIDADE: c.cidade || "",
-        SIGLA: c.sigla_cidade || "",
-        UF: c.uf || "",
-        ATIVIDADE: c.atividade,
-        "TIPO APLICAÇÃO": c.tipo_aplicacao,
-        "CÓDIGO MATERIAL": item.codigo_material,
-        "NOME MATERIAL": item.nome_material,
-        QUANTIDADE: item.quantidade,
-        UNIDADE: item.unidade,
-        SERIAL: item.serial || "",
-        "DATA EXECUÇÃO": c.data_execucao ? new Date(c.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "",
-        "DATA REGISTRO": new Date(c.created_at).toLocaleDateString("pt-BR"),
-      }))
-    );
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Coletas");
@@ -1419,8 +1421,7 @@ const MaterialColeta = () => {
       XLSX.writeFile(wb, `${filename}.xlsx`);
     }
 
-    // Log Excel export action
-    trackAction("exportar_excel");
+    trackAction(format === "csv" ? "exportar_csv" : "exportar_excel");
   };
 
   // Export Gestech
@@ -1561,13 +1562,7 @@ const MaterialColeta = () => {
     }
   };
 
-  // Reset Gestech export status (admin only)
-  const handleResetGestechStatus = async () => {
-    if (selectedColetaIds.size === 0) {
-      toast.error("Selecione os registros que deseja resetar o status de exportação.");
-      return;
-    }
-    const idsToReset = Array.from(selectedColetaIds);
+  const resetGestechStatus = async (idsToReset: string[]) => {
     try {
       const { error } = await supabase
         .from("material_coletas")
@@ -1581,6 +1576,15 @@ const MaterialColeta = () => {
     } catch (err: any) {
       toast.error("Erro ao resetar status: " + err.message);
     }
+  };
+
+  // Reset Gestech export status (admin only)
+  const handleResetGestechStatus = async () => {
+    if (selectedColetaIds.size === 0) {
+      toast.error("Selecione os registros que deseja resetar o status de exportação.");
+      return;
+    }
+    await resetGestechStatus(Array.from(selectedColetaIds));
   };
 
   return (
@@ -2386,17 +2390,28 @@ const MaterialColeta = () => {
                                      <FileText className="w-3.5 h-3.5" />
                                    </Button>
                                  )}
-                                 {(isAdmin || profile?.area === "Gerencia") && (
-                                   <Button 
-                                     size="icon" 
-                                     variant="ghost" 
-                                     className="h-7 w-7 text-destructive" 
-                                     onClick={() => setDeleteId(c.id)} 
-                                     title="Excluir"
-                                   >
-                                     <Trash2 className="w-3.5 h-3.5" />
-                                   </Button>
-                                 )}
+                                  {isAdmin && c.last_exported_at && c.tipo_aplicacao !== "REVERSA" && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7"
+                                      onClick={() => resetGestechStatus([c.id])}
+                                      title="Retornar status de exportação"
+                                    >
+                                      <RefreshCw className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {(isAdmin || profile?.area === "Gerencia") && (
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 text-destructive" 
+                                      onClick={() => setDeleteId(c.id)} 
+                                      title="Excluir"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2529,7 +2544,7 @@ const MaterialColeta = () => {
 
       {/* View detail dialog */}
       < Dialog open={!!viewColeta} onOpenChange={() => setViewColeta(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-auto">
+        <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Detalhes da Coleta</DialogTitle>
             <DialogDescription>Registro completo da coleta de materiais</DialogDescription>
@@ -2546,7 +2561,7 @@ const MaterialColeta = () => {
                 <div><strong>Tipo:</strong> {viewColeta.tipo_aplicacao}</div>
                 <div><strong>Data:</strong> {viewColeta.data_execucao ? new Date(viewColeta.data_execucao + "T12:00:00").toLocaleDateString("pt-BR") : "-"}</div>
               </div>
-              <div>
+              <div className="overflow-x-auto">
                 <strong>Materiais:</strong>
                 <Table>
                   <TableHeader>
@@ -2554,9 +2569,8 @@ const MaterialColeta = () => {
                       <TableHead className="text-xs">Código</TableHead>
                       <TableHead className="text-xs">Nome</TableHead>
                       <TableHead className="text-xs">Qtde</TableHead>
-                      <TableHead>Activity</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-xs">Un</TableHead>
+                      <TableHead className="text-xs">Serial</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
