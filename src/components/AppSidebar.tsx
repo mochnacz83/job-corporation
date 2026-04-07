@@ -100,7 +100,8 @@ const AppSidebar = () => {
         show: hasModule("powerbi"),
         path: `/powerbi?id=${link.id}`,
         icon: BarChart3,
-        label: link.titulo
+        label: link.titulo,
+        description: link.descricao
       }))
     : [{ show: hasModule("powerbi"), path: "/powerbi", icon: BarChart3, label: "Relatórios Power BI" }];
 
@@ -118,7 +119,7 @@ const AppSidebar = () => {
   const renderMenuGroup = (
     title: string,
     icon: React.ElementType,
-    items: { show?: boolean; path: string; icon: React.ElementType; label: string; locked?: boolean }[],
+    items: { show?: boolean; path: string; icon: React.ElementType; label: string; locked?: boolean; description?: string }[],
     defaultOpen?: boolean
   ) => {
     const visibleItems = items.filter(i => i.show !== false);
@@ -148,11 +149,14 @@ const AppSidebar = () => {
                       className="transition-colors"
                     >
                       {item.locked ? (
-                        <div className="flex items-center gap-2 px-2 py-1.5 opacity-50 cursor-not-allowed">
+                        <div 
+                          className="flex items-center gap-2 px-2 py-1.5 opacity-50 cursor-not-allowed"
+                          title={item.description || "Módulo Bloqueado"}
+                        >
                           <item.icon className="w-4 h-4" />
                           {!collapsed && (
                             <>
-                              <span className="flex-1">{item.label}</span>
+                              <span className="flex-1 truncate">{item.label}</span>
                               <Lock className="w-3 h-3 text-destructive" />
                             </>
                           )}
@@ -163,9 +167,10 @@ const AppSidebar = () => {
                           end
                           className="hover:bg-sidebar-accent/20"
                           activeClassName="bg-sidebar-primary/20 text-sidebar-primary font-medium"
+                          title={item.description || item.label}
                         >
-                          <item.icon className="w-4 h-4 mr-2" />
-                          {!collapsed && <span>{item.label}</span>}
+                          <item.icon className="w-4 h-4 mr-2 flex-shrink-0" />
+                          {!collapsed && <span className="truncate">{item.label}</span>}
                         </NavLink>
                       )}
                     </SidebarMenuButton>
