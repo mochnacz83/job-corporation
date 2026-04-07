@@ -301,7 +301,7 @@ const Inventory = () => {
       if (sub.inventory_submission_items && sub.inventory_submission_items.length > 0) {
         sub.inventory_submission_items.forEach((item: any) => {
           dataToExport.push({
-            "Data Envio": new Date(sub.created_at).toLocaleString('pt-BR'),
+            "Data Envio": new Date(sub.data_fim || sub.data_inicio).toLocaleString('pt-BR'),
             "Técnico": sub.nome_tecnico,
             "Matrícula TT": sub.matricula_tt,
             "Supervisor": tech?.supervisor || sub.supervisor || "—",
@@ -407,7 +407,7 @@ const Inventory = () => {
             *,
             inventory_submission_items(*)
           `)
-          .order("created_at", { ascending: false }),
+          .order("data_fim", { ascending: false }),
         (supabase.from as any)("inventory_base")
           .select("matricula_tt, nome_tecnico, supervisor, coordenador")
       ]);
