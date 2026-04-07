@@ -132,7 +132,6 @@ const Dashboard = () => {
         {/* Brazil Map */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Truck className="w-5 h-5 text-primary" />
             Áreas de Atuação
           </h2>
           <Card className="glass-card">

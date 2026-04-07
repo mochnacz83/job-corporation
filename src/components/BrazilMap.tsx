@@ -3,90 +3,106 @@ import React from "react";
 const BrazilMap = () => {
   return (
     <div className="relative w-full max-w-2xl mx-auto">
-      <svg viewBox="0 0 600 650" className="w-full h-auto" xmlns="http://www.w3.org/2000/svg">
-        {/* Brazil outline simplified */}
+      <svg viewBox="0 0 700 750" className="w-full h-auto" xmlns="http://www.w3.org/2000/svg">
+        {/* Brazil realistic outline */}
         <path
-          d="M280,30 C320,25 370,35 400,50 C430,65 460,90 480,120 C500,150 520,180 530,210 C540,240 545,270 540,300 C535,330 530,360 520,390 C510,410 500,430 490,450 C475,470 460,485 440,500 C420,510 400,520 380,530 C360,540 340,545 320,548 C300,550 280,548 260,540 C240,530 220,515 200,500 C180,480 165,460 155,440 C140,420 130,400 120,375 C110,350 105,325 100,300 C95,275 95,250 100,225 C105,200 110,175 120,155 C135,130 150,110 170,90 C190,70 210,55 230,45 C250,35 265,32 280,30Z"
-          fill="hsl(var(--muted) / 0.15)"
+          d="M330,45 L360,40 L390,42 L420,50 L445,60 L470,75 L490,90 L505,105 
+             L520,125 L535,150 L548,175 L558,200 L565,225 L570,250 L572,275 
+             L570,300 L565,325 L558,350 L548,370 L540,385 L530,400 L518,415 
+             L505,430 L490,442 L475,455 L458,465 L440,475 L420,485 L400,492 
+             L380,498 L360,502 L340,505 L325,508 L310,512 L295,518 L280,525 
+             L265,535 L250,548 L238,560 L225,575 L215,590 L205,600 L195,608 
+             L182,612 L170,610 L160,602 L152,590 L148,575 L145,558 L140,540 
+             L135,520 L128,500 L120,480 L112,458 L105,435 L100,410 L96,385 
+             L94,360 L93,335 L94,310 L96,285 L100,260 L106,238 L115,215 
+             L125,195 L138,175 L152,158 L168,142 L185,128 L202,115 L220,105 
+             L238,95 L255,85 L272,75 L290,65 L308,55 L330,45Z"
+          fill="hsl(var(--muted) / 0.12)"
           stroke="hsl(var(--border))"
           strokeWidth="1.5"
         />
 
-        {/* Santa Catarina - Major highlight */}
+        {/* State boundaries - subtle internal lines */}
+        {/* Minas Gerais region */}
+        <ellipse cx="380" cy="360" rx="55" ry="35" fill="hsl(var(--muted) / 0.06)" stroke="hsl(var(--border) / 0.2)" strokeWidth="0.5" strokeDasharray="3,3" />
+        {/* Paraná region */}
+        <ellipse cx="320" cy="465" rx="40" ry="22" fill="hsl(var(--muted) / 0.06)" stroke="hsl(var(--border) / 0.2)" strokeWidth="0.5" strokeDasharray="3,3" />
+        {/* Rio Grande do Sul region */}
+        <ellipse cx="290" cy="545" rx="45" ry="30" fill="hsl(var(--muted) / 0.06)" stroke="hsl(var(--border) / 0.2)" strokeWidth="0.5" strokeDasharray="3,3" />
+
+        {/* São Paulo - highlighted state */}
+        <path
+          d="M310,410 C330,400 360,402 378,412 C388,420 386,432 376,440 C364,448 346,452 328,449 C312,446 302,436 300,425 C298,418 303,413 310,410Z"
+          fill="hsl(var(--accent))"
+          stroke="hsl(var(--border))"
+          strokeWidth="1"
+          className="transition-all duration-300 hover:brightness-110"
+        />
+        <circle cx="345" cy="425" r="3.5" fill="hsl(var(--primary))" />
+        <text x="345" y="425" dy="-10" textAnchor="middle" className="fill-foreground font-semibold text-[11px]">
+          São Paulo
+        </text>
+
+        {/* Rio de Janeiro (Interior) - highlighted state */}
+        <path
+          d="M390,385 C408,378 430,381 442,390 C450,397 447,407 438,413 C427,420 412,422 397,418 C385,414 380,404 383,395 C384,391 387,388 390,385Z"
+          fill="hsl(var(--accent))"
+          stroke="hsl(var(--border))"
+          strokeWidth="1"
+          className="transition-all duration-300 hover:brightness-110"
+        />
+        <circle cx="415" cy="400" r="3.5" fill="hsl(var(--primary))" />
+        <text x="460" y="395" textAnchor="start" className="fill-foreground font-semibold text-[11px]">
+          Rio de Janeiro
+        </text>
+        <text x="460" y="408" textAnchor="start" className="fill-muted-foreground text-[9px]">
+          Interior
+        </text>
+
+        {/* Santa Catarina - Major highlight with glow */}
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
         <g className="cursor-pointer group">
           <path
-            d="M310,430 C325,425 345,428 360,432 C370,436 375,442 372,450 C368,458 358,462 345,464 C330,466 315,462 305,456 C298,450 300,440 310,430Z"
+            d="M285,490 C305,483 330,486 350,492 C365,497 372,506 368,516 C363,526 350,532 332,534 C314,536 296,531 284,522 C275,514 274,502 285,490Z"
             fill="hsl(var(--primary))"
             className="drop-shadow-lg transition-all duration-300 group-hover:brightness-110"
             stroke="hsl(var(--primary-foreground))"
             strokeWidth="1.5"
+            filter="url(#glow)"
           />
-          <circle cx="338" cy="446" r="4" fill="hsl(var(--primary-foreground))" />
-          <text x="338" y="480" textAnchor="middle" className="fill-primary font-bold text-[13px]">
+          <circle cx="325" cy="510" r="5" fill="hsl(var(--primary-foreground))" />
+          <text x="325" y="550" textAnchor="middle" className="fill-primary font-bold text-[14px]">
             Santa Catarina
           </text>
-          <text x="338" y="495" textAnchor="middle" className="fill-muted-foreground text-[10px]">
+          <text x="325" y="565" textAnchor="middle" className="fill-muted-foreground text-[10px]">
             Base Principal
           </text>
           {/* Pulse ring */}
-          <circle cx="338" cy="446" r="12" fill="none" stroke="hsl(var(--primary))" strokeWidth="2" opacity="0.5">
-            <animate attributeName="r" from="12" to="24" dur="2s" repeatCount="indefinite" />
+          <circle cx="325" cy="510" r="14" fill="none" stroke="hsl(var(--primary))" strokeWidth="2" opacity="0.5">
+            <animate attributeName="r" from="14" to="28" dur="2s" repeatCount="indefinite" />
             <animate attributeName="opacity" from="0.6" to="0" dur="2s" repeatCount="indefinite" />
           </circle>
         </g>
 
-        {/* São Paulo */}
-        <g className="cursor-pointer group">
-          <path
-            d="M280,380 C300,370 325,372 340,380 C350,386 348,396 340,404 C330,412 315,416 300,414 C285,412 274,404 272,395 C270,388 274,383 280,380Z"
-            fill="hsl(var(--sidebar-background))"
-            className="transition-all duration-300 group-hover:brightness-125"
-            stroke="hsl(var(--sidebar-foreground) / 0.3)"
-            strokeWidth="1"
-          />
-          <circle cx="308" cy="393" r="3" fill="hsl(var(--primary-foreground))" />
-          <text x="268" y="400" textAnchor="end" className="fill-foreground font-semibold text-[11px]">
-            São Paulo
-          </text>
-        </g>
-
-        {/* Rio de Janeiro (Interior) */}
-        <g className="cursor-pointer group">
-          <path
-            d="M340,365 C355,358 375,360 385,368 C392,374 390,382 382,388 C372,394 358,396 345,393 C335,390 332,380 335,372 C336,369 338,367 340,365Z"
-            fill="hsl(var(--sidebar-background) / 0.75)"
-            className="transition-all duration-300 group-hover:brightness-125"
-            stroke="hsl(var(--sidebar-foreground) / 0.3)"
-            strokeWidth="1"
-          />
-          <circle cx="362" cy="378" r="3" fill="hsl(var(--primary-foreground))" />
-          <text x="400" y="375" textAnchor="start" className="fill-foreground font-semibold text-[11px]">
-            Rio de Janeiro
-          </text>
-          <text x="400" y="388" textAnchor="start" className="fill-muted-foreground text-[9px]">
-            Interior
-          </text>
-        </g>
-
-        {/* Other states (subtle) */}
-        {/* Minas Gerais */}
-        <ellipse cx="330" cy="330" rx="50" ry="30" fill="hsl(var(--muted) / 0.08)" stroke="hsl(var(--border) / 0.3)" strokeWidth="0.5" />
-        {/* Paraná */}
-        <ellipse cx="300" cy="415" rx="35" ry="18" fill="hsl(var(--muted) / 0.08)" stroke="hsl(var(--border) / 0.3)" strokeWidth="0.5" />
-        {/* RS */}
-        <ellipse cx="310" cy="470" rx="30" ry="20" fill="hsl(var(--muted) / 0.08)" stroke="hsl(var(--border) / 0.3)" strokeWidth="0.5" />
-
-        {/* Decorative labels */}
-        <text x="300" y="200" textAnchor="middle" className="fill-muted-foreground/30 text-[40px] font-bold tracking-widest select-none">
+        {/* Watermark */}
+        <text x="340" y="230" textAnchor="middle" className="fill-muted-foreground/20 text-[44px] font-bold tracking-[0.2em] select-none">
           BRASIL
         </text>
 
         {/* Legend */}
-        <g transform="translate(30, 540)">
-          <rect x="0" y="0" width="12" height="12" rx="2" fill="hsl(var(--primary))" />
-          <text x="18" y="10" className="fill-foreground text-[10px]">Atuação Principal</text>
-          <rect x="0" y="20" width="12" height="12" rx="2" fill="hsl(var(--sidebar-background))" />
-          <text x="18" y="30" className="fill-foreground text-[10px]">Atuação Regional</text>
+        <g transform="translate(40, 640)">
+          <rect x="0" y="0" width="14" height="14" rx="3" fill="hsl(var(--primary))" />
+          <text x="22" y="11" className="fill-foreground text-[11px]">Atuação Principal</text>
+          <rect x="160" y="0" width="14" height="14" rx="3" fill="hsl(var(--accent))" stroke="hsl(var(--border))" strokeWidth="0.5" />
+          <text x="182" y="11" className="fill-foreground text-[11px]">Atuação Regional</text>
         </g>
       </svg>
     </div>
