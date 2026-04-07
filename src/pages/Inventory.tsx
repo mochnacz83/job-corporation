@@ -99,6 +99,8 @@ const Inventory = () => {
   const [loadingReports, setLoadingReports] = useState(false);
   const [basePreview, setBasePreview] = useState<any[]>([]);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [submissionDetailsOpen, setSubmissionDetailsOpen] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   
   // Filters
   const [filterSupervisor, setFilterSupervisor] = useState("todos");
@@ -853,7 +855,16 @@ const Inventory = () => {
                               <TableCell className="text-right">
                                 {sub && (
                                   <div className="flex items-center justify-end gap-2">
-                                    <Button size="sm" variant="ghost">Detalhes</Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="ghost"
+                                      onClick={() => {
+                                        setSelectedSubmission(sub);
+                                        setSubmissionDetailsOpen(true);
+                                      }}
+                                    >
+                                      Detalhes
+                                    </Button>
                                     <Button 
                                       size="sm" 
                                       variant="destructive" 
@@ -1123,6 +1134,84 @@ const Inventory = () => {
               }
             }}>
               <Check className="w-4 h-4 mr-1" /> Salvar Serial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Submission Details */}
+      <Dialog open={submissionDetailsOpen} onOpenChange={setSubmissionDetailsOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Carga Inventariada</DialogTitle>
+            <DialogDescription>
+              Técnico: {selectedSubmission?.nome_tecnico} | Matrícula: {selectedSubmission?.matricula_tt}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSubmission && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-success/10 p-4 rounded-xl border border-success/20 flex flex-col items-center justify-center">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Possui</p>
+                  <p className="text-3xl font-black text-success">
+                    {selectedSubmission.inventory_submission_items?.filter((i: any) => i.status === 'presente').length || 0}
+                  </p>
+                </div>
+                <div className="bg-destructive/10 p-4 rounded-xl border border-destructive/20 flex flex-col items-center justify-center">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Faltantes</p>
+                  <p className="text-3xl font-black text-destructive">
+                    {selectedSubmission.inventory_submission_items?.filter((i: any) => i.status === 'falta').length || 0}
+                  </p>
+                </div>
+                <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 flex flex-col items-center justify-center">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Extras Bipados</p>
+                  <p className="text-3xl font-black text-blue-500">
+                    {selectedSubmission.inventory_submission_items?.filter((i: any) => i.status === 'extra').length || 0}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-secondary/50">
+                    <TableRow>
+                      <TableHead>Serial</TableHead>
+                      <TableHead>Modelo / Código</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedSubmission.inventory_submission_items?.map((item: any, idx: number) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-sm font-semibold">{item.serial}</TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium">{item.modelo || "—"}</div>
+                          <div className="text-xs text-muted-foreground">Código: {item.codigo_material || "N/A"}</div>
+                        </TableCell>
+                        <TableCell>
+                          {item.status === 'presente' ? <Badge className="bg-success text-success-foreground hover:bg-success">Possuo</Badge> :
+                           item.status === 'falta' ? <Badge variant="destructive">Falta</Badge> :
+                           <Badge className="bg-blue-500 text-white hover:bg-blue-600">Extra (Incluído)</Badge>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!selectedSubmission.inventory_submission_items || selectedSubmission.inventory_submission_items.length === 0) && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                          Nenhum item foi processado nesse inventário.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSubmissionDetailsOpen(false)}>
+              Fechar Formato
             </Button>
           </DialogFooter>
         </DialogContent>
