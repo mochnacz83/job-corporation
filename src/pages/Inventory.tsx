@@ -61,6 +61,18 @@ const Inventory = () => {
   const { user, profile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { trackAction } = useAccessTracking("/inventario");
+  const [inventoryLocked, setInventoryLocked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase
+      .from("app_settings" as any)
+      .select("value")
+      .eq("key", "inventory_locked")
+      .maybeSingle()
+      .then(({ data }: any) => {
+        setInventoryLocked(data ? data.value === true : false);
+      });
+  }, []);
 
   const [activeTab, setActiveTab] = useState("colaborador");
   
