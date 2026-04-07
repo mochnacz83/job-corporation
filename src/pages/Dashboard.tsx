@@ -9,7 +9,6 @@ import {
   BarChart3, CalendarDays, ClipboardList, ClipboardCheck, Boxes,
   TrendingUp, Users, Clock
 } from "lucide-react";
-import BrazilMap from "@/components/BrazilMap";
 
 const Dashboard = () => {
   const { user, profile, areaPermissions, isAdmin, loading } = useAuth();
@@ -104,41 +103,26 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Quick actions */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-primary" />
-            Acesso Rápido
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {quickActions.map(action => (
-              <Card
-                key={action.path}
-                className="glass-card hover:shadow-lg transition-all duration-200 cursor-pointer group hover:-translate-y-0.5"
-                onClick={() => navigate(action.path)}
-              >
-                <CardContent className="p-4 flex flex-col items-center text-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${action.color} transition-transform group-hover:scale-110`}>
-                    <action.icon className="w-6 h-6" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">{action.label}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Brazil Map */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            Áreas de Atuação
-          </h2>
-          <Card className="glass-card">
-            <CardContent className="p-4">
-              <BrazilMap />
-            </CardContent>
-          </Card>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-primary" />
+          Acesso Rápido
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {quickActions.map(action => (
+            <Card
+              key={action.path}
+              className="glass-card hover:shadow-lg transition-all duration-200 cursor-pointer group hover:-translate-y-0.5"
+              onClick={() => navigate(action.path)}
+            >
+              <CardContent className="p-4 flex flex-col items-center text-center gap-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${action.color} transition-transform group-hover:scale-110`}>
+                  <action.icon className="w-6 h-6" />
+                </div>
+                <span className="text-sm font-medium text-foreground">{action.label}</span>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     </div>

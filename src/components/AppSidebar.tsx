@@ -154,15 +154,15 @@ const AppSidebar = () => {
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
-      <SidebarHeader className="p-4 border-b border-sidebar-border/30">
+      <SidebarHeader className="p-4 border-b border-sidebar-border/30 bg-white">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
             <img src="/ability-logo.png" alt="Ability" className="w-full h-full object-contain" />
           </div>
           {!collapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-bold text-sidebar-foreground truncate">Ability Tecnologia</span>
-              <span className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wider">Portal Corporativo</span>
+              <span className="text-sm font-bold text-black truncate">Ability Tecnologia</span>
+              <span className="text-[10px] text-black/60 uppercase tracking-wider">Portal Corporativo</span>
             </div>
           )}
         </div>
