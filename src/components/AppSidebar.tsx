@@ -37,6 +37,7 @@ const AppSidebar = () => {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const [inventoryLocked, setInventoryLocked] = useState(true);
+  const [powerBiLinks, setPowerBiLinks] = useState<any[]>([]);
 
   useEffect(() => {
     supabase
@@ -61,21 +62,47 @@ const AppSidebar = () => {
   const hasModule = (mod: string) =>
     isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes(mod);
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path.includes("?")) {
+      return location.pathname + location.search === path;
+    }
+    return location.pathname === path;
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
 
+  useEffect(() => {
+    if (hasModule("powerbi")) {
+      supabase.from("powerbi_links").select("*").eq("ativo", true).order("ordem")
+        .then(({ data }) => {
+          const dbLinks = data || [];
+          if (!dbLinks.some((link: any) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
+            dbLinks.push({ id: "bi-servicos", titulo: "Filas de Serviços - Instalação, Reparo e Mudança" } as any);
+          }
+          if (!dbLinks.some((link: any) => link.titulo === "DashBoard SEF São Jose")) {
+            dbLinks.push({ id: "bi-sef-sj", titulo: "DashBoard SEF São Jose" } as any);
+          }
+          setPowerBiLinks(dbLinks);
+        });
+    }
+  }, [isAdmin, areaPermissions]);
+
   const logisticaItems = [
     { show: hasModule("material_coleta"), path: "/material-coleta", icon: ClipboardList, label: "Controle Materiais" },
     { show: hasModule("inventario"), path: "/inventario", icon: Boxes, label: "Mini Inventário", locked: !isAdmin && inventoryLocked },
   ];
 
-  const dashboardItems = [
-    { show: hasModule("powerbi"), path: "/powerbi", icon: BarChart3, label: "Relatórios Power BI" },
-  ];
+  const dashboardItems = powerBiLinks.length > 0 
+    ? powerBiLinks.map((link) => ({
+        show: hasModule("powerbi"),
+        path: `/powerbi?id=${link.id}`,
+        icon: BarChart3,
+        label: link.titulo
+      }))
+    : [{ show: hasModule("powerbi"), path: "/powerbi", icon: BarChart3, label: "Relatórios Power BI" }];
 
   const operacionalItems = [
     { show: hasModule("reagenda"), path: "/reagenda", icon: CalendarDays, label: "Reagendamento" },

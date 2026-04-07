@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
@@ -88,7 +88,9 @@ const PowerBI = () => {
   const { user, areaPermissions, isAdmin } = useAuth();
   const [links, setLinks] = useState<PowerBILink[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
-  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const idParam = searchParams.get("id");
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(idParam);
   const [loading, setLoading] = useState(true);
   const [mountedIframes, setMountedIframes] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
@@ -107,6 +109,15 @@ const PowerBI = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  useEffect(() => {
+    if (idParam && idParam !== selectedLinkId) {
+      setSelectedLinkId(idParam);
+      setMountedIframes(prev => new Set(prev).add(idParam));
+    } else if (!idParam && selectedLinkId) {
+      setSelectedLinkId(null);
+    }
+  }, [idParam]);
 
   useEffect(() => {
     if (hasFetched.current || !user) return;
@@ -268,14 +279,8 @@ const PowerBI = () => {
   };
 
   const selectLink = (link: PowerBILink) => {
-    setSelectedLinkId(link.id);
     trackAction(`Acessou o BI: ${link.titulo}`);
-    // Mount iframe if not yet mounted
-    setMountedIframes(prev => {
-      const next = new Set(prev);
-      next.add(link.id);
-      return next;
-    });
+    navigate(`/powerbi?id=${link.id}`);
   };
 
   const selectedLink = sortedLinks.find(l => l.id === selectedLinkId) || null;
@@ -289,7 +294,7 @@ const PowerBI = () => {
             size="icon"
             onClick={() => {
               if (selectedLinkId) {
-                setSelectedLinkId(null);
+                navigate("/powerbi");
               } else {
                 navigate("/dashboard");
               }

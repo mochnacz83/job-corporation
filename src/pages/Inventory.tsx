@@ -346,25 +346,29 @@ const Inventory = () => {
 
       // Expected columns: Serial, Modelo, Código, Técnico, TT, Setor, Supervisor, Coordenador
       const mappedData = jsonData.map((row: any) => ({
-        serial: String(row.Serial || row.serial || "").trim(),
-        modelo: String(row.Modelo || row.modelo || "").trim(),
-        codigo_material: String(row["Código"] || row["Codigo"] || row.codigo || "").trim(),
-        nome_tecnico: String(row["Nome Técnico"] || row["Nome Tecnico"] || row.tecnico || "").trim(),
-        matricula_tt: String(row["Matrícula TT"] || row["Matricula TT"] || row.tt || "").trim().toUpperCase(),
-        setor: String(row.Setor || row.setor || "").trim(),
-        supervisor: String(row.Supervisor || row.supervisor || "").trim(),
-        coordenador: String(row.Coordenador || row.coordenador || "").trim(),
-      })).filter(item => item.serial && item.matricula_tt);
+        serial: String(row.Serial ?? row.serial ?? "").trim(),
+        modelo: String(row.Modelo ?? row.modelo ?? "").trim(),
+        codigo_material: String(row["Código"] ?? row["Codigo"] ?? row.codigo ?? "").trim(),
+        nome_tecnico: String(row["Nome Técnico"] ?? row["Nome Tecnico"] ?? row.tecnico ?? row.Tecnico ?? "").trim(),
+        matricula_tt: String(row["Matrícula TT"] ?? row["Matricula TT"] ?? row.tt ?? row.TT ?? "").trim().toUpperCase(),
+        setor: String(row.Setor ?? row.setor ?? "").trim(),
+        supervisor: String(row.Supervisor ?? row.supervisor ?? "").trim(),
+        coordenador: String(row.Coordenador ?? row.coordenador ?? "").trim(),
+      })).filter(item => item.serial && item.matricula_tt && item.nome_tecnico);
 
       if (mappedData.length === 0) {
         throw new Error("Nenhum dado válido encontrado na planilha.");
       }
 
-      // Optional: Clear old base? 
-      // const { error: deleteError = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
 
-      const { error } = await (supabase.from as any)("inventory_base").insert(mappedData);
-      if (error) throw error;
+      const chunkSize = 500;
+      for (let i = 0; i < mappedData.length; i += chunkSize) {
+        const chunk = mappedData.slice(i, i + chunkSize);
+        const { error } = await (supabase.from as any)("inventory_base").insert(chunk);
+        if (error) throw new Error("Falha ao inserir lote: " + error.message);
+      }
 
       toast.success(`${mappedData.length} itens carregados com sucesso!`);
     } catch (err: any) {
