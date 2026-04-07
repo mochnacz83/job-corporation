@@ -76,7 +76,6 @@ const Inventory = () => {
 
   const [activeTab, setActiveTab] = useState("colaborador");
   
-  // Colaborador State
   const [tt, setTt] = useState("");
   const [nomeTecnico, setNomeTecnico] = useState("");
   const [supervisor, setSupervisor] = useState("");
@@ -86,6 +85,7 @@ const Inventory = () => {
   const [extraItems, setExtraItems] = useState<SubmissionItem[]>([]);
   const [loadingBase, setLoadingBase] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [existingSubmissionId, setExistingSubmissionId] = useState<string | null>(null);
   
   // Grouping State
   const [selectedCategory, setSelectedCategory] = useState<GroupedCategory | null>(null);
@@ -122,23 +122,60 @@ const Inventory = () => {
     if (!tt) return;
     setLoadingBase(true);
     try {
-      const { data, error } = await (supabase.from as any)("inventory_base")
+      const { data: baseData, error: baseError } = await (supabase.from as any)("inventory_base")
         .select("*")
         .eq("matricula_tt", tt.toUpperCase());
 
-      if (error) throw error;
+      if (baseError) throw baseError;
       
-      setBaseItems(data || []);
-      if (data && data.length > 0) {
-        setNomeTecnico(data[0].nome_tecnico);
-        setSupervisor(data[0].supervisor || "");
-        setCoordenador(data[0].coordenador || "");
-        // Initialize submission items
+      setBaseItems(baseData || []);
+      if (baseData && baseData.length > 0) {
+        setNomeTecnico(baseData[0].nome_tecnico);
+        setSupervisor(baseData[0].supervisor || "");
+        setCoordenador(baseData[0].coordenador || "");
+        
+        // Check for existing submissions (drafts or finished)
+        const { data: subData, error: subError } = await (supabase.from as any)("inventory_submissions")
+          .select("*, inventory_submission_items(*)")
+          .eq("matricula_tt", tt.toUpperCase())
+          .maybeSingle();
+
+        if (subError && subError.code !== 'PGRST116') throw subError; // IGNORE NOT FOUND
+
         const initial: Record<string, 'presente' | 'falta' | null> = {};
-        data.forEach((item: any) => {
-          initial[item.id] = null;
-        });
-        setSubmissionItems(initial);
+        
+        if (subData) {
+          if (subData.status === 'finalizado') {
+            toast.info("Seu inventário já foi finalizado e submetido. Procure a gerência para reabertura.");
+            setBaseItems([]); // Block the view to prevent edits
+            return;
+          }
+          
+          setExistingSubmissionId(subData.id);
+          const extras: SubmissionItem[] = [];
+          
+          subData.inventory_submission_items?.forEach((i: any) => {
+            if (i.status === 'extra') {
+              extras.push({ serial: i.serial, modelo: i.modelo, codigo_material: i.codigo_material, status: 'extra' });
+            } else {
+              const bItem = baseData.find((b: any) => b.serial === i.serial);
+              if (bItem) initial[bItem.id] = i.status as 'presente' | 'falta';
+            }
+          });
+          
+          baseData.forEach((item: any) => {
+            if (initial[item.id] === undefined) initial[item.id] = null;
+          });
+          
+          setSubmissionItems(initial);
+          setExtraItems(extras);
+          toast.success("Rascunho recuperado. Você pode continuar a validação.");
+        } else {
+          setExistingSubmissionId(null);
+          setExtraItems([]);
+          baseData.forEach((item: any) => { initial[item.id] = null; });
+          setSubmissionItems(initial);
+        }
       } else {
         toast.info("Nenhum item encontrado para esta matrícula.");
         setNomeTecnico("");
@@ -203,69 +240,105 @@ const Inventory = () => {
     setExtraItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmitInventory = async () => {
-    // Validate: all base items must have a status
-    const incomplete = Object.values(submissionItems).some(val => val === null);
-    if (incomplete) {
-      const pendingCount = Object.values(submissionItems).filter(val => val === null).length;
-      toast.error(`Atenção! Faltam ${pendingCount} itens da sua carga para serem validados (informe se 'Possui' ou 'Falta'). Revise todos antes de salvar.`);
-      return;
+  const handleSubmitInventory = async (isDraft = false) => {
+    // Validate only if finishing
+    if (!isDraft) {
+      const incomplete = Object.values(submissionItems).some(val => val === null);
+      if (incomplete) {
+        const pendingCount = Object.values(submissionItems).filter(val => val === null).length;
+        toast.error(`Atenção! Faltam ${pendingCount} itens da sua carga para serem validados. Revise todos antes de salvar.`);
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
-      // 1. Create submission record
-      const { data: subData, error: subError } = await (supabase.from as any)("inventory_submissions")
-        .insert({
-          matricula_tt: tt.toUpperCase(),
-          nome_tecnico: nomeTecnico,
-          supervisor: supervisor,
-          coordenador: coordenador,
-          status: 'finalizado',
-          data_fim: new Date().toISOString(),
-          user_id: user?.id
-        })
-        .select()
-        .single();
+      let subId = existingSubmissionId;
 
-      if (subError) throw subError;
+      if (!subId) {
+        // Create new
+        const { data: subData, error: subError } = await (supabase.from as any)("inventory_submissions")
+          .insert({
+            matricula_tt: tt.toUpperCase(),
+            nome_tecnico: nomeTecnico,
+            supervisor: supervisor,
+            coordenador: coordenador,
+            status: isDraft ? 'em_andamento' : 'finalizado',
+            data_fim: isDraft ? null : new Date().toISOString(),
+            user_id: user?.id
+          })
+          .select()
+          .single();
+        if (subError) throw subError;
+        subId = subData.id;
+        setExistingSubmissionId(subId);
+      } else {
+        // Update existing
+        const { error: subError } = await (supabase.from as any)("inventory_submissions")
+          .update({
+             status: isDraft ? 'em_andamento' : 'finalizado',
+             data_fim: isDraft ? null : new Date().toISOString(),
+          })
+          .eq("id", subId);
+        if (subError) throw subError;
+        
+        await (supabase.from as any)("inventory_submission_items").delete().eq("submission_id", subId);
+      }
 
-      // 2. Prepare all items
-      const finalItems = [
-        ...baseItems.map(item => ({
-          submission_id: subData.id,
-          serial: item.serial,
-          modelo: item.modelo,
-          codigo_material: item.codigo_material,
-          status: submissionItems[item.id] as string
-        })),
-        ...extraItems.map(item => ({
-          submission_id: subData.id,
+      // Prepare items (we insert all that have a status)
+      const finalItems: any[] = [];
+      
+      baseItems.forEach(item => {
+        if (submissionItems[item.id]) {
+          finalItems.push({
+            submission_id: subId,
+            serial: item.serial,
+            modelo: item.modelo,
+            codigo_material: item.codigo_material,
+            status: submissionItems[item.id]
+          });
+        }
+      });
+
+      extraItems.forEach(item => {
+        finalItems.push({
+          submission_id: subId,
           serial: item.serial,
           modelo: item.modelo,
           codigo_material: item.codigo_material,
           status: 'extra'
-        }))
-      ];
+        });
+      });
 
-      // 3. Bulk insert
-      const { error: itemsError } = await (supabase.from as any)("inventory_submission_items")
-        .insert(finalItems);
+      if (finalItems.length > 0) {
+        const { error: itemsError } = await (supabase.from as any)("inventory_submission_items")
+          .insert(finalItems);
+        if (itemsError) throw itemsError;
+      }
 
-      if (itemsError) throw itemsError;
-
-      toast.success("Inventário finalizado com sucesso!");
-      // Reset state
-      setTt("");
-      setBaseItems([]);
-      setSubmissionItems({});
-      setExtraItems([]);
-      setNomeTecnico("");
-      setSupervisor("");
-      setCoordenador("");
-      setActiveTab("colaborador");
+      if (isDraft) {
+        toast.success("Progresso salvo com sucesso!");
+      } else {
+        toast.success("Inventário finalizado! O Termo de Responsabilidade será impresso.");
+        
+        setTimeout(() => {
+          window.print();
+          
+          setTimeout(() => {
+            setTt("");
+            setBaseItems([]);
+            setSubmissionItems({});
+            setExtraItems([]);
+            setNomeTecnico("");
+            setSupervisor("");
+            setCoordenador("");
+            setExistingSubmissionId(null);
+            setActiveTab("colaborador");
+          }, 1000);
+        }, 500);
+      }
     } catch (err: any) {
-      toast.error("Erro ao salvar inventário: " + err.message);
+      toast.error("Erro ao salvar: " + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -274,12 +347,12 @@ const Inventory = () => {
   // --- Admin Functions ---
 
   const handleReopenInventory = async (subId: string) => {
-    if (!window.confirm("Atenção: Reabrir este inventário apagará a consolidação atual do técnico. Ele precisará bipar e validar novamente. Deseja continuar?")) return;
+    if (!window.confirm("Atenção: Reabrir este inventário permitirá que o técnico edite a consolidação atual. Deseja continuar?")) return;
     
     try {
-      const { error } = await (supabase.from as any)("inventory_submissions").delete().eq("id", subId);
+      const { error } = await (supabase.from as any)("inventory_submissions").update({ status: 'em_andamento' }).eq("id", subId);
       if (error) throw error;
-      toast.success("Inventário reaberto com sucesso. O técnico já pode validá-lo novamente.");
+      toast.success("Inventário reaberto com sucesso. O técnico já pode editá-lo novamente.");
       fetchDashboardData();
     } catch (err: any) {
       toast.error("Erro ao reabrir inventário: " + err.message);
@@ -514,7 +587,8 @@ const Inventory = () => {
   }
 
   return (
-    <div className="bg-background p-4 md:p-8 space-y-6">
+    <>
+    <div className="bg-background print:hidden p-4 md:p-8 space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -648,10 +722,14 @@ const Inventory = () => {
           )}
 
           {baseItems.length > 0 && (
-            <div className="flex justify-center pt-4">
-              <Button size="lg" className="w-full md:w-auto px-12" onClick={handleSubmitInventory} disabled={submitting}>
+            <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
+              <Button size="lg" variant="outline" className="w-full md:w-auto px-8 border-dashed" onClick={() => handleSubmitInventory(true)} disabled={submitting}>
+                {submitting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Salvar Rascunho
+              </Button>
+              <Button size="lg" className="w-full md:w-auto px-12" onClick={() => handleSubmitInventory(false)} disabled={submitting}>
                 {submitting ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                Finalizar Inventário
+                Finalizar e Gerar Termo
               </Button>
             </div>
           )}
@@ -1209,14 +1287,111 @@ const Inventory = () => {
             </div>
           )}
           
+          
           <DialogFooter>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSubmissionDetailsOpen(false)}>
+            <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" onClick={() => window.print()}>
+              <FileText className="w-4 h-4 mr-2" /> Imprimir Recibo
+            </Button>
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setSubmissionDetailsOpen(false)}>
               Fechar Formato
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+
+    {/* Print Layout */}
+    <div className="hidden print:block absolute inset-0 bg-white z-[9999] p-8 min-h-screen">
+      <div className="max-w-4xl mx-auto space-y-6 text-black">
+        {/* Print Header */}
+        <div className="flex items-center justify-between border-b-2 border-black pb-4 mb-8">
+          <div className="flex items-center gap-4">
+            <img src="/ability-logo.png" alt="Ability" className="h-16 object-contain grayscale" />
+            <div>
+              <h1 className="text-xl font-bold uppercase tracking-widest text-black m-0">Portal Corporativo</h1>
+              <p className="text-sm font-semibold uppercase text-black/70 m-0">Termo de Responsabilidade - Inventário</p>
+            </div>
+          </div>
+          <div className="text-right text-xs">
+            <p>Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+          </div>
+        </div>
+
+        {/* Statement */}
+        <div className="text-justify text-sm mb-6 leading-relaxed">
+          Declaro, para os devidos fins, que realizei a conferência dos equipamentos listados abaixo e assumo a responsabilidade pela guarda, conservação e correto uso dos materiais associados à minha matrícula que se encontram sob minha posse.
+        </div>
+
+        {/* User Info */}
+        <div className="grid grid-cols-2 gap-4 mb-8 text-sm">
+          <div><span className="font-bold">Técnico:</span> {nomeTecnico || selectedSubmission?.nome_tecnico}</div>
+          <div><span className="font-bold">Matrícula TT:</span> {tt || selectedSubmission?.matricula_tt}</div>
+          <div><span className="font-bold">Supervisor:</span> {supervisor || selectedSubmission?.supervisor || "—"}</div>
+          <div><span className="font-bold">Coordenador:</span> {coordenador || selectedSubmission?.coordenador || "—"}</div>
+        </div>
+
+        {/* Items Table */}
+        <div className="w-full mb-12">
+          <h3 className="font-bold text-lg mb-2 border-b border-black">Equipamentos Inventariados</h3>
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-black/50">
+                <th className="py-2 px-1">SERIAL</th>
+                <th className="py-2 px-1">MODELO</th>
+                <th className="py-2 px-1">CÓDIGO MATERIAL</th>
+                <th className="py-2 px-1 text-right">STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Combine base and extra items dynamically for print based on active state vs selected detail */}
+              {(tt && baseItems.length > 0 ? [
+                ...baseItems.map(item => ({
+                  serial: item.serial,
+                  modelo: item.modelo,
+                  codigo: item.codigo_material,
+                  status: submissionItems[item.id] === 'presente' ? 'Possuo' : submissionItems[item.id] === 'falta' ? 'Faltante' : 'Pendente'
+                })).filter(i => i.status !== 'Pendente'), 
+                ...extraItems.map(item => ({
+                  serial: item.serial,
+                  modelo: item.modelo,
+                  codigo: item.codigo_material,
+                  status: 'Extra (Possuo)'
+                }))
+              ] : (selectedSubmission?.inventory_submission_items || []).map((i: any) => ({
+                  serial: i.serial,
+                  modelo: i.modelo,
+                  codigo: i.codigo_material,
+                  status: i.status === 'presente' ? 'Possuo' : i.status === 'falta' ? 'Faltante' : 'Extra (Possuo)'
+              }))).map((row, idx) => (
+                <tr key={idx} className="border-b border-black/20">
+                  <td className="py-1 px-1 font-mono uppercase">{row.serial}</td>
+                  <td className="py-1 px-1 uppercase">{row.modelo || "—"}</td>
+                  <td className="py-1 px-1">{row.codigo || "—"}</td>
+                  <td className="py-1 px-1 text-right uppercase font-semibold">{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Signatures */}
+        <div className="grid grid-cols-2 gap-12 mt-32 pt-8">
+          <div className="text-center">
+            <div className="border-t border-black w-full pt-2">
+              <p className="font-bold uppercase text-sm">{nomeTecnico || selectedSubmission?.nome_tecnico || "Colaborador"}</p>
+              <p className="text-xs">Técnico / Colaborador</p>
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="border-t border-black w-full pt-2">
+              <p className="font-bold uppercase text-sm">{supervisor || selectedSubmission?.supervisor || "Liderança"}</p>
+              <p className="text-xs">Supervisor Operacional</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
   );
 };
 
