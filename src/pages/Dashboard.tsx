@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart3, CalendarDays, ClipboardList, ClipboardCheck, Boxes,
-  Truck, TrendingUp, Users, Clock
+  TrendingUp, Users, Clock
 } from "lucide-react";
 import BrazilMap from "@/components/BrazilMap";
 
@@ -132,7 +132,6 @@ const Dashboard = () => {
         {/* Brazil Map */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <Truck className="w-5 h-5 text-primary" />
             Áreas de Atuação
           </h2>
           <Card className="glass-card">
