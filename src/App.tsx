@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import MainLayout from "@/components/MainLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ChangePassword from "./pages/ChangePassword";
@@ -47,7 +48,7 @@ const PersistentPage = ({ path, children }: { path: string; children: ReactNode 
   );
 };
 
-// Pages that should persist their state (all protected pages except Dashboard which resets)
+// Pages that should persist their state
 const persistentPages = [
   { path: "/alterar-senha", element: <ProtectedRoute><ChangePassword /></ProtectedRoute> },
   { path: "/powerbi", element: <ProtectedRoute><PowerBI /></ProtectedRoute> },
@@ -62,22 +63,40 @@ const persistentPages = [
 
 const AppRoutes = () => {
   const location = useLocation();
+  const isLoginRoute = location.pathname === "/";
   const isPersistentRoute = persistentPages.some(p => p.path === location.pathname);
+  const isDashboard = location.pathname === "/dashboard";
+  const isProtectedArea = isPersistentRoute || isDashboard;
 
   return (
     <>
-      {/* Persistent pages stay mounted, hidden via CSS */}
-      {persistentPages.map(({ path, element }) => (
-        <PersistentPage key={path} path={path}>
-          {element}
-        </PersistentPage>
-      ))}
-
-      {/* Non-persistent pages render normally via Routes */}
-      {!isPersistentRoute && (
+      {/* Login page - no sidebar */}
+      {isLoginRoute && (
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        </Routes>
+      )}
+
+      {/* Protected pages with sidebar layout */}
+      {isProtectedArea && (
+        <ProtectedRoute>
+          <MainLayout>
+            {/* Persistent pages */}
+            {persistentPages.map(({ path, element }) => (
+              <PersistentPage key={path} path={path}>
+                {element}
+              </PersistentPage>
+            ))}
+
+            {/* Dashboard (non-persistent) */}
+            {isDashboard && <Dashboard />}
+          </MainLayout>
+        </ProtectedRoute>
+      )}
+
+      {/* 404 */}
+      {!isLoginRoute && !isProtectedArea && !isPersistentRoute && (
+        <Routes>
           <Route path="*" element={<NotFound />} />
         </Routes>
       )}
