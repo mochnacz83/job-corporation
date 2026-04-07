@@ -104,9 +104,11 @@ const Inventory = () => {
   const [filterSupervisor, setFilterSupervisor] = useState("todos");
   const [filterCoordenador, setFilterCoordenador] = useState("todos");
 
-  // Scanner State
+  // Scanner & Dialog State
   const [scannerOpen, setScannerOpen] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const [scannerContext, setScannerContext] = useState<{modelo: string, codigo: string | null} | null>(null);
+  const [pendingSerial, setPendingSerial] = useState<{serial: string, modelo: string, codigo: string | null} | null>(null);
 
   useEffect(() => {
     trackAction("Acessou o Módulo de Inventário");
@@ -203,7 +205,8 @@ const Inventory = () => {
     // Validate: all base items must have a status
     const incomplete = Object.values(submissionItems).some(val => val === null);
     if (incomplete) {
-      toast.error("Por favor, valide todos os itens da sua carga antes de finalizar.");
+      const pendingCount = Object.values(submissionItems).filter(val => val === null).length;
+      toast.error(`Atenção! Faltam ${pendingCount} itens da sua carga para serem validados (informe se 'Possui' ou 'Falta'). Revise todos antes de salvar.`);
       return;
     }
 
@@ -267,6 +270,19 @@ const Inventory = () => {
   };
 
   // --- Admin Functions ---
+
+  const handleReopenInventory = async (subId: string) => {
+    if (!window.confirm("Atenção: Reabrir este inventário apagará a consolidação atual do técnico. Ele precisará bipar e validar novamente. Deseja continuar?")) return;
+    
+    try {
+      const { error } = await (supabase.from as any)("inventory_submissions").delete().eq("id", subId);
+      if (error) throw error;
+      toast.success("Inventário reaberto com sucesso. O técnico já pode validá-lo novamente.");
+      fetchDashboardData();
+    } catch (err: any) {
+      toast.error("Erro ao reabrir inventário: " + err.message);
+    }
+  };
 
   const downloadTemplate = () => {
     const templateData = [
@@ -447,7 +463,8 @@ const Inventory = () => {
 
   // --- Scanner Logic ---
   
-  const startScanner = async () => {
+  const startScanner = async (modelo = "ONT", codigo: string | null = null) => {
+    setScannerContext({ modelo, codigo });
     setScannerOpen(true);
     setTimeout(async () => {
       try {
@@ -457,8 +474,8 @@ const Inventory = () => {
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 250, height: 150 } },
           (decodedText) => {
-            handleAddExtra(decodedText, "ONT"); // Default model
             stopScanner();
+            setPendingSerial({ serial: decodedText, modelo, codigo });
           },
           () => {}
         );
@@ -506,7 +523,7 @@ const Inventory = () => {
                   </Button>
                   <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
                 </div>
-                <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs</p>
+                <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs e DROP</p>
               </div>
 
               <TabsList className="grid grid-cols-2 w-full md:w-[400px]">
@@ -596,7 +613,7 @@ const Inventory = () => {
                   <CardTitle className="text-md">Itens Extras</CardTitle>
                   <CardDescription>Adicione equipamentos que você possui mas não estão na lista.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={startScanner}>
+                <Button variant="outline" size="sm" onClick={() => startScanner("ONT", null)}>
                   <ScanBarcode className="w-4 h-4 mr-2" /> Bipar Serial
                 </Button>
               </CardHeader>
@@ -835,7 +852,18 @@ const Inventory = () => {
                               </TableCell>
                               <TableCell className="text-right">
                                 {sub && (
-                                  <Button size="sm" variant="ghost">Ver Detalhes</Button>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button size="sm" variant="ghost">Detalhes</Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="destructive" 
+                                      className="h-8"
+                                      onClick={() => handleReopenInventory(sub.id)}
+                                      title="Desfazer e reabrir o inventário deste técnico"
+                                    >
+                                      Reabrir
+                                    </Button>
+                                  </div>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1030,6 +1058,9 @@ const Inventory = () => {
             <div className="pt-4 border-t border-dashed">
               <Label className="text-xs text-muted-foreground mb-2 block">Deseja incluir um novo serial neste grupo?</Label>
               <div className="flex gap-2">
+                <Button variant="outline" size="icon" title="Escanear com Câmera" onClick={() => startScanner(selectedCategory?.nome || "ONT", selectedCategory?.codigo || null)}>
+                  <ScanBarcode className="w-4 h-4" />
+                </Button>
                 <Input 
                   id="modal-extra-serial" 
                   placeholder="Novo Serial" 
@@ -1060,6 +1091,38 @@ const Inventory = () => {
           <DialogFooter>
             <Button variant="outline" className="w-full" onClick={() => setIsDetailOpen(false)}>
               Fechar Detalhamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog for Confirming Read Serial */}
+      <Dialog open={!!pendingSerial} onOpenChange={(open) => !open && setPendingSerial(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirme o Serial Lido</DialogTitle>
+            <DialogDescription>A câmera identificou o seguinte código de barras:</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 text-center bg-secondary/30 rounded-lg border-2 border-dashed">
+            <p className="text-3xl font-mono tracking-widest font-bold text-foreground text-center break-all whitespace-normal px-2">
+              {pendingSerial?.serial}
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => {
+              setPendingSerial(null);
+              // optionally reopen scanner
+              if (scannerContext) startScanner(scannerContext.modelo, scannerContext.codigo);
+            }}>
+              <X className="w-4 h-4 mr-1" /> Ler Novamente
+            </Button>
+            <Button onClick={() => {
+              if (pendingSerial) {
+                handleAddExtra(pendingSerial.serial, pendingSerial.modelo, pendingSerial.codigo);
+                setPendingSerial(null);
+                setIsDetailOpen(false); // fechar caso esteja na modal
+              }
+            }}>
+              <Check className="w-4 h-4 mr-1" /> Salvar Serial
             </Button>
           </DialogFooter>
         </DialogContent>
