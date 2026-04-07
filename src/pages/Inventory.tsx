@@ -450,8 +450,23 @@ const Inventory = () => {
     setScannerOpen(false);
   };
 
+  // Show locked screen for non-admin users
+  if (!isAdmin && inventoryLocked) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
+          <Lock className="w-10 h-10 text-destructive" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground">Inventário Bloqueado</h2>
+        <p className="text-muted-foreground max-w-md">
+          O módulo de inventário está temporariamente fechado. Aguarde a liberação pelo administrador.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
+    <div className="bg-background p-4 md:p-8 space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
