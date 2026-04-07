@@ -50,15 +50,15 @@ const PersistentPage = ({ path, children }: { path: string; children: ReactNode 
 
 // Pages that should persist their state
 const persistentPages = [
-  { path: "/alterar-senha", element: <ProtectedRoute><ChangePassword /></ProtectedRoute> },
-  { path: "/powerbi", element: <ProtectedRoute><PowerBI /></ProtectedRoute> },
-  { path: "/admin/usuarios", element: <ProtectedRoute><AdminUsers /></ProtectedRoute> },
-  { path: "/admin/analytics", element: <ProtectedRoute><AdminAnalytics /></ProtectedRoute> },
-  { path: "/admin/perfis", element: <ProtectedRoute><AdminPermissions /></ProtectedRoute> },
-  { path: "/reagenda", element: <ProtectedRoute><Reagenda /></ProtectedRoute> },
-  { path: "/material-coleta", element: <ProtectedRoute><MaterialColeta /></ProtectedRoute> },
-  { path: "/vistoria-campo", element: <ProtectedRoute><VistoriaCampo /></ProtectedRoute> },
-  { path: "/inventario", element: <ProtectedRoute><Inventory /></ProtectedRoute> },
+  { path: "/alterar-senha", element: <ChangePassword /> },
+  { path: "/powerbi", element: <PowerBI /> },
+  { path: "/admin/usuarios", element: <AdminUsers /> },
+  { path: "/admin/analytics", element: <AdminAnalytics /> },
+  { path: "/admin/perfis", element: <AdminPermissions /> },
+  { path: "/reagenda", element: <Reagenda /> },
+  { path: "/material-coleta", element: <MaterialColeta /> },
+  { path: "/vistoria-campo", element: <VistoriaCampo /> },
+  { path: "/inventario", element: <Inventory /> },
 ];
 
 const AppRoutes = () => {
