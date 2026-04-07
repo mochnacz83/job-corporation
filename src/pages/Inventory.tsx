@@ -17,7 +17,7 @@ import {
   ScanBarcode, CheckCircle2, AlertTriangle, AlertCircle, 
   RefreshCw, X, Check, BarChart3, ChevronRight, ClipboardCheck, 
   CornerDownRight, Filter, History, LayoutDashboard, Package, 
-  UserCheck, Download, FileText, Save
+  UserCheck, Download, FileText, Save, Lock
 } from "lucide-react";
 import { 
   DropdownMenu,
