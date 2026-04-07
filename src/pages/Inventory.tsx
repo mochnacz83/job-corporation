@@ -97,6 +97,8 @@ const Inventory = () => {
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
   const [allBaseTechnicians, setAllBaseTechnicians] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [basePreview, setBasePreview] = useState<any[]>([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   
   // Filters
   const [filterSupervisor, setFilterSupervisor] = useState("todos");
@@ -371,11 +373,28 @@ const Inventory = () => {
       }
 
       toast.success(`${mappedData.length} itens carregados com sucesso!`);
+      fetchBasePreview();
     } catch (err: any) {
       toast.error("Erro no upload: " + err.message);
     } finally {
       setUploading(false);
       if (e.target) e.target.value = "";
+    }
+  };
+
+  const fetchBasePreview = async () => {
+    setLoadingPreview(true);
+    try {
+      const { data, error } = await (supabase.from as any)("inventory_base")
+        .select("*")
+        .order("nome_tecnico", { ascending: true })
+        .limit(1000);
+      if (error) throw error;
+      setBasePreview(data || []);
+    } catch (err: any) {
+      toast.error("Erro ao carregar prévia da base: " + err.message);
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -419,6 +438,12 @@ const Inventory = () => {
       fetchDashboardData();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeAdminTab === "upload") {
+      fetchBasePreview();
+    }
+  }, [activeAdminTab]);
 
   // --- Scanner Logic ---
   
@@ -833,7 +858,7 @@ const Inventory = () => {
                     <Upload className="w-10 h-10 text-muted-foreground" />
                     <div className="text-center">
                       <p className="font-medium">Clique para fazer upload</p>
-                      <p className="text-xs text-muted-foreground">XLSX com Serial, Modelo, Código, TT, Técnico, Supervisor, etc.</p>
+                      <p className="text-xs text-muted-foreground">O banco atual será limpo e substituído. Envie arquivo XLSX completo.</p>
                     </div>
                     <Input 
                       type="file" 
@@ -852,9 +877,64 @@ const Inventory = () => {
                       </Button>
                       <Button variant="outline" onClick={downloadTemplate} disabled={uploading}>
                         <FileSpreadsheet className="w-4 h-4 mr-2" />
-                        Baixar Modelo (.xlsx)
+                        Baixar Modelo
                       </Button>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Base Atual (Visualização)</CardTitle>
+                    <CardDescription>Visualizando os 1000 primeiros registros da base importada ativa.</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={fetchBasePreview} disabled={loadingPreview}>
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loadingPreview ? 'animate-spin' : ''}`} />
+                    Atualizar Tabela
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border h-96 overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-secondary/80 sticky top-0 backdrop-blur-sm shadow-sm">
+                        <TableRow>
+                          <TableHead>Técnico</TableHead>
+                          <TableHead>Serial</TableHead>
+                          <TableHead>Modelo</TableHead>
+                          <TableHead>Cód. Material</TableHead>
+                          <TableHead>Matrícula TT</TableHead>
+                          <TableHead>Supervisor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loadingPreview ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8">
+                              <RefreshCw className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+                            </TableCell>
+                          </TableRow>
+                        ) : basePreview.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              A base está vazia. Importe uma planilha para preenchê-la.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          basePreview.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium text-xs">{item.nome_tecnico}</TableCell>
+                              <TableCell className="font-mono text-xs">{item.serial}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{item.modelo || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{item.codigo_material || "—"}</TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground">{item.matricula_tt}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{item.supervisor || "—"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
                 </CardContent>
               </Card>
