@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   BarChart3, CalendarDays, ClipboardList, ClipboardCheck, Boxes,
-  TrendingUp, Users, Clock
+  TrendingUp, Users, Clock, Package
 } from "lucide-react";
 
 const Dashboard = () => {
@@ -40,7 +40,7 @@ const Dashboard = () => {
 
   const quickActions = [
     { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("powerbi"), path: "/powerbi", icon: BarChart3, label: "Power BI", color: "bg-primary/10 text-primary" },
-    { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("material_coleta"), path: "/material-coleta", icon: ClipboardList, label: "Materiais", color: "bg-sidebar/10 text-sidebar-foreground" },
+    { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("material_coleta"), path: "/material-coleta", icon: Package, label: "Materiais", color: "bg-blue-500/10 text-blue-500" },
     { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("reagenda"), path: "/reagenda", icon: CalendarDays, label: "Reagendamento", color: "bg-success/10 text-success" },
     { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("vistoria_campo"), path: "/vistoria-campo", icon: ClipboardCheck, label: "Vistoria", color: "bg-warning/10 text-warning" },
     { show: isAdmin || areaPermissions?.all_access || areaPermissions?.modules?.includes("inventario"), path: "/inventario", icon: Boxes, label: "Inventário", color: "bg-accent text-accent-foreground" },
