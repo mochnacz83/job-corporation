@@ -805,7 +805,7 @@ const Inventory = () => {
                           const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
                           const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
                           const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
-                          return matchCoord && matchSuper;
+                          return matchCoord && matchSuper && s.status === 'finalizado';
                         }).length}</h3>
                       </div>
                       <div className="p-2 bg-success/10 rounded-full">
@@ -824,7 +824,7 @@ const Inventory = () => {
                           {allBaseTechnicians.filter(t => {
                             const matchCoord = filterCoordenador === "todos" || t?.coordenador === filterCoordenador;
                             const matchSuper = filterSupervisor === "todos" || t?.supervisor === filterSupervisor;
-                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t?.matricula_tt);
+                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t?.matricula_tt && s.status === 'finalizado');
                             return matchCoord && matchSuper && !alreadyDone;
                           }).length}</h3>
                       </div>
@@ -846,7 +846,7 @@ const Inventory = () => {
                             const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
                             const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
                             
-                            if (matchCoord && matchSuper) {
+                            if (matchCoord && matchSuper && sub.status === 'finalizado') {
                               return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'falta')?.length || 0);
                             }
                             return acc;
@@ -871,7 +871,7 @@ const Inventory = () => {
                             const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
                             const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
                             
-                            if (matchCoord && matchSuper) {
+                            if (matchCoord && matchSuper && sub.status === 'finalizado') {
                               return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'extra')?.length || 0);
                             }
                             return acc;
@@ -921,14 +921,16 @@ const Inventory = () => {
                               <TableCell className="text-sm">{tech?.supervisor || "—"}</TableCell>
                               <TableCell className="text-sm">{tech?.coordenador || "—"}</TableCell>
                               <TableCell>
-                                {sub ? (
+                                {sub?.status === 'finalizado' ? (
                                   <Badge className="bg-success text-success-foreground">Finalizado</Badge>
+                                ) : sub?.status === 'em_andamento' ? (
+                                  <Badge variant="secondary" className="border-warning text-warning">Em Andamento</Badge>
                                 ) : (
                                   <Badge variant="outline" className="text-muted-foreground border-dashed">Pendente</Badge>
                                 )}
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {sub ? new Date(sub.data_fim).toLocaleString('pt-BR') : "—"}
+                                {sub?.status === 'finalizado' ? new Date(sub.data_fim).toLocaleString('pt-BR') : "—"}
                               </TableCell>
                               <TableCell className="text-right">
                                 {sub && (
@@ -943,15 +945,17 @@ const Inventory = () => {
                                     >
                                       Detalhes
                                     </Button>
-                                    <Button 
-                                      size="sm" 
-                                      variant="destructive" 
-                                      className="h-8"
-                                      onClick={() => handleReopenInventory(sub.id)}
-                                      title="Desfazer e reabrir o inventário deste técnico"
-                                    >
-                                      Reabrir
-                                    </Button>
+                                    {sub.status === 'finalizado' && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="destructive" 
+                                        className="h-8"
+                                        onClick={() => handleReopenInventory(sub.id)}
+                                        title="Desfazer e reabrir o inventário deste técnico"
+                                      >
+                                        Reabrir
+                                      </Button>
+                                    )}
                                   </div>
                                 )}
                               </TableCell>
