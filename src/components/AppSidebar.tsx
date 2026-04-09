@@ -95,12 +95,21 @@ const AppSidebar = () => {
     { show: hasModule("inventario"), path: "/inventario", icon: Boxes, label: "Mini Inventário", locked: !isAdmin && inventoryLocked },
   ];
 
+  const shortenSidebarLabel = (titulo: string) => {
+    return titulo
+      .replace(/dash\s*board\s*/gi, "")
+      .replace(/filas\s+de\s+/gi, "")
+      .replace(/\s*-\s*$/, "")
+      .replace(/^\s*-\s*/, "")
+      .trim();
+  };
+
   const dashboardItems = powerBiLinks.length > 0 
     ? powerBiLinks.map((link) => ({
         show: hasModule("powerbi"),
         path: `/powerbi?id=${link.id}`,
         icon: BarChart3,
-        label: link.titulo,
+        label: shortenSidebarLabel(link.titulo),
         description: link.descricao
       }))
     : [{ show: hasModule("powerbi"), path: "/powerbi", icon: BarChart3, label: "Relatórios Power BI" }];
