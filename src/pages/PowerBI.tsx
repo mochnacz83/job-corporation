@@ -106,12 +106,18 @@ const PowerBI = () => {
   );
 
   useEffect(() => {
-    if (idParam && idParam !== selectedLinkId) {
+    if (idParam) {
       setSelectedLinkId(idParam);
-      setMountedIframes((prev) => new Set(prev).add(idParam));
-    } else if (!idParam && selectedLinkId) {
-      setSelectedLinkId(null);
+      setMountedIframes((prev) => {
+        if (prev.has(idParam)) return prev;
+        const next = new Set(prev);
+        next.add(idParam);
+        return next;
+      });
+      return;
     }
+
+    setSelectedLinkId(null);
   }, [idParam]);
 
   const fetchLinks = useCallback(async () => {
