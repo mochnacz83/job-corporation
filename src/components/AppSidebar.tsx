@@ -179,7 +179,7 @@ const AppSidebar = () => {
                           title={item.description || item.label}
                         >
                           <item.icon className="w-4 h-4 mr-2 flex-shrink-0" />
-                          {!collapsed && <span className="truncate">{item.label}</span>}
+                          {!collapsed && <span className="truncate text-[11px] leading-tight">{item.label}</span>}
                         </NavLink>
                       )}
                     </SidebarMenuButton>
