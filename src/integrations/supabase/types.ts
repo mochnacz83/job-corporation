@@ -182,6 +182,119 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_base: {
+        Row: {
+          codigo_material: string | null
+          coordenador: string | null
+          created_at: string | null
+          id: string
+          matricula_tt: string
+          modelo: string | null
+          nome_tecnico: string
+          serial: string
+          setor: string | null
+          supervisor: string | null
+        }
+        Insert: {
+          codigo_material?: string | null
+          coordenador?: string | null
+          created_at?: string | null
+          id?: string
+          matricula_tt: string
+          modelo?: string | null
+          nome_tecnico: string
+          serial: string
+          setor?: string | null
+          supervisor?: string | null
+        }
+        Update: {
+          codigo_material?: string | null
+          coordenador?: string | null
+          created_at?: string | null
+          id?: string
+          matricula_tt?: string
+          modelo?: string | null
+          nome_tecnico?: string
+          serial?: string
+          setor?: string | null
+          supervisor?: string | null
+        }
+        Relationships: []
+      }
+      inventory_submission_items: {
+        Row: {
+          codigo_material: string | null
+          created_at: string | null
+          id: string
+          modelo: string | null
+          serial: string
+          status: string
+          submission_id: string | null
+        }
+        Insert: {
+          codigo_material?: string | null
+          created_at?: string | null
+          id?: string
+          modelo?: string | null
+          serial: string
+          status: string
+          submission_id?: string | null
+        }
+        Update: {
+          codigo_material?: string | null
+          created_at?: string | null
+          id?: string
+          modelo?: string | null
+          serial?: string
+          status?: string
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_submission_items_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_submissions: {
+        Row: {
+          coordenador: string | null
+          data_fim: string | null
+          data_inicio: string | null
+          id: string
+          matricula_tt: string
+          nome_tecnico: string
+          status: string | null
+          supervisor: string | null
+          user_id: string | null
+        }
+        Insert: {
+          coordenador?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          matricula_tt: string
+          nome_tecnico: string
+          status?: string | null
+          supervisor?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          coordenador?: string | null
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          matricula_tt?: string
+          nome_tecnico?: string
+          status?: string | null
+          supervisor?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       materiais_cadastro: {
         Row: {
           codigo: string

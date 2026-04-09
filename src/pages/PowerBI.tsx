@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,6 @@ import { ArrowLeft, BarChart3, Loader2, GripVertical, RotateCcw } from "lucide-r
 import { 
   DndContext, 
   closestCenter,
-  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -18,9 +17,6 @@ import {
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  horizontalListSortingStrategy,
   rectSortingStrategy,
   useSortable
 } from "@dnd-kit/sortable";
@@ -37,15 +33,23 @@ interface PowerBILink {
   created_at?: string;
 }
 
-const SortableItem = ({ link, onSelect }: { link: PowerBILink, onSelect: (link: PowerBILink) => void }) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: link.id });
+const HARDCODED_LINKS: PowerBILink[] = [
+  {
+    id: "bi-servicos",
+    titulo: "Filas de Serviços - Instalação, Reparo e Mudança",
+    url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9",
+    descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança",
+  },
+  {
+    id: "bi-sef-sj",
+    titulo: "DashBoard SEF São Jose",
+    url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969",
+    descricao: "Monitoramento de indicadores SEF São Jose",
+  },
+];
+
+const SortableItem = ({ link, onSelect }: { link: PowerBILink; onSelect: (link: PowerBILink) => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -60,8 +64,8 @@ const SortableItem = ({ link, onSelect }: { link: PowerBILink, onSelect: (link: 
         className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all duration-200 group h-full relative"
         onClick={() => onSelect(link)}
       >
-        <div 
-          {...attributes} 
+        <div
+          {...attributes}
           {...listeners}
           className="absolute top-2 right-2 p-1 text-muted-foreground/30 hover:text-primary transition-colors cursor-grab active:cursor-grabbing z-20"
           onClick={(e) => e.stopPropagation()}
@@ -94,128 +98,100 @@ const PowerBI = () => {
   const [loading, setLoading] = useState(true);
   const [mountedIframes, setMountedIframes] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
-
   const hasFetched = useRef(false);
-
   const { trackAction } = useAccessTracking("/powerbi");
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
   useEffect(() => {
     if (idParam && idParam !== selectedLinkId) {
       setSelectedLinkId(idParam);
-      setMountedIframes(prev => new Set(prev).add(idParam));
+      setMountedIframes((prev) => new Set(prev).add(idParam));
     } else if (!idParam && selectedLinkId) {
       setSelectedLinkId(null);
     }
   }, [idParam]);
 
-  useEffect(() => {
-    if (hasFetched.current || !user) return;
-    const fetchLinks = async () => {
-      setLoading(true);
-      try {
-        // Fetch reports
-        const { data: reportData, error: reportError } = await supabase
-          .from("powerbi_links")
-          .select("*")
-          .eq("ativo", true)
-          .order("ordem");
+  const fetchLinks = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const { data: reportData, error: reportError } = await supabase
+        .from("powerbi_links")
+        .select("*")
+        .eq("ativo", true)
+        .order("ordem");
 
-        if (reportError) throw reportError;
-        
-        const dbLinks = (reportData || []) as PowerBILink[];
-        
-        // Add hardcoded fallback
-        if (!dbLinks.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
-           dbLinks.push({ 
-             id: "bi-servicos", 
-             titulo: "Filas de Serviços - Instalação, Reparo e Mudança", 
-             url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9", 
-             descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança" 
-           });
+      if (reportError) throw reportError;
+
+      const dbLinks = (reportData || []) as PowerBILink[];
+
+      // Add hardcoded fallbacks
+      for (const hl of HARDCODED_LINKS) {
+        if (!dbLinks.some((l) => l.titulo === hl.titulo)) {
+          dbLinks.push(hl);
         }
-
-        if (!dbLinks.some((link) => link.titulo === "DashBoard SEF São Jose")) {
-           dbLinks.push({ 
-             id: "bi-sef-sj", 
-             titulo: "DashBoard SEF São Jose", 
-             url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969", 
-             descricao: "Monitoramento de indicadores SEF São Jose" 
-           });
-        }
-        setLinks(dbLinks);
-
-        // Load user preferences from localStorage
-        const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
-        if (savedOrder) {
-          try {
-            setOrderedIds(JSON.parse(savedOrder));
-          } catch {
-            setOrderedIds(dbLinks.map(l => l.id));
-          }
-        } else {
-          setOrderedIds(dbLinks.map(l => l.id));
-        }
-
-        hasFetched.current = true;
-      } catch (err) {
-        console.error("Erro ao carregar relatórios Power BI:", err);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchLinks();
+      setLinks(dbLinks);
+
+      const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
+      if (savedOrder) {
+        try {
+          setOrderedIds(JSON.parse(savedOrder));
+        } catch {
+          setOrderedIds(dbLinks.map((l) => l.id));
+        }
+      } else {
+        setOrderedIds(dbLinks.map((l) => l.id));
+      }
+
+      hasFetched.current = true;
+    } catch (err) {
+      console.error("Erro ao carregar relatórios Power BI:", err);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
-  // Filter and Sort links
+  useEffect(() => {
+    if (hasFetched.current || !user) return;
+    fetchLinks();
+  }, [user, fetchLinks]);
+
   const sortedLinks = useMemo(() => {
-    const baseLinks = (!isAdmin && areaPermissions && !areaPermissions.all_access)
-      ? links.filter(link => areaPermissions.powerbi_report_ids?.includes(link.id))
-      : links;
+    const baseLinks =
+      !isAdmin && areaPermissions && !areaPermissions.all_access
+        ? links.filter((link) => areaPermissions.powerbi_report_ids?.includes(link.id))
+        : links;
 
     if (orderedIds.length === 0) return baseLinks;
 
-    const linkMap = new Map(baseLinks.map(l => [l.id, l]));
+    const linkMap = new Map(baseLinks.map((l) => [l.id, l]));
     const result: PowerBILink[] = [];
-    
-    // First, add links in stored order
-    orderedIds.forEach(id => {
+
+    orderedIds.forEach((id) => {
       const link = linkMap.get(id);
       if (link) {
         result.push(link);
         linkMap.delete(id);
       }
     });
-    
-    // Add any remaining links (e.g. newly added reports)
-    linkMap.forEach(link => result.push(link));
-    
+
+    linkMap.forEach((link) => result.push(link));
     return result;
   }, [links, orderedIds, areaPermissions, isAdmin]);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
     if (over && active.id !== over.id) {
-      const currentIds = sortedLinks.map(l => l.id);
+      const currentIds = sortedLinks.map((l) => l.id);
       const oldIndex = currentIds.indexOf(active.id as string);
       const newIndex = currentIds.indexOf(over.id as string);
-      
       const newOrderIds = arrayMove(currentIds, oldIndex, newIndex);
       setOrderedIds(newOrderIds);
-
-      // Persist to localStorage
       if (user) {
         localStorage.setItem(`powerbi_order_${user.id}`, JSON.stringify(newOrderIds));
       }
@@ -225,56 +201,7 @@ const PowerBI = () => {
   const handleRefresh = () => {
     hasFetched.current = false;
     setMountedIframes(new Set());
-    // Trigger the effect again by toggling a local state or just calling fetchLinks
-    // Since fetchLinks is inside useEffect, we can just call it if it's exposed or use a trigger state
-    // For simplicity, let's just reload the data manually here
-    const fetchLinks = async () => {
-      setLoading(true);
-      try {
-        const { data: reportData, error: reportError } = await supabase
-          .from("powerbi_links")
-          .select("*")
-          .eq("ativo", true)
-          .order("ordem");
-
-        if (reportError) throw reportError;
-        
-        const dbLinks = (reportData || []) as PowerBILink[];
-        
-        if (!dbLinks.some((link) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
-           dbLinks.push({ 
-             id: "bi-servicos", 
-             titulo: "Filas de Serviços - Instalação, Reparo e Mudança", 
-             url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9", 
-             descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança" 
-           });
-        }
-
-        if (!dbLinks.some((link) => link.titulo === "DashBoard SEF São Jose")) {
-           dbLinks.push({ 
-             id: "bi-sef-sj", 
-             titulo: "DashBoard SEF São Jose", 
-             url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969", 
-             descricao: "Monitoramento de indicadores SEF São Jose" 
-           });
-        }
-        setLinks(dbLinks);
-
-        const savedOrder = localStorage.getItem(`powerbi_order_${user?.id}`);
-        if (savedOrder) {
-          try {
-            setOrderedIds(JSON.parse(savedOrder));
-          } catch { /* ignore */ }
-        }
-        
-        hasFetched.current = true;
-      } catch (err) {
-        console.error("Erro ao recarregar relatórios:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchLinks();
+    fetchLinks();
     trackAction("Acionou o botão de refresh no Power BI");
   };
 
@@ -283,51 +210,34 @@ const PowerBI = () => {
     navigate(`/powerbi?id=${link.id}`);
   };
 
-  const selectedLink = sortedLinks.find(l => l.id === selectedLinkId) || null;
+  const selectedLink = sortedLinks.find((l) => l.id === selectedLinkId) || null;
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50 shrink-0">
-        <div className="px-4 h-14 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              if (selectedLinkId) {
-                navigate("/powerbi");
-              } else {
-                navigate("/dashboard");
-              }
-            }}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="p-1 bg-transparent w-10 h-10 flex items-center justify-center overflow-hidden">
-              <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
-            </div>
-            <h1 className="text-lg font-bold text-foreground">
-              {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
-            </h1>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              className="gap-2"
-              disabled={loading}
-            >
-              <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Compact toolbar */}
+      <div className="border-b bg-card/60 backdrop-blur-sm shrink-0">
+        <div className="px-4 h-11 flex items-center gap-3">
+          {selectedLinkId ? (
+            <Button variant="ghost" size="sm" onClick={() => navigate("/powerbi")} className="gap-1 px-2">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline text-sm">Voltar</span>
+            </Button>
+          ) : null}
+          <h1 className="text-sm font-semibold text-foreground truncate">
+            {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
+          </h1>
+          <div className="ml-auto">
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading} className="gap-1.5 h-8">
+              <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline text-xs">Atualizar</span>
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden">
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center h-full">
             <Loader2 className="w-8 h-8 text-primary animate-spin" />
           </div>
         ) : sortedLinks.length === 0 ? (
@@ -340,20 +250,10 @@ const PowerBI = () => {
           </div>
         ) : (
           <>
-            {/* Card grid - visible when no link selected */}
-            <div
-              className="px-4 py-8 overflow-y-auto"
-              style={{ display: selectedLinkId ? "none" : "block" }}
-            >
-              <DndContext 
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext 
-                  items={sortedLinks.map(l => l.id)}
-                  strategy={rectSortingStrategy}
-                >
+            {/* Card grid */}
+            <div className="px-4 py-6 overflow-y-auto h-full" style={{ display: selectedLinkId ? "none" : "block" }}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={sortedLinks.map((l) => l.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {sortedLinks.map((link) => (
                       <SortableItem key={link.id} link={link} onSelect={selectLink} />
@@ -363,25 +263,28 @@ const PowerBI = () => {
               </DndContext>
             </div>
 
-            {/* All mounted iframes - persist once opened, show/hide via CSS */}
-            {sortedLinks.filter(link => mountedIframes.has(link.id)).map(link => (
-              <div
-                key={link.id}
-                className="absolute inset-0"
-                style={{ display: selectedLinkId === link.id ? "block" : "none" }}
-              >
-                <iframe
-                  src={link.url}
-                  title={link.titulo}
-                  className="w-full h-full border-0"
-                  allowFullScreen
-                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                />
-              </div>
-            ))}
+            {/* Iframes - no sandbox restriction for Power BI compatibility */}
+            {sortedLinks
+              .filter((link) => mountedIframes.has(link.id))
+              .map((link) => (
+                <div
+                  key={link.id}
+                  className="absolute inset-0"
+                  style={{ display: selectedLinkId === link.id ? "block" : "none" }}
+                >
+                  <iframe
+                    src={link.url}
+                    title={link.titulo}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              ))}
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 };
