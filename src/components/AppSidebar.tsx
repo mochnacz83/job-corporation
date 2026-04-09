@@ -30,25 +30,27 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 const AppSidebar = () => {
   const { profile, isAdmin, signOut, areaPermissions } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const [inventoryLocked, setInventoryLocked] = useState(true);
-  const [powerBiLinks, setPowerBiLinks] = useState<any[]>([]);
 
-  useEffect(() => {
-    supabase
-      .from("app_settings" as any)
-      .select("value")
-      .eq("key", "inventory_locked")
-      .maybeSingle()
-      .then(({ data }: any) => {
-        if (data) setInventoryLocked(data.value === true);
-      });
-  }, []);
+  const { data: inventoryLocked = true } = useQuery({
+    queryKey: ["app_settings", "inventory_locked"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("app_settings" as any)
+        .select("value")
+        .eq("key", "inventory_locked")
+        .maybeSingle();
+      return data ? data.value === true : true;
+    },
+  });
 
   const toggleInventoryLock = async () => {
     const newValue = !inventoryLocked;
@@ -56,7 +58,8 @@ const AppSidebar = () => {
       .from("app_settings" as any)
       .update({ value: newValue, updated_by: profile?.user_id } as any)
       .eq("key", "inventory_locked");
-    setInventoryLocked(newValue);
+    // Invalidate query to refresh UI
+    queryClient.invalidateQueries({ queryKey: ["app_settings", "inventory_locked"] });
   };
 
   const hasModule = (mod: string) =>
@@ -74,21 +77,26 @@ const AppSidebar = () => {
     navigate("/");
   };
 
-  useEffect(() => {
-    if (hasModule("powerbi")) {
-      supabase.from("powerbi_links").select("*").eq("ativo", true).order("ordem")
-        .then(({ data }) => {
-          const dbLinks = data || [];
-          if (!dbLinks.some((link: any) => link.titulo === "Fila de Atividades SC")) {
-            dbLinks.push({ id: "bi-servicos", titulo: "Fila de Atividades SC" } as any);
-          }
-          if (!dbLinks.some((link: any) => link.titulo === "DashBoard SEF São Jose")) {
-            dbLinks.push({ id: "bi-sef-sj", titulo: "DashBoard SEF São Jose" } as any);
-          }
-          setPowerBiLinks(dbLinks);
-        });
-    }
-  }, [isAdmin, areaPermissions]);
+  const { data: powerBiLinks = [] } = useQuery({
+    queryKey: ["powerbi_links"],
+    queryFn: async () => {
+      const { data } = await supabase.from("powerbi_links").select("*").eq("ativo", true).order("ordem");
+      const dbLinks = (data || []) as any[];
+      
+      const hardcoded = [
+        { id: "bi-servicos", titulo: "Fila de Atividades SC", url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9" },
+        { id: "bi-sef-sj", titulo: "DashBoard SEF São Jose", url: "https://app.powerbi.com/view?r=eyJrIjoiM2NjZjRkNmMtOWY3Yy00ZmJmLTk2NjgtNTM2YWU0MGRmYmZjIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9&disablecdnExpiration=1770063969" }
+      ];
+
+      for (const hl of hardcoded) {
+        if (!dbLinks.some((link) => link.titulo === hl.titulo)) {
+          dbLinks.push({ ...hl, descricao: "", icone: null, ordem: 999, ativo: true });
+        }
+      }
+      return dbLinks;
+    },
+    enabled: hasModule("powerbi"),
+  });
 
   const logisticaItems = [
     { show: hasModule("material_coleta"), path: "/material-coleta", icon: ClipboardList, label: "Controle Materiais" },

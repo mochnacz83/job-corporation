@@ -21,6 +21,7 @@ import {
   useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface PowerBILink {
   id: string;
@@ -90,15 +91,13 @@ const SortableItem = ({ link, onSelect }: { link: PowerBILink; onSelect: (link: 
 
 const PowerBI = () => {
   const { user, areaPermissions, isAdmin } = useAuth();
-  const [links, setLinks] = useState<PowerBILink[]>([]);
+  const queryClient = useQueryClient();
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [searchParams] = useSearchParams();
   const idParam = searchParams.get("id");
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(idParam);
-  const [loading, setLoading] = useState(true);
   const [mountedIframes, setMountedIframes] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
-  const hasFetched = useRef(false);
   const { trackAction } = useAccessTracking("/powerbi");
 
   const sensors = useSensors(
@@ -120,52 +119,40 @@ const PowerBI = () => {
     setSelectedLinkId(null);
   }, [idParam]);
 
-  const fetchLinks = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const { data: reportData, error: reportError } = await supabase
-        .from("powerbi_links")
-        .select("*")
-        .eq("ativo", true)
-        .order("ordem");
-
-      if (reportError) throw reportError;
-
-      const dbLinks = (reportData || []) as PowerBILink[];
-
-      // Add hardcoded fallbacks
+  const { 
+    data: links = [], 
+    isLoading: loading,
+    refetch
+  } = useQuery({
+    queryKey: ["powerbi_links"],
+    queryFn: async () => {
+      const { data } = await supabase.from("powerbi_links").select("*").eq("ativo", true).order("ordem");
+      const dbLinks = (data || []) as PowerBILink[];
+      
       for (const hl of HARDCODED_LINKS) {
         if (!dbLinks.some((l) => l.titulo === hl.titulo)) {
           dbLinks.push(hl);
         }
       }
+      return dbLinks;
+    },
+    enabled: !!user,
+  });
 
-      setLinks(dbLinks);
-
+  useEffect(() => {
+    if (user && links.length > 0) {
       const savedOrder = localStorage.getItem(`powerbi_order_${user.id}`);
       if (savedOrder) {
         try {
           setOrderedIds(JSON.parse(savedOrder));
         } catch {
-          setOrderedIds(dbLinks.map((l) => l.id));
+          setOrderedIds(links.map((l) => l.id));
         }
       } else {
-        setOrderedIds(dbLinks.map((l) => l.id));
+        setOrderedIds(links.map((l) => l.id));
       }
-
-      hasFetched.current = true;
-    } catch (err) {
-      console.error("Erro ao carregar relatórios Power BI:", err);
-    } finally {
-      setLoading(false);
     }
-  }, [user]);
-
-  useEffect(() => {
-    if (hasFetched.current || !user) return;
-    fetchLinks();
-  }, [user, fetchLinks]);
+  }, [user, links]);
 
   const sortedLinks = useMemo(() => {
     const baseLinks =

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,28 +14,28 @@ import {
 const Dashboard = () => {
   const { user, profile, areaPermissions, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ coletas: 0, reagendas: 0, vistorias: 0 });
 
   useEffect(() => {
     if (!loading && profile?.must_change_password) {
       navigate("/alterar-senha");
     }
   }, [profile, loading, navigate]);
-
-  useEffect(() => {
-    if (!user) return;
-    Promise.all([
-      supabase.from("material_coletas").select("id", { count: "exact", head: true }),
-      supabase.from("reagenda_history").select("id", { count: "exact", head: true }).eq("user_id", user.id),
-      supabase.from("vistorias_campo").select("id", { count: "exact", head: true }),
-    ]).then(([c, r, v]) => {
-      setStats({
+  const { data: stats = { coletas: 0, reagendas: 0, vistorias: 0 } } = useQuery({
+    queryKey: ["dashboard_stats"],
+    queryFn: async () => {
+      const [c, r, v] = await Promise.all([
+        supabase.from("material_coletas").select("id", { count: "exact", head: true }),
+        supabase.from("reagenda_history").select("id", { count: "exact", head: true }).eq("user_id", user?.id),
+        supabase.from("vistorias_campo").select("id", { count: "exact", head: true }),
+      ]);
+      return {
         coletas: c.count || 0,
         reagendas: r.count || 0,
         vistorias: v.count || 0,
-      });
-    });
-  }, [user]);
+      };
+    },
+    enabled: !!user,
+  });
 
   useAccessTracking("/dashboard");
 

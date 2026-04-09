@@ -6,28 +6,30 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import MainLayout from "@/components/MainLayout";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import ChangePassword from "./pages/ChangePassword";
-import PowerBI from "./pages/PowerBI";
-import AdminUsers from "./pages/AdminUsers";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminPermissions from "./pages/AdminPermissions";
-import Reagenda from "./pages/Reagenda";
-import MaterialColeta from "./pages/MaterialColeta";
-import VistoriaCampo from "./pages/VistoriaCampo";
-import Inventory from "./pages/Inventory";
-import NotFound from "./pages/NotFound";
-import { useEffect, useState, ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, ReactNode } from "react";
+import PageLoader from "@/components/PageLoader";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
+      staleTime: 60 * 1000, // 60 seconds
     },
   },
 });
+
+// Lazy load pages
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ChangePassword = lazy(() => import("./pages/ChangePassword"));
+const PowerBI = lazy(() => import("./pages/PowerBI"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const AdminPermissions = lazy(() => import("./pages/AdminPermissions"));
+const Reagenda = lazy(() => import("./pages/Reagenda"));
+const MaterialColeta = lazy(() => import("./pages/MaterialColeta"));
+const VistoriaCampo = lazy(() => import("./pages/VistoriaCampo"));
+const Inventory = lazy(() => import("./pages/Inventory"));
 
 // Generic persistent page wrapper: mounts once, then hides/shows via CSS
 const PersistentPage = ({ path, children }: { path: string; children: ReactNode }) => {
@@ -43,7 +45,9 @@ const PersistentPage = ({ path, children }: { path: string; children: ReactNode 
 
   return (
     <div style={{ display: isActive ? "flex" : "none", flexDirection: "column", height: "100%" }}>
-      {children}
+      <Suspense fallback={<PageLoader />}>
+        {children}
+      </Suspense>
     </div>
   );
 };
@@ -61,6 +65,9 @@ const persistentPages = [
   { path: "/inventario", element: <Inventory /> },
 ];
 
+const Login = lazy(() => import("./pages/Login"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
 const AppRoutes = () => {
   const location = useLocation();
   const isLoginRoute = location.pathname === "/";
@@ -69,7 +76,7 @@ const AppRoutes = () => {
   const isProtectedArea = isPersistentRoute || isDashboard;
 
   return (
-    <>
+    <Suspense fallback={<PageLoader />}>
       {/* Login page - no sidebar */}
       {isLoginRoute && (
         <Routes>
@@ -89,7 +96,11 @@ const AppRoutes = () => {
             ))}
 
             {/* Dashboard (non-persistent) */}
-            {isDashboard && <Dashboard />}
+            {isDashboard && (
+              <Suspense fallback={<PageLoader />}>
+                <Dashboard />
+              </Suspense>
+            )}
           </MainLayout>
         </ProtectedRoute>
       )}
@@ -100,7 +111,7 @@ const AppRoutes = () => {
           <Route path="*" element={<NotFound />} />
         </Routes>
       )}
-    </>
+    </Suspense>
   );
 };
 
