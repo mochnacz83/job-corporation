@@ -221,7 +221,7 @@ const AppSidebar = () => {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {renderMenuGroup("Dashboards", BarChart3, dashboardItems)}
+        {renderMenuGroup("Relatórios", BarChart3, dashboardItems)}
         {renderMenuGroup("Logística", Truck, logisticaItems)}
         {renderMenuGroup("Operacional", CalendarDays, operacionalItems)}
         {isAdmin && renderMenuGroup("Administração", Shield, adminItems.map(i => ({ ...i, show: true })))}
