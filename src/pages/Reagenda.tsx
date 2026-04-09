@@ -998,7 +998,7 @@ Para seguirmos com o reagendamento, por favor, me informe:
                     </div>
                 </header>
 
-                <main className="flex-1 w-full max-w-[1600px] mx-auto overflow-y-auto space-y-4 sm:space-y-6 px-1">
+                <main className="flex-1 w-full overflow-y-auto space-y-4 sm:space-y-6 px-1">
                     {isAdmin && globalAdminView && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                             <Card className="bg-primary/5 border-primary/20">

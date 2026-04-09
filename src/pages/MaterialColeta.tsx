@@ -1590,7 +1590,7 @@ const MaterialColeta = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="w-full max-w-[1600px] mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="w-full mx-auto px-4 h-14 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -1601,7 +1601,7 @@ const MaterialColeta = () => {
         </div>
       </header>
 
-      <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 py-4 overflow-auto">
+      <main className="flex-1 w-full px-4 py-4 overflow-auto">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="formulario">Formulário</TabsTrigger>

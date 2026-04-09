@@ -589,7 +589,7 @@ const Inventory = () => {
   return (
     <>
     <div className="bg-background print:hidden p-4 md:p-8 space-y-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div className="space-y-1">

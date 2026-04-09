@@ -136,7 +136,7 @@ const AppSidebar = () => {
     const groupActive = visibleItems.some(i => isActive(i.path));
 
     return (
-      <Collapsible defaultOpen={defaultOpen || groupActive} className="group/collapsible">
+      <Collapsible defaultOpen={defaultOpen} className="group/collapsible">
         <SidebarGroup>
           <CollapsibleTrigger className="w-full">
             <SidebarGroupLabel className="flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/10 rounded-md px-2 py-1.5 transition-colors">
