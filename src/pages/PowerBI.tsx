@@ -36,9 +36,9 @@ interface PowerBILink {
 const HARDCODED_LINKS: PowerBILink[] = [
   {
     id: "bi-servicos",
-    titulo: "Filas de Serviços - Instalação, Reparo e Mudança",
+    titulo: "Fila de Atividades SC",
     url: "https://app.powerbi.com/view?r=eyJrIjoiYmMzZDIyNGYtMDRmMy00NDExLTlhNTctMjNkYzIxNzU5M2RmIiwidCI6ImExMjEzYzlhLTAzZTAtNGI0OC05YTVlLTFkZmYzZmVjNTRlMCJ9",
-    descricao: "Monitoramento de filas de serviços para instalação, reparo e mudança",
+    descricao: "Monitoramento da fila de atividades SC",
   },
   {
     id: "bi-sef-sj",

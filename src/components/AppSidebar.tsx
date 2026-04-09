@@ -79,8 +79,8 @@ const AppSidebar = () => {
       supabase.from("powerbi_links").select("*").eq("ativo", true).order("ordem")
         .then(({ data }) => {
           const dbLinks = data || [];
-          if (!dbLinks.some((link: any) => link.titulo === "Filas de Serviços - Instalação, Reparo e Mudança")) {
-            dbLinks.push({ id: "bi-servicos", titulo: "Filas de Serviços - Instalação, Reparo e Mudança" } as any);
+          if (!dbLinks.some((link: any) => link.titulo === "Fila de Atividades SC")) {
+            dbLinks.push({ id: "bi-servicos", titulo: "Fila de Atividades SC" } as any);
           }
           if (!dbLinks.some((link: any) => link.titulo === "DashBoard SEF São Jose")) {
             dbLinks.push({ id: "bi-sef-sj", titulo: "DashBoard SEF São Jose" } as any);
