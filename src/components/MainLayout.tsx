@@ -22,7 +22,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
               </span>
             </div>
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto flex flex-col">
             {children}
           </main>
         </div>

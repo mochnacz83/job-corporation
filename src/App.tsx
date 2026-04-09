@@ -42,7 +42,7 @@ const PersistentPage = ({ path, children }: { path: string; children: ReactNode 
   if (!hasBeenMounted) return null;
 
   return (
-    <div style={{ display: isActive ? "block" : "none" }}>
+    <div style={{ display: isActive ? "flex" : "none", flexDirection: "column", height: "100%" }}>
       {children}
     </div>
   );
