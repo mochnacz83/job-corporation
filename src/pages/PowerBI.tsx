@@ -221,6 +221,9 @@ const PowerBI = () => {
               <span className="hidden sm:inline text-sm">Voltar</span>
             </Button>
           ) : null}
+          <div className="p-0.5 bg-transparent w-7 h-7 flex items-center justify-center overflow-hidden shrink-0">
+            <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
+          </div>
           <h1 className="text-sm font-semibold text-foreground truncate">
             {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
           </h1>
