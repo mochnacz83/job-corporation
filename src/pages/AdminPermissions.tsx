@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList, ClipboardCheck, Boxes } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PowerBILink {
@@ -28,6 +28,8 @@ const DEFAULT_AREAS: AreaPermission[] = [
     { area: "Home Connect", modules: [], powerbi_report_ids: [], all_access: false },
     { area: "Gerencia", modules: ["dashboard", "powerbi", "reagenda"], powerbi_report_ids: [], all_access: true },
     { area: "Suporte CL", modules: [], powerbi_report_ids: [], all_access: false },
+    { area: "Tecnico de Dados", modules: [], powerbi_report_ids: [], all_access: false },
+    { area: "Tecnico De Home", modules: [], powerbi_report_ids: [], all_access: false },
 ];
 
 const AVAILABLE_MODULES = [
@@ -35,6 +37,8 @@ const AVAILABLE_MODULES = [
     { id: "powerbi", label: "Relatórios Power BI", icon: BarChart3 },
     { id: "reagenda", label: "Sistema de Reagendamento", icon: CalendarDays },
     { id: "material_coleta", label: "Coleta Material Dados", icon: ClipboardList },
+    { id: "vistoria_campo", label: "Vistoria de Campo", icon: ClipboardCheck },
+    { id: "inventario", label: "Mini Inventário", icon: Boxes },
 ];
 
 const AdminPermissions = () => {
