@@ -57,15 +57,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(p);
       setIsAdmin(!!roleRes.data);
 
-      if (p?.area) {
-        const { data: permData } = await supabase
-          .from("area_permissions" as any)
-          .select("*")
-          .eq("area", p.area)
-          .maybeSingle();
-        setAreaPermissions(permData as unknown as AreaPermissions | null);
+      // Fetch permissions by area
+      const areaQuery = p?.area
+        ? supabase.from("area_permissions" as any).select("*").eq("area", p.area).maybeSingle()
+        : Promise.resolve({ data: null });
+
+      // Fetch permissions by cargo
+      const cargoQuery = p?.cargo
+        ? supabase.from("area_permissions" as any).select("*").eq("area", p.cargo).maybeSingle()
+        : Promise.resolve({ data: null });
+
+      const [areaRes, cargoRes] = await Promise.all([areaQuery, cargoQuery]);
+
+      const areaPerm = areaRes.data as unknown as AreaPermissions | null;
+      const cargoPerm = cargoRes.data as unknown as AreaPermissions | null;
+
+      if (areaPerm && cargoPerm) {
+        // Merge: union of modules and reports, either all_access wins
+        setAreaPermissions({
+          area: areaPerm.area,
+          modules: [...new Set([...areaPerm.modules, ...cargoPerm.modules])],
+          powerbi_report_ids: [...new Set([...areaPerm.powerbi_report_ids, ...cargoPerm.powerbi_report_ids])],
+          all_access: areaPerm.all_access || cargoPerm.all_access,
+        });
       } else {
-        setAreaPermissions(null);
+        setAreaPermissions(areaPerm || cargoPerm);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
