@@ -437,7 +437,6 @@ const Inventory = () => {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // Expected columns: Serial, Modelo, Código, Técnico, TT, Setor, Supervisor, Coordenador
       const mappedData = jsonData.map((row: any) => ({
         serial: String(row.Serial ?? row.serial ?? "").trim(),
         modelo: String(row.Modelo ?? row.modelo ?? "").trim(),
@@ -453,17 +452,61 @@ const Inventory = () => {
         throw new Error("Nenhum dado válido encontrado na planilha.");
       }
 
-      const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
+      // Buscar matrículas que já possuem inventário finalizado para protegê-las
+      const { data: finalizedSubs, error: subError } = await (supabase.from as any)("inventory_submissions")
+        .select("matricula_tt")
+        .eq("status", "finalizado");
+      
+      if (subError) throw new Error("Erro ao verificar inventários finalizados: " + subError.message);
+      
+      const protectedMatriculas = new Set((finalizedSubs || []).map((s: any) => s.matricula_tt));
+      
+      // Filtrar dados novos: separar protegidos dos não-protegidos
+      const newDataForProtected = mappedData.filter(item => protectedMatriculas.has(item.matricula_tt));
+      const newDataForUnprotected = mappedData.filter(item => !protectedMatriculas.has(item.matricula_tt));
+      
+      // Deletar apenas registros de matrículas NÃO finalizadas
+      if (protectedMatriculas.size > 0) {
+        // Deletar somente os que não estão protegidos
+        const { data: allBase } = await (supabase.from as any)("inventory_base")
+          .select("id, matricula_tt");
+        
+        const idsToDelete = (allBase || [])
+          .filter((item: any) => !protectedMatriculas.has(item.matricula_tt))
+          .map((item: any) => item.id);
+        
+        if (idsToDelete.length > 0) {
+          const chunkSize = 500;
+          for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+            const chunk = idsToDelete.slice(i, i + chunkSize);
+            await (supabase.from as any)("inventory_base").delete().in("id", chunk);
+          }
+        }
+      } else {
+        // Nenhum protegido, limpar tudo
+        const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
+      }
 
+      // Inserir apenas dados de matrículas não-protegidas
+      const dataToInsert = newDataForUnprotected;
+      
       const chunkSize = 500;
-      for (let i = 0; i < mappedData.length; i += chunkSize) {
-        const chunk = mappedData.slice(i, i + chunkSize);
+      for (let i = 0; i < dataToInsert.length; i += chunkSize) {
+        const chunk = dataToInsert.slice(i, i + chunkSize);
         const { error } = await (supabase.from as any)("inventory_base").insert(chunk);
         if (error) throw new Error("Falha ao inserir lote: " + error.message);
       }
 
-      toast.success(`${mappedData.length} itens carregados com sucesso!`);
+      const skippedCount = newDataForProtected.length;
+      const insertedCount = dataToInsert.length;
+      
+      if (skippedCount > 0) {
+        toast.success(`${insertedCount} itens carregados. ${skippedCount} itens de técnicos já inventariados foram preservados.`);
+      } else {
+        toast.success(`${insertedCount} itens carregados com sucesso!`);
+      }
+      
       fetchBasePreview();
     } catch (err: any) {
       toast.error("Erro no upload: " + err.message);
