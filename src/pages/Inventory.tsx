@@ -437,7 +437,6 @@ const Inventory = () => {
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-      // Expected columns: Serial, Modelo, Código, Técnico, TT, Setor, Supervisor, Coordenador
       const mappedData = jsonData.map((row: any) => ({
         serial: String(row.Serial ?? row.serial ?? "").trim(),
         modelo: String(row.Modelo ?? row.modelo ?? "").trim(),
@@ -453,17 +452,61 @@ const Inventory = () => {
         throw new Error("Nenhum dado válido encontrado na planilha.");
       }
 
-      const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-      if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
+      // Buscar matrículas que já possuem inventário finalizado para protegê-las
+      const { data: finalizedSubs, error: subError } = await (supabase.from as any)("inventory_submissions")
+        .select("matricula_tt")
+        .eq("status", "finalizado");
+      
+      if (subError) throw new Error("Erro ao verificar inventários finalizados: " + subError.message);
+      
+      const protectedMatriculas = new Set((finalizedSubs || []).map((s: any) => s.matricula_tt));
+      
+      // Filtrar dados novos: separar protegidos dos não-protegidos
+      const newDataForProtected = mappedData.filter(item => protectedMatriculas.has(item.matricula_tt));
+      const newDataForUnprotected = mappedData.filter(item => !protectedMatriculas.has(item.matricula_tt));
+      
+      // Deletar apenas registros de matrículas NÃO finalizadas
+      if (protectedMatriculas.size > 0) {
+        // Deletar somente os que não estão protegidos
+        const { data: allBase } = await (supabase.from as any)("inventory_base")
+          .select("id, matricula_tt");
+        
+        const idsToDelete = (allBase || [])
+          .filter((item: any) => !protectedMatriculas.has(item.matricula_tt))
+          .map((item: any) => item.id);
+        
+        if (idsToDelete.length > 0) {
+          const chunkSize = 500;
+          for (let i = 0; i < idsToDelete.length; i += chunkSize) {
+            const chunk = idsToDelete.slice(i, i + chunkSize);
+            await (supabase.from as any)("inventory_base").delete().in("id", chunk);
+          }
+        }
+      } else {
+        // Nenhum protegido, limpar tudo
+        const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
+      }
 
+      // Inserir apenas dados de matrículas não-protegidas
+      const dataToInsert = newDataForUnprotected;
+      
       const chunkSize = 500;
-      for (let i = 0; i < mappedData.length; i += chunkSize) {
-        const chunk = mappedData.slice(i, i + chunkSize);
+      for (let i = 0; i < dataToInsert.length; i += chunkSize) {
+        const chunk = dataToInsert.slice(i, i + chunkSize);
         const { error } = await (supabase.from as any)("inventory_base").insert(chunk);
         if (error) throw new Error("Falha ao inserir lote: " + error.message);
       }
 
-      toast.success(`${mappedData.length} itens carregados com sucesso!`);
+      const skippedCount = newDataForProtected.length;
+      const insertedCount = dataToInsert.length;
+      
+      if (skippedCount > 0) {
+        toast.success(`${insertedCount} itens carregados. ${skippedCount} itens de técnicos já inventariados foram preservados.`);
+      } else {
+        toast.success(`${insertedCount} itens carregados com sucesso!`);
+      }
+      
       fetchBasePreview();
     } catch (err: any) {
       toast.error("Erro no upload: " + err.message);
@@ -592,37 +635,30 @@ const Inventory = () => {
       <div className="w-full space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
-                    <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
-                  </div>
-                  <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground">Inventário de Materiais</h1>
+                  <p className="text-sm text-muted-foreground">Conferência e validação de equipamentos</p>
                 </div>
-                <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs e DROP</p>
               </div>
 
-              <TabsList className="grid grid-cols-2 w-full md:w-[400px]">
-                <TabsTrigger value="colaborador">Colaborador</TabsTrigger>
-                <TabsTrigger value="admin" disabled={!isAdmin && profile?.cargo !== "Gerente" && profile?.cargo !== "Coordenador" && profile?.cargo !== "Supervisor"}>Admin</TabsTrigger>
+              <TabsList className="grid grid-cols-2 w-full md:w-[320px]">
+                <TabsTrigger value="colaborador">Minha Carga</TabsTrigger>
+                <TabsTrigger value="admin" disabled={!isAdmin && profile?.cargo !== "Gerente" && profile?.cargo !== "Coordenador" && profile?.cargo !== "Supervisor"}>Gestão</TabsTrigger>
               </TabsList>
             </header>
 
         <TabsContent value="colaborador" className="m-0 space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Validar Minha Carga</CardTitle>
-              <CardDescription>Informe sua matrícula TT para ver os equipamentos atribuídos a você.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
               <div className="flex flex-row gap-3 items-end">
                 <div className="space-y-2 flex-1">
-                  <Label>Matrícula TT</Label>
+                  <Label className="text-sm font-medium">Matrícula TT</Label>
                   <Input 
-                    placeholder="Ex: TT12345" 
+                    placeholder="Digite sua matrícula (ex: TT12345)" 
                     value={tt} 
                     onChange={e => setTt(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === 'Enter' && handleFetchBase()}
@@ -635,9 +671,9 @@ const Inventory = () => {
               </div>
 
               {nomeTecnico && (
-                <div className="p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-primary font-medium">
-                  <CheckCircle2 className="w-5 h-5" />
-                  Técnico: {nomeTecnico}
+                <div className="p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-primary font-medium text-sm">
+                  <UserCheck className="w-4 h-4" />
+                  {nomeTecnico} {supervisor && <span className="text-muted-foreground font-normal">• Sup: {supervisor}</span>}
                 </div>
               )}
             </CardContent>
@@ -1338,7 +1374,7 @@ const Inventory = () => {
         </div>
 
         {/* Items Table */}
-        <div className="w-full mb-12">
+        <div className="w-full mb-6">
           <h3 className="font-bold text-lg mb-2 border-b border-black">Equipamentos Inventariados</h3>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -1350,7 +1386,6 @@ const Inventory = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Combine base and extra items dynamically for print based on active state vs selected detail */}
               {(tt && baseItems.length > 0 ? [
                 ...baseItems.map(item => ({
                   serial: item.serial,
@@ -1381,18 +1416,31 @@ const Inventory = () => {
           </table>
         </div>
 
-        {/* Signatures */}
-        <div className="grid grid-cols-2 gap-12 mt-32 pt-8">
-          <div className="text-center">
-            <div className="border-t border-black w-full pt-2">
-              <p className="font-bold uppercase text-sm">{nomeTecnico || selectedSubmission?.nome_tecnico || "Colaborador"}</p>
-              <p className="text-xs">Técnico / Colaborador</p>
+        {/* Closing Message */}
+        <div className="text-justify text-[10px] leading-snug border border-black/30 rounded p-3 mb-8">
+          <p className="font-bold mb-1">OBSERVAÇÃO IMPORTANTE:</p>
+          <p>
+            O material que consta neste inventário é exclusivamente o que foi apresentado fisicamente pelo colaborador no ato da conferência. 
+            Materiais não apresentados e/ou identificados em relatórios anteriores como equipamentos fora do sistema devem ser informados 
+            e incluídos em inventário posterior. Uma vez que os materiais são disponibilizados pela empresa, os mesmos devem ser devolvidos 
+            ao término da necessidade, sendo a guarda e conservação de responsabilidade direta do colaborador ao qual foram atribuídos.
+          </p>
+        </div>
+
+        {/* Signatures - fixed at bottom of page */}
+        <div className="fixed bottom-0 left-0 right-0 print:fixed print:bottom-8 print:left-8 print:right-8">
+          <div className="max-w-4xl mx-auto flex justify-between items-end px-8 pb-8">
+            <div className="text-center w-64">
+              <div className="border-t border-black w-full pt-2">
+                <p className="font-bold uppercase text-sm">{nomeTecnico || selectedSubmission?.nome_tecnico || "Colaborador"}</p>
+                <p className="text-xs">Técnico / Colaborador</p>
+              </div>
             </div>
-          </div>
-          <div className="text-center">
-            <div className="border-t border-black w-full pt-2">
-              <p className="font-bold uppercase text-sm">{supervisor || selectedSubmission?.supervisor || "Liderança"}</p>
-              <p className="text-xs">Supervisor Operacional</p>
+            <div className="text-center w-64">
+              <div className="border-t border-black w-full pt-2">
+                <p className="font-bold uppercase text-sm">{supervisor || selectedSubmission?.supervisor || "Liderança"}</p>
+                <p className="text-xs">Supervisor Operacional</p>
+              </div>
             </div>
           </div>
         </div>
