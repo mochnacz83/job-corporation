@@ -635,22 +635,19 @@ const Inventory = () => {
       <div className="w-full space-y-6">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
-                    <ArrowLeft className="w-5 h-5" />
-                  </Button>
-                  <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
-                    <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
-                  </div>
-                  <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight text-foreground">Inventário de Materiais</h1>
+                  <p className="text-sm text-muted-foreground">Conferência e validação de equipamentos</p>
                 </div>
-                <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs e DROP</p>
               </div>
 
-              <TabsList className="grid grid-cols-2 w-full md:w-[400px]">
-                <TabsTrigger value="colaborador">Colaborador</TabsTrigger>
-                <TabsTrigger value="admin" disabled={!isAdmin && profile?.cargo !== "Gerente" && profile?.cargo !== "Coordenador" && profile?.cargo !== "Supervisor"}>Admin</TabsTrigger>
+              <TabsList className="grid grid-cols-2 w-full md:w-[320px]">
+                <TabsTrigger value="colaborador">Minha Carga</TabsTrigger>
+                <TabsTrigger value="admin" disabled={!isAdmin && profile?.cargo !== "Gerente" && profile?.cargo !== "Coordenador" && profile?.cargo !== "Supervisor"}>Gestão</TabsTrigger>
               </TabsList>
             </header>
 
