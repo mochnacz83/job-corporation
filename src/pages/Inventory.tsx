@@ -652,17 +652,13 @@ const Inventory = () => {
             </header>
 
         <TabsContent value="colaborador" className="m-0 space-y-6">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Validar Minha Carga</CardTitle>
-              <CardDescription>Informe sua matrícula TT para ver os equipamentos atribuídos a você.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
               <div className="flex flex-row gap-3 items-end">
                 <div className="space-y-2 flex-1">
-                  <Label>Matrícula TT</Label>
+                  <Label className="text-sm font-medium">Matrícula TT</Label>
                   <Input 
-                    placeholder="Ex: TT12345" 
+                    placeholder="Digite sua matrícula (ex: TT12345)" 
                     value={tt} 
                     onChange={e => setTt(e.target.value.toUpperCase())}
                     onKeyDown={e => e.key === 'Enter' && handleFetchBase()}
@@ -675,9 +671,9 @@ const Inventory = () => {
               </div>
 
               {nomeTecnico && (
-                <div className="p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-primary font-medium">
-                  <CheckCircle2 className="w-5 h-5" />
-                  Técnico: {nomeTecnico}
+                <div className="p-3 bg-primary/10 rounded-lg flex items-center gap-2 text-primary font-medium text-sm">
+                  <UserCheck className="w-4 h-4" />
+                  {nomeTecnico} {supervisor && <span className="text-muted-foreground font-normal">• Sup: {supervisor}</span>}
                 </div>
               )}
             </CardContent>
