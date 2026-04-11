@@ -1381,7 +1381,7 @@ const Inventory = () => {
         </div>
 
         {/* Items Table */}
-        <div className="w-full mb-12">
+        <div className="w-full mb-6">
           <h3 className="font-bold text-lg mb-2 border-b border-black">Equipamentos Inventariados</h3>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -1393,7 +1393,6 @@ const Inventory = () => {
               </tr>
             </thead>
             <tbody>
-              {/* Combine base and extra items dynamically for print based on active state vs selected detail */}
               {(tt && baseItems.length > 0 ? [
                 ...baseItems.map(item => ({
                   serial: item.serial,
@@ -1424,18 +1423,31 @@ const Inventory = () => {
           </table>
         </div>
 
-        {/* Signatures */}
-        <div className="grid grid-cols-2 gap-12 mt-32 pt-8">
-          <div className="text-center">
-            <div className="border-t border-black w-full pt-2">
-              <p className="font-bold uppercase text-sm">{nomeTecnico || selectedSubmission?.nome_tecnico || "Colaborador"}</p>
-              <p className="text-xs">Técnico / Colaborador</p>
+        {/* Closing Message */}
+        <div className="text-justify text-[10px] leading-snug border border-black/30 rounded p-3 mb-8">
+          <p className="font-bold mb-1">OBSERVAÇÃO IMPORTANTE:</p>
+          <p>
+            O material que consta neste inventário é exclusivamente o que foi apresentado fisicamente pelo colaborador no ato da conferência. 
+            Materiais não apresentados e/ou identificados em relatórios anteriores como equipamentos fora do sistema devem ser informados 
+            e incluídos em inventário posterior. Uma vez que os materiais são disponibilizados pela empresa, os mesmos devem ser devolvidos 
+            ao término da necessidade, sendo a guarda e conservação de responsabilidade direta do colaborador ao qual foram atribuídos.
+          </p>
+        </div>
+
+        {/* Signatures - fixed at bottom of page */}
+        <div className="fixed bottom-0 left-0 right-0 print:fixed print:bottom-8 print:left-8 print:right-8">
+          <div className="max-w-4xl mx-auto flex justify-between items-end px-8 pb-8">
+            <div className="text-center w-64">
+              <div className="border-t border-black w-full pt-2">
+                <p className="font-bold uppercase text-sm">{nomeTecnico || selectedSubmission?.nome_tecnico || "Colaborador"}</p>
+                <p className="text-xs">Técnico / Colaborador</p>
+              </div>
             </div>
-          </div>
-          <div className="text-center">
-            <div className="border-t border-black w-full pt-2">
-              <p className="font-bold uppercase text-sm">{supervisor || selectedSubmission?.supervisor || "Liderança"}</p>
-              <p className="text-xs">Supervisor Operacional</p>
+            <div className="text-center w-64">
+              <div className="border-t border-black w-full pt-2">
+                <p className="font-bold uppercase text-sm">{supervisor || selectedSubmission?.supervisor || "Liderança"}</p>
+                <p className="text-xs">Supervisor Operacional</p>
+              </div>
             </div>
           </div>
         </div>
