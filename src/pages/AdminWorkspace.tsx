@@ -2,7 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
-const WORKSPACE_URL = "https://app.powerbi.com/groups/me/list?experience=power-bi";
+const WORKSPACE_URL = "https://app.powerbi.com";
 
 const AdminWorkspace = () => {
   const [iframeKey, setIframeKey] = useState(0);
