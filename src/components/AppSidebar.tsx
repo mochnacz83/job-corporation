@@ -130,6 +130,7 @@ const AppSidebar = () => {
     { path: "/admin/usuarios", icon: Shield, label: "Gerenciar Usuários" },
     { path: "/admin/analytics", icon: Activity, label: "Monitoramento" },
     { path: "/admin/perfis", icon: User, label: "Perfis de Acesso" },
+    { path: "/admin/workspace", icon: BarChart3, label: "Workspace Power BI" },
   ];
 
   const renderMenuGroup = (

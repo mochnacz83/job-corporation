@@ -26,6 +26,7 @@ const PowerBI = lazy(() => import("./pages/PowerBI"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
 const AdminPermissions = lazy(() => import("./pages/AdminPermissions"));
+const AdminWorkspace = lazy(() => import("./pages/AdminWorkspace"));
 const Reagenda = lazy(() => import("./pages/Reagenda"));
 const MaterialColeta = lazy(() => import("./pages/MaterialColeta"));
 const VistoriaCampo = lazy(() => import("./pages/VistoriaCampo"));
@@ -59,6 +60,7 @@ const persistentPages = [
   { path: "/admin/usuarios", element: <AdminUsers /> },
   { path: "/admin/analytics", element: <AdminAnalytics /> },
   { path: "/admin/perfis", element: <AdminPermissions /> },
+  { path: "/admin/workspace", element: <AdminWorkspace /> },
   { path: "/reagenda", element: <Reagenda /> },
   { path: "/material-coleta", element: <MaterialColeta /> },
   { path: "/vistoria-campo", element: <VistoriaCampo /> },
