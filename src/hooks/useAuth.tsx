@@ -114,16 +114,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (matricula: string, password: string) => {
-    // Try new domain first, fallback to old domain for existing users
+    // Try both domains in parallel for faster login
     const newEmail = `${matricula.toLowerCase()}@corporativo.local`;
     const oldEmail = `${matricula}@empresa.local`;
 
-    const { error: newError } = await supabase.auth.signInWithPassword({ email: newEmail, password });
-    if (!newError) return; // Success with new domain
+    const [newResult, oldResult] = await Promise.allSettled([
+      supabase.auth.signInWithPassword({ email: newEmail, password }),
+      supabase.auth.signInWithPassword({ email: oldEmail, password }),
+    ]);
 
-    // Try old domain for users registered before the migration
-    const { error: oldError } = await supabase.auth.signInWithPassword({ email: oldEmail, password });
-    if (oldError) throw oldError; // Both failed — throw the final error
+    // Check new domain first
+    if (newResult.status === "fulfilled" && !newResult.value.error) return;
+    // Then old domain
+    if (oldResult.status === "fulfilled" && !oldResult.value.error) return;
+
+    // Both failed — sign out any partial session and throw
+    await supabase.auth.signOut().catch(() => {});
+    const errorMsg = newResult.status === "fulfilled" 
+      ? newResult.value.error?.message 
+      : "Erro de conexão";
+    throw new Error(errorMsg || "Matrícula ou senha incorretos.");
   };
 
   const signOut = async () => {

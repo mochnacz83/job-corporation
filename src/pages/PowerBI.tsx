@@ -191,11 +191,17 @@ const PowerBI = () => {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
+    // Clear iframes to force reload
     setMountedIframes(new Set());
-    refetch();
+    refetch().then(() => {
+      // Re-add current iframe after refetch completes
+      if (selectedLinkId) {
+        setMountedIframes(new Set([selectedLinkId]));
+      }
+    });
     trackAction("Acionou o botão de refresh no Power BI");
-  };
+  }, [selectedLinkId, refetch, trackAction]);
 
   const selectLink = (link: PowerBILink) => {
     trackAction(`Acessou o BI: ${link.titulo}`);
