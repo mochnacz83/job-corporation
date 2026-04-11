@@ -390,8 +390,10 @@ serve(async (req) => {
         });
       }
 
-      // Only allow safe fields
-      const allowed = ['nome', 'cargo', 'email', 'empresa', 'telefone', 'area'];
+      // Only allow safe fields - 'area' is admin-only to prevent privilege escalation
+      const allowed = isAdmin
+        ? ['nome', 'cargo', 'email', 'empresa', 'telefone', 'area']
+        : ['nome', 'cargo', 'email', 'empresa', 'telefone'];
       const safeData: Record<string, any> = {};
       for (const key of allowed) {
         if (profileData[key] !== undefined) safeData[key] = profileData[key];

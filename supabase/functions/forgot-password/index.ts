@@ -13,7 +13,9 @@ serve(async (req) => {
   }
 
   try {
-    const { matricula } = await req.json();
+    const body = await req.json();
+    const matricula = typeof body?.matricula === 'string' ? body.matricula.trim().slice(0, 20) : '';
+    
     if (!matricula) {
       return new Response(JSON.stringify({ error: 'Matrícula é obrigatória' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -24,6 +26,12 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
+    // Always return the same generic message to prevent account enumeration
+    const genericResponse = {
+      success: true,
+      message: 'Se esta matrícula estiver vinculada a uma conta ativa, o administrador será notificado. Aguarde o contato para receber sua nova senha.'
+    };
+
     // Find user by matricula
     const { data: profile, error: profileError } = await serviceClient
       .from('profiles')
@@ -32,18 +40,17 @@ serve(async (req) => {
       .maybeSingle();
 
     if (profileError || !profile) {
-      return new Response(JSON.stringify({ error: 'Esta matrícula não está vinculada a nenhuma conta ativa.' }), {
-        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      // Return same generic message - don't reveal whether matricula exists
+      return new Response(JSON.stringify(genericResponse), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // Mark as pending reset
-    const { error: dbError } = await serviceClient
+    await serviceClient
       .from('profiles')
       .update({ reset_password_pending: true, requested_password: null })
       .eq('user_id', profile.user_id);
-
-    if (dbError) throw new Error(`Erro ao registrar solicitação: ${dbError.message}`);
 
     // Notify Admin
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
@@ -52,6 +59,11 @@ serve(async (req) => {
 
     if (RESEND_API_KEY) {
       try {
+        // Sanitize values for HTML
+        const safeName = (profile.nome || '').replace(/[<>&"']/g, '');
+        const safeMatricula = (profile.matricula || '').replace(/[<>&"']/g, '');
+        const safeEmail = (profile.email || 'Não informado').replace(/[<>&"']/g, '');
+
         await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -67,9 +79,9 @@ serve(async (req) => {
                 <h2 style="color: #d9480f;">Solicitação de Reset de Senha</h2>
                 <p>O seguinte usuário solicitou a recuperação de acesso:</p>
                 <div style="background: #fff4e6; padding: 15px; border-radius: 8px;">
-                  <p><strong>Nome:</strong> ${profile.nome}</p>
-                  <p><strong>Matrícula:</strong> ${profile.matricula}</p>
-                  <p><strong>E-mail:</strong> ${profile.email || 'Não informado'}</p>
+                  <p><strong>Nome:</strong> ${safeName}</p>
+                  <p><strong>Matrícula:</strong> ${safeMatricula}</p>
+                  <p><strong>E-mail:</strong> ${safeEmail}</p>
                 </div>
                 <p>Acesse o painel administrativo para definir uma nova senha e encaminhar ao usuário.</p>
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
@@ -83,17 +95,13 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Sua solicitação foi enviada ao administrador. Aguarde o contato para receber sua nova senha.'
-    }), {
+    return new Response(JSON.stringify(genericResponse), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    const msg = error instanceof Error ? error.message : 'Erro interno';
-    return new Response(JSON.stringify({ error: msg }), {
+    return new Response(JSON.stringify({ error: 'Erro ao processar solicitação' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
