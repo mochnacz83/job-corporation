@@ -192,9 +192,8 @@ const PowerBI = () => {
   };
 
   const handleRefresh = () => {
-    hasFetched.current = false;
     setMountedIframes(new Set());
-    fetchLinks();
+    refetch();
     trackAction("Acionou o botão de refresh no Power BI");
   };
 

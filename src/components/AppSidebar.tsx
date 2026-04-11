@@ -44,21 +44,20 @@ const AppSidebar = () => {
     queryKey: ["app_settings", "inventory_locked"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("app_settings" as any)
+        .from("app_settings")
         .select("value")
         .eq("key", "inventory_locked")
         .maybeSingle();
-      return data ? data.value === true : true;
+      return data ? (data as any).value === true : true;
     },
   });
 
   const toggleInventoryLock = async () => {
     const newValue = !inventoryLocked;
     await supabase
-      .from("app_settings" as any)
+      .from("app_settings")
       .update({ value: newValue, updated_by: profile?.user_id } as any)
       .eq("key", "inventory_locked");
-    // Invalidate query to refresh UI
     queryClient.invalidateQueries({ queryKey: ["app_settings", "inventory_locked"] });
   };
 
