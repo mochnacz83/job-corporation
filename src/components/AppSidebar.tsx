@@ -201,7 +201,7 @@ const AppSidebar = () => {
   };
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
+    <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border bg-sidebar">
       <SidebarHeader className="p-4 border-b border-sidebar-border/30 bg-white">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">

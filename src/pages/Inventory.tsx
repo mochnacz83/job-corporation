@@ -597,6 +597,9 @@ const Inventory = () => {
                   <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")} className="rounded-full">
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
+                  <div className="p-1 bg-transparent w-9 h-9 flex items-center justify-center overflow-hidden">
+                    <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
+                  </div>
                   <h1 className="text-3xl font-bold tracking-tight text-primary">Mini Inventário</h1>
                 </div>
                 <p className="text-muted-foreground ml-12">Controle e validação de carga de ONTs e DROP</p>

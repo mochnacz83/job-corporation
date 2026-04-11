@@ -955,8 +955,10 @@ Para seguirmos com o reagendamento, por favor, me informe:
                         <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")} className="shrink-0">
                             <ArrowLeft className="w-4 h-4 mr-1 sm:mr-2" /> <span className="hidden sm:inline">Voltar</span>
                         </Button>
+                        <div className="p-1 bg-transparent w-8 h-8 flex items-center justify-center overflow-hidden shrink-0">
+                            <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
+                        </div>
                         <h1 className="text-base sm:text-xl md:text-2xl font-bold flex items-center gap-2 truncate">
-                            <FileSpreadsheet className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
                             <span className="truncate">Reserva / Antecipação</span>
                         </h1>
                     </div>
