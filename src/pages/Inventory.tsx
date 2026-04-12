@@ -296,37 +296,65 @@ const Inventory = () => {
     }
 
     const needsSerial = requiresSerial(selectedCatalogItem.nome_material);
-    
-    if (needsSerial && !extraSerial.trim()) {
-      toast.error("Este material requer Serial obrigatório (ONT, DROP, EDD ou Transceiver).");
-      return;
-    }
+    const qty = Math.max(1, extraQuantity);
 
-    const serial = extraSerial.trim() ? extraSerial.trim().toUpperCase() : `SEM-SERIAL-${Date.now()}`;
-
-    // Check duplicate
-    if (extraSerial.trim()) {
-      const inBase = baseItems.find(item => item.serial.toUpperCase() === serial);
-      if (inBase) {
-        toast.warning("Este serial já consta na sua carga original.");
+    if (needsSerial) {
+      // Validate all serials are filled
+      const serials = extraSerials.slice(0, qty);
+      const emptyIdx = serials.findIndex(s => !s.trim());
+      if (emptyIdx !== -1 || serials.length < qty) {
+        toast.error(`Preencha todos os ${qty} seriais obrigatórios antes de incluir.`);
         return;
       }
-      if (extraItems.find(item => item.serial === serial)) {
-        toast.error("Serial já adicionado.");
+
+      // Check duplicates
+      for (const s of serials) {
+        const upper = s.trim().toUpperCase();
+        if (baseItems.find(item => item.serial.toUpperCase() === upper)) {
+          toast.warning(`Serial ${upper} já consta na carga original.`);
+          return;
+        }
+        if (extraItems.find(item => item.serial === upper)) {
+          toast.error(`Serial ${upper} já foi adicionado.`);
+          return;
+        }
+      }
+
+      // Check for duplicates within the batch
+      const upperSerials = serials.map(s => s.trim().toUpperCase());
+      const uniqueSet = new Set(upperSerials);
+      if (uniqueSet.size !== upperSerials.length) {
+        toast.error("Há seriais duplicados na lista. Corrija antes de incluir.");
         return;
       }
+
+      // Add all items
+      const newItems: SubmissionItem[] = upperSerials.map(s => ({
+        serial: s,
+        modelo: selectedCatalogItem.nome_material,
+        codigo_material: selectedCatalogItem.codigo,
+        status: 'extra' as const
+      }));
+      setExtraItems(prev => [...prev, ...newItems]);
+    } else {
+      // No serial required - add qty items
+      const newItems: SubmissionItem[] = [];
+      for (let i = 0; i < qty; i++) {
+        newItems.push({
+          serial: `SEM-SERIAL-${Date.now()}-${i}`,
+          modelo: selectedCatalogItem.nome_material,
+          codigo_material: selectedCatalogItem.codigo,
+          status: 'extra'
+        });
+      }
+      setExtraItems(prev => [...prev, ...newItems]);
     }
 
-    setExtraItems(prev => [...prev, {
-      serial,
-      modelo: selectedCatalogItem.nome_material,
-      codigo_material: selectedCatalogItem.codigo,
-      status: 'extra'
-    }]);
-
-    toast.success("Item incluído com sucesso!");
+    toast.success(`${qty} item(ns) incluído(s) com sucesso!`);
     setSelectedCatalogItem(null);
     setExtraSerial("");
+    setExtraSerials([]);
+    setExtraQuantity(1);
     setCatalogSearchQuery("");
     setAddExtraDialogOpen(false);
   };
