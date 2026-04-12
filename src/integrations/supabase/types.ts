@@ -319,6 +319,30 @@ export type Database = {
         }
         Relationships: []
       }
+      materiais_inventario: {
+        Row: {
+          codigo: string
+          created_at: string
+          id: string
+          nome_material: string
+          segmento: string
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          id?: string
+          nome_material: string
+          segmento?: string
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          id?: string
+          nome_material?: string
+          segmento?: string
+        }
+        Relationships: []
+      }
       material_coleta_items: {
         Row: {
           codigo_material: string
