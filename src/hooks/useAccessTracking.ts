@@ -38,13 +38,30 @@ export const useAccessTracking = (pageName: string, active: boolean = true, disp
         }).then(() => { });
 
         // Update heartbeat
-        const interval = setInterval(() => {
+        const interval = setInterval(async () => {
+            // First check if the admin kicked this user
+            const { data: presence } = await supabase
+                .from("user_presence")
+                .select("current_page")
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (presence?.current_page === 'FORCED_DISCONNECT') {
+                // Remove heartbeat
+                clearInterval(interval);
+                // Actually signOut on the client
+                await supabase.auth.signOut();
+                window.location.href = '/';
+                return;
+            }
+
+            // Normal presence update
             supabase.from("user_presence").upsert({
                 user_id: user.id,
                 last_seen_at: new Date().toISOString(),
                 current_page: friendlyPage
             }).then(() => { });
-        }, 30000);
+        }, 15000); // Check every 15s instead of 30s to respond faster to kicks
 
         return () => clearInterval(interval);
     }, [user, pageName, active, friendlyPage]);

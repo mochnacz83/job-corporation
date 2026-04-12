@@ -450,13 +450,14 @@ serve(async (req) => {
         });
       }
 
-      const { error: signOutError } = await serviceClient.auth.admin.signOut(userId, 'global');
-      if (signOutError) throw new Error(`Failed to kick user: ${signOutError.message}`);
-
-      await serviceClient
+      // Supabase JS v2 does not support `admin.signOut(userId)` directly (it expects a JWT).
+      // We rely on updating user_presence and having the client forcibly logout.
+      const { error: presenceError } = await serviceClient
         .from('user_presence')
-        .update({ current_page: 'Desconectado (Ação do Admin)' })
+        .update({ current_page: 'FORCED_DISCONNECT' })
         .eq('user_id', userId);
+
+      if (presenceError) throw new Error(`Falha ao atualizar presença para kick: ${presenceError.message}`);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
