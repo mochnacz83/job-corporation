@@ -1624,7 +1624,7 @@ const Inventory = () => {
                       <TableRow 
                         key={item.id} 
                         className={`cursor-pointer transition-colors ${selectedCatalogItem?.id === item.id ? 'bg-primary/10' : 'hover:bg-secondary/30'}`}
-                        onClick={() => { setSelectedCatalogItem(item); setExtraSerial(""); }}
+                        onClick={() => { setSelectedCatalogItem(item); setExtraSerial(""); setExtraQuantity(1); setExtraSerials([]); }}
                       >
                         <TableCell className="font-mono text-xs py-2">{item.codigo}</TableCell>
                         <TableCell className="text-xs py-2 font-medium">{item.nome_material}</TableCell>
@@ -1643,52 +1643,120 @@ const Inventory = () => {
               )}
             </div>
 
-            {/* Step 4: Selected item + Serial */}
-            {selectedCatalogItem && (
-              <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold">{selectedCatalogItem.nome_material}</p>
-                    <p className="text-xs text-muted-foreground">Código: {selectedCatalogItem.codigo} • {selectedCatalogItem.segmento}</p>
+            {/* Step 4: Selected item + Quantity + Serial(s) */}
+            {selectedCatalogItem && (() => {
+              const needsSerial = requiresSerial(selectedCatalogItem.nome_material);
+              const qty = Math.max(1, extraQuantity);
+              const allSerialsFilled = needsSerial ? extraSerials.slice(0, qty).filter(s => s.trim()).length === qty : true;
+              
+              return (
+                <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">{selectedCatalogItem.nome_material}</p>
+                      <p className="text-xs text-muted-foreground">Código: {selectedCatalogItem.codigo} • {selectedCatalogItem.segmento}</p>
+                    </div>
+                    {needsSerial && (
+                      <Badge variant="destructive" className="text-[10px]">Serial Obrigatório</Badge>
+                    )}
                   </div>
-                  {requiresSerial(selectedCatalogItem.nome_material) && (
-                    <Badge variant="destructive" className="text-[10px]">Serial Obrigatório</Badge>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">
-                    Serial {requiresSerial(selectedCatalogItem.nome_material) ? "(Obrigatório)" : "(Opcional)"}
-                  </Label>
-                  <div className="flex gap-2">
+                  {/* Quantity */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Quantidade</Label>
                     <Input 
-                      placeholder={requiresSerial(selectedCatalogItem.nome_material) ? "Informe o serial obrigatoriamente" : "Deixe vazio se não tiver serial"}
-                      value={extraSerial}
-                      onChange={e => setExtraSerial(e.target.value.toUpperCase())}
-                      className="font-mono h-9"
+                      type="number" 
+                      min={1} 
+                      max={50}
+                      value={extraQuantity}
+                      onChange={e => {
+                        const val = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
+                        setExtraQuantity(val);
+                        setExtraSerials(prev => {
+                          const arr = [...prev];
+                          while (arr.length < val) arr.push("");
+                          return arr.slice(0, val);
+                        });
+                      }}
+                      className="h-9 w-24"
                     />
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Bipar Serial" onClick={() => {
-                      setAddExtraDialogOpen(false);
-                      startScanner(selectedCatalogItem.nome_material, selectedCatalogItem.codigo);
-                    }}>
-                      <ScanBarcode className="w-4 h-4" />
-                    </Button>
                   </div>
-                  {requiresSerial(selectedCatalogItem.nome_material) && (
-                    <p className="text-[10px] text-destructive">Materiais do tipo ONT, DROP, EDD e Transceiver exigem serial.</p>
+
+                  {/* Serials */}
+                  {needsSerial ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Seriais ({extraSerials.slice(0, qty).filter(s => s.trim()).length}/{qty} preenchidos)</Label>
+                      <div className="max-h-40 overflow-y-auto space-y-2">
+                        {Array.from({ length: qty }).map((_, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <span className="text-[10px] text-muted-foreground w-5 text-right">{idx + 1}.</span>
+                            <Input 
+                              placeholder={`Serial ${idx + 1}`}
+                              value={extraSerials[idx] || ""}
+                              onChange={e => {
+                                const val = e.target.value.toUpperCase();
+                                setExtraSerials(prev => {
+                                  const arr = [...prev];
+                                  while (arr.length <= idx) arr.push("");
+                                  arr[idx] = val;
+                                  return arr;
+                                });
+                              }}
+                              className={`font-mono h-8 text-xs ${extraSerials[idx]?.trim() ? 'border-success' : 'border-destructive/50'}`}
+                            />
+                            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Bipar" onClick={() => {
+                              setAddExtraDialogOpen(false);
+                              // Store context for which serial index to fill
+                              setScannerContext({ modelo: selectedCatalogItem.nome_material, codigo: selectedCatalogItem.codigo });
+                              setScannerOpen(true);
+                              setTimeout(async () => {
+                                try {
+                                  const html5Qr = new Html5Qrcode("inventory-scanner");
+                                  scannerRef.current = html5Qr;
+                                  await html5Qr.start(
+                                    { facingMode: "environment" },
+                                    { fps: 10, qrbox: { width: 250, height: 150 } },
+                                    (decodedText) => {
+                                      stopScanner();
+                                      setExtraSerials(prev => {
+                                        const arr = [...prev];
+                                        while (arr.length <= idx) arr.push("");
+                                        arr[idx] = decodedText.toUpperCase();
+                                        return arr;
+                                      });
+                                      setAddExtraDialogOpen(true);
+                                    },
+                                    () => {}
+                                  );
+                                } catch (err) {
+                                  toast.error("Erro ao acessar câmera.");
+                                  setScannerOpen(false);
+                                  setAddExtraDialogOpen(true);
+                                }
+                              }, 300);
+                            }}>
+                              <ScanBarcode className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-destructive">Materiais do tipo ONT, DROP, EDD e Transceiver exigem serial.</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Este material não requer serial. Serão adicionados {qty} item(ns).</p>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setAddExtraDialogOpen(false)}>Cancelar</Button>
             <Button 
               onClick={handleAddExtraFromCatalog} 
-              disabled={!selectedCatalogItem || (requiresSerial(selectedCatalogItem?.nome_material || "") && !extraSerial.trim())}
+              disabled={!selectedCatalogItem || (requiresSerial(selectedCatalogItem?.nome_material || "") && extraSerials.slice(0, Math.max(1, extraQuantity)).filter(s => s.trim()).length < Math.max(1, extraQuantity))}
             >
-              <Plus className="w-4 h-4 mr-1" /> Incluir Material
+              <Plus className="w-4 h-4 mr-1" /> Incluir {extraQuantity > 1 ? `${extraQuantity} Itens` : 'Material'}
             </Button>
           </DialogFooter>
         </DialogContent>
