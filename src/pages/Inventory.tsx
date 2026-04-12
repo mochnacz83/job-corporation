@@ -1139,7 +1139,13 @@ const Inventory = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Inventários Submetidos</CardTitle>
+                  <CardTitle>
+                    {dashboardFilter === 'pendentes' ? 'Técnicos Pendentes' : 
+                     dashboardFilter === 'base' ? 'Todos os Técnicos na Base' :
+                     dashboardFilter === 'fechados' ? 'Inventários Fechados' :
+                     dashboardFilter === 'andamento' ? 'Inventários Em Andamento' :
+                     'Inventários Submetidos'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-md border h-96 overflow-y-auto">
@@ -1148,18 +1154,57 @@ const Inventory = () => {
                         <TableRow>
                           <TableHead>Técnico</TableHead>
                           <TableHead>Matrícula TT</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Data</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
+                          {dashboardFilter !== 'base' && <TableHead>Status</TableHead>}
+                          {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && <TableHead>Data</TableHead>}
+                          {dashboardFilter === 'base' && <TableHead>Supervisor</TableHead>}
+                          {dashboardFilter === 'base' && <TableHead>Coordenador</TableHead>}
+                          {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && <TableHead className="text-right">Ações</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {allSubmissions
+                        {/* Pendentes view - show technicians without submissions */}
+                        {dashboardFilter === 'pendentes' && (() => {
+                          const submittedMatriculas = new Set(allSubmissions.map(s => s.matricula_tt));
+                          return allBaseTechnicians
+                            .filter(t => {
+                              const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                              const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                              return matchCoord && matchSuper && !submittedMatriculas.has(t.matricula_tt);
+                            })
+                            .map((tech, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium text-sm">{tech.nome_tecnico}</TableCell>
+                                <TableCell className="font-mono text-xs">{tech.matricula_tt}</TableCell>
+                              </TableRow>
+                            ));
+                        })()}
+
+                        {/* Base view - show all technicians */}
+                        {dashboardFilter === 'base' && allBaseTechnicians
+                          .filter(t => {
+                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                            return matchCoord && matchSuper;
+                          })
+                          .map((tech, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium text-sm">{tech.nome_tecnico}</TableCell>
+                              <TableCell className="font-mono text-xs">{tech.matricula_tt}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{tech.supervisor || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{tech.coordenador || "—"}</TableCell>
+                            </TableRow>
+                          ))}
+
+                        {/* Submissions view */}
+                        {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && allSubmissions
                           .filter(s => {
                             const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
                             const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
                             const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
-                            return matchCoord && matchSuper;
+                            if (!matchCoord || !matchSuper) return false;
+                            if (dashboardFilter === 'fechados') return s.status === 'finalizado';
+                            if (dashboardFilter === 'andamento') return s.status === 'em_andamento';
+                            return true;
                           })
                           .map((sub) => (
                             <TableRow key={sub.id}>
