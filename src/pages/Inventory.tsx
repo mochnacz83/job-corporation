@@ -363,6 +363,8 @@ const Inventory = () => {
     setAddExtraContext(fromCategory ? { fromCategory } : null);
     setSelectedCatalogItem(null);
     setExtraSerial("");
+    setExtraSerials([]);
+    setExtraQuantity(1);
     setCatalogSearchQuery("");
     setCatalogSegmentoFilter("todos");
     setAddExtraDialogOpen(true);
