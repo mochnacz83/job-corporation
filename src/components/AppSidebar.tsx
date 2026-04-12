@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   BarChart3, Home, LogOut, User, Shield, Activity, KeyRound,
   CalendarDays, ClipboardList, ClipboardCheck, Boxes, Package,
-  Truck, Lock, Unlock, ChevronDown
+  Truck, Lock, Unlock, ChevronDown, Lightbulb
 } from "lucide-react";
 import {
   Collapsible,
@@ -130,6 +130,7 @@ const AppSidebar = () => {
     { path: "/admin/usuarios", icon: Shield, label: "Gerenciar Usuários" },
     { path: "/admin/analytics", icon: Activity, label: "Monitoramento" },
     { path: "/admin/perfis", icon: User, label: "Perfis de Acesso" },
+    { path: "/admin/ideias", icon: Lightbulb, label: "Ideias e Ajustes" },
   ];
 
   const renderMenuGroup = (
