@@ -17,7 +17,7 @@ import {
   ScanBarcode, CheckCircle2, AlertTriangle, AlertCircle, 
   RefreshCw, X, Check, BarChart3, ChevronRight, ClipboardCheck, 
   CornerDownRight, Filter, History, LayoutDashboard, Package, 
-  UserCheck, Download, FileText, Save, Lock
+  UserCheck, Download, FileText, Save, Lock, BookOpen
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -56,6 +56,21 @@ interface SubmissionItem {
   codigo_material: string | null;
   status: 'presente' | 'falta' | 'extra';
 }
+
+interface CatalogItem {
+  id: string;
+  codigo: string;
+  nome_material: string;
+  segmento: string;
+}
+
+// Materials that REQUIRE serial number
+const SERIAL_REQUIRED_KEYWORDS = ['ONT', 'DROP', 'EDD', 'TRANSCEIVER'];
+
+const requiresSerial = (nomeMaterial: string): boolean => {
+  const upper = nomeMaterial.toUpperCase();
+  return SERIAL_REQUIRED_KEYWORDS.some(kw => upper.includes(kw));
+};
 
 const Inventory = () => {
   const { user, profile, isAdmin } = useAuth();
@@ -112,9 +127,40 @@ const Inventory = () => {
   const [scannerContext, setScannerContext] = useState<{modelo: string, codigo: string | null} | null>(null);
   const [pendingSerial, setPendingSerial] = useState<{serial: string, modelo: string, codigo: string | null} | null>(null);
 
+  // Catalog State
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogUploadLoading, setCatalogUploadLoading] = useState(false);
+  const [catalogPreview, setCatalogPreview] = useState<CatalogItem[]>([]);
+
+  // Add Extra via Catalog Dialog
+  const [addExtraDialogOpen, setAddExtraDialogOpen] = useState(false);
+  const [catalogSegmentoFilter, setCatalogSegmentoFilter] = useState("todos");
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState("");
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
+  const [extraSerial, setExtraSerial] = useState("");
+  const [addExtraContext, setAddExtraContext] = useState<{ fromCategory?: GroupedCategory } | null>(null);
+
   useEffect(() => {
     trackAction("Acessou o Módulo de Inventário");
   }, []);
+
+  // Fetch catalog on mount
+  useEffect(() => {
+    fetchCatalog();
+  }, []);
+
+  const fetchCatalog = async () => {
+    try {
+      const { data, error } = await (supabase.from as any)("materiais_inventario")
+        .select("*")
+        .order("segmento", { ascending: true });
+      if (error) throw error;
+      setCatalogItems(data || []);
+    } catch (err: any) {
+      console.error("Erro ao carregar catálogo:", err.message);
+    }
+  };
 
   // --- Colaborador Functions ---
 
@@ -134,20 +180,19 @@ const Inventory = () => {
         setSupervisor(baseData[0].supervisor || "");
         setCoordenador(baseData[0].coordenador || "");
         
-        // Check for existing submissions (drafts or finished)
         const { data: subData, error: subError } = await (supabase.from as any)("inventory_submissions")
           .select("*, inventory_submission_items(*)")
           .eq("matricula_tt", tt.toUpperCase())
           .maybeSingle();
 
-        if (subError && subError.code !== 'PGRST116') throw subError; // IGNORE NOT FOUND
+        if (subError && subError.code !== 'PGRST116') throw subError;
 
         const initial: Record<string, 'presente' | 'falta' | null> = {};
         
         if (subData) {
           if (subData.status === 'finalizado') {
             toast.info("Seu inventário já foi finalizado e submetido. Procure a gerência para reabertura.");
-            setBaseItems([]); // Block the view to prevent edits
+            setBaseItems([]);
             return;
           }
           
@@ -219,14 +264,12 @@ const Inventory = () => {
 
   const handleAddExtra = (serial: string, modelo: string, codigo: string | null = null) => {
     const upperSerial = serial.toUpperCase();
-    // Check if it's already in base
     const inBase = baseItems.find(item => item.serial.toUpperCase() === upperSerial);
     if (inBase) {
       toast.warning("Este serial já consta na sua carga original. Marque-o como 'Possuo'.");
       return;
     }
     
-    // Check if already in extras
     if (extraItems.find(item => item.serial === upperSerial)) {
       toast.error("Serial já adicionado.");
       return;
@@ -240,8 +283,59 @@ const Inventory = () => {
     setExtraItems(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Add extra via catalog selection
+  const handleAddExtraFromCatalog = () => {
+    if (!selectedCatalogItem) {
+      toast.error("Selecione um material do catálogo.");
+      return;
+    }
+
+    const needsSerial = requiresSerial(selectedCatalogItem.nome_material);
+    
+    if (needsSerial && !extraSerial.trim()) {
+      toast.error("Este material requer Serial obrigatório (ONT, DROP, EDD ou Transceiver).");
+      return;
+    }
+
+    const serial = extraSerial.trim() ? extraSerial.trim().toUpperCase() : `SEM-SERIAL-${Date.now()}`;
+
+    // Check duplicate
+    if (extraSerial.trim()) {
+      const inBase = baseItems.find(item => item.serial.toUpperCase() === serial);
+      if (inBase) {
+        toast.warning("Este serial já consta na sua carga original.");
+        return;
+      }
+      if (extraItems.find(item => item.serial === serial)) {
+        toast.error("Serial já adicionado.");
+        return;
+      }
+    }
+
+    setExtraItems(prev => [...prev, {
+      serial,
+      modelo: selectedCatalogItem.nome_material,
+      codigo_material: selectedCatalogItem.codigo,
+      status: 'extra'
+    }]);
+
+    toast.success("Item incluído com sucesso!");
+    setSelectedCatalogItem(null);
+    setExtraSerial("");
+    setCatalogSearchQuery("");
+    setAddExtraDialogOpen(false);
+  };
+
+  const openAddExtraDialog = (fromCategory?: GroupedCategory) => {
+    setAddExtraContext(fromCategory ? { fromCategory } : null);
+    setSelectedCatalogItem(null);
+    setExtraSerial("");
+    setCatalogSearchQuery("");
+    setCatalogSegmentoFilter("todos");
+    setAddExtraDialogOpen(true);
+  };
+
   const handleSubmitInventory = async (isDraft = false) => {
-    // Validate only if finishing
     if (!isDraft) {
       const incomplete = Object.values(submissionItems).some(val => val === null);
       if (incomplete) {
@@ -256,7 +350,6 @@ const Inventory = () => {
       let subId = existingSubmissionId;
 
       if (!subId) {
-        // Create new
         const { data: subData, error: subError } = await (supabase.from as any)("inventory_submissions")
           .insert({
             matricula_tt: tt.toUpperCase(),
@@ -273,7 +366,6 @@ const Inventory = () => {
         subId = subData.id;
         setExistingSubmissionId(subId);
       } else {
-        // Update existing
         const { error: subError } = await (supabase.from as any)("inventory_submissions")
           .update({
              status: isDraft ? 'em_andamento' : 'finalizado',
@@ -285,7 +377,6 @@ const Inventory = () => {
         await (supabase.from as any)("inventory_submission_items").delete().eq("submission_id", subId);
       }
 
-      // Prepare items (we insert all that have a status)
       const finalItems: any[] = [];
       
       baseItems.forEach(item => {
@@ -379,6 +470,76 @@ const Inventory = () => {
     XLSX.writeFile(wb, "modelo_importacao_inventario.xlsx");
   };
 
+  const downloadCatalogTemplate = () => {
+    const templateData = [
+      { "Código": "100200", "Material": "ONT HG8245H", "Segmento": "Fibra" },
+      { "Código": "100300", "Material": "Cabo Drop 1FO", "Segmento": "Cabos" },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Catálogo");
+    XLSX.writeFile(wb, "modelo_catalogo_materiais.xlsx");
+  };
+
+  const handleCatalogUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCatalogUploadLoading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      const mapped = jsonData.map((row: any) => ({
+        codigo: String(row["Código"] ?? row["Codigo"] ?? row.codigo ?? row.CodMaterial ?? row.codmaterial ?? "").trim(),
+        nome_material: String(row["Material"] ?? row["Nome Material"] ?? row.material ?? row.nome_material ?? row.Nome ?? row.nome ?? "").trim(),
+        segmento: String(row["Segmento"] ?? row.segmento ?? row.Segmento ?? "").trim(),
+      })).filter((item: any) => item.codigo && item.nome_material);
+
+      if (mapped.length === 0) {
+        throw new Error("Nenhum dado válido. Verifique as colunas: Código, Material, Segmento.");
+      }
+
+      // Clear existing catalog
+      await (supabase.from as any)("materiais_inventario").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+      // Insert in chunks
+      const chunkSize = 500;
+      for (let i = 0; i < mapped.length; i += chunkSize) {
+        const chunk = mapped.slice(i, i + chunkSize);
+        const { error } = await (supabase.from as any)("materiais_inventario").insert(chunk);
+        if (error) throw error;
+      }
+
+      toast.success(`${mapped.length} materiais carregados no catálogo!`);
+      fetchCatalog();
+      fetchCatalogPreview();
+    } catch (err: any) {
+      toast.error("Erro no upload do catálogo: " + err.message);
+    } finally {
+      setCatalogUploadLoading(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const fetchCatalogPreview = async () => {
+    setCatalogLoading(true);
+    try {
+      const { data, error } = await (supabase.from as any)("materiais_inventario")
+        .select("*")
+        .order("segmento", { ascending: true })
+        .limit(1000);
+      if (error) throw error;
+      setCatalogPreview(data || []);
+    } catch (err: any) {
+      toast.error("Erro ao carregar catálogo: " + err.message);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
   const downloadInventoryResults = (format: 'xlsx' | 'csv') => {
     const dataToExport: any[] = [];
 
@@ -452,7 +613,6 @@ const Inventory = () => {
         throw new Error("Nenhum dado válido encontrado na planilha.");
       }
 
-      // Buscar matrículas que já possuem inventário finalizado para protegê-las
       const { data: finalizedSubs, error: subError } = await (supabase.from as any)("inventory_submissions")
         .select("matricula_tt")
         .eq("status", "finalizado");
@@ -461,13 +621,10 @@ const Inventory = () => {
       
       const protectedMatriculas = new Set((finalizedSubs || []).map((s: any) => s.matricula_tt));
       
-      // Filtrar dados novos: separar protegidos dos não-protegidos
       const newDataForProtected = mappedData.filter(item => protectedMatriculas.has(item.matricula_tt));
       const newDataForUnprotected = mappedData.filter(item => !protectedMatriculas.has(item.matricula_tt));
-      
-      // Deletar apenas registros de matrículas NÃO finalizadas
+
       if (protectedMatriculas.size > 0) {
-        // Deletar somente os que não estão protegidos
         const { data: allBase } = await (supabase.from as any)("inventory_base")
           .select("id, matricula_tt");
         
@@ -483,12 +640,10 @@ const Inventory = () => {
           }
         }
       } else {
-        // Nenhum protegido, limpar tudo
         const { error: deleteError } = await (supabase.from as any)("inventory_base").delete().neq("id", "00000000-0000-0000-0000-000000000000");
         if (deleteError) throw new Error("Erro ao limpar base antiga: " + deleteError.message);
       }
 
-      // Inserir apenas dados de matrículas não-protegidas
       const dataToInsert = newDataForUnprotected;
       
       const chunkSize = 500;
@@ -537,10 +692,7 @@ const Inventory = () => {
     try {
       const [submissionsRes, baseTechsRes] = await Promise.all([
         (supabase.from as any)("inventory_submissions")
-          .select(`
-            *,
-            inventory_submission_items(*)
-          `)
+          .select(`*, inventory_submission_items(*)`)
           .order("data_fim", { ascending: false }),
         (supabase.from as any)("inventory_base")
           .select("matricula_tt, nome_tecnico, supervisor, coordenador")
@@ -551,7 +703,6 @@ const Inventory = () => {
 
       setAllSubmissions(submissionsRes.data || []);
       
-      // Get unique technicians from base
       const techMap: Record<string, any> = {};
       (baseTechsRes.data || []).forEach((item: any) => {
         if (!techMap[item.matricula_tt]) {
@@ -576,6 +727,9 @@ const Inventory = () => {
   useEffect(() => {
     if (activeAdminTab === "upload") {
       fetchBasePreview();
+    }
+    if (activeAdminTab === "catalogo") {
+      fetchCatalogPreview();
     }
   }, [activeAdminTab]);
 
@@ -613,6 +767,16 @@ const Inventory = () => {
     }
     setScannerOpen(false);
   };
+
+  // Catalog filtering
+  const catalogSegmentos = Array.from(new Set(catalogItems.map(c => c.segmento).filter(Boolean)));
+  
+  const filteredCatalog = catalogItems.filter(item => {
+    const matchSeg = catalogSegmentoFilter === "todos" || item.segmento === catalogSegmentoFilter;
+    const query = catalogSearchQuery.toLowerCase();
+    const matchSearch = !query || item.codigo.toLowerCase().includes(query) || item.nome_material.toLowerCase().includes(query);
+    return matchSeg && matchSearch;
+  });
 
   // Show locked screen for non-admin users
   if (!isAdmin && inventoryLocked) {
@@ -726,35 +890,33 @@ const Inventory = () => {
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <div>
                   <CardTitle className="text-md">Itens Extras</CardTitle>
-                  <CardDescription>Adicione equipamentos que você possui mas não estão na lista.</CardDescription>
+                  <CardDescription>Equipamentos que você possui mas não estão na sua carga.</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => startScanner("ONT", null)}>
-                  <ScanBarcode className="w-4 h-4 mr-2" /> Bipar Serial
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openAddExtraDialog()}>
+                    <BookOpen className="w-4 h-4 mr-2" /> Incluir do Catálogo
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => startScanner("ONT", null)}>
+                    <ScanBarcode className="w-4 h-4 mr-2" /> Bipar Serial
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {extraItems.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-3 bg-secondary/20 rounded-md border">
                       <div>
-                        <p className="font-mono text-sm">{item.serial}</p>
-                        <p className="text-xs text-muted-foreground">{item.modelo}</p>
+                        <p className="font-mono text-sm">{item.serial.startsWith('SEM-SERIAL-') ? '(Sem Serial)' : item.serial}</p>
+                        <p className="text-xs text-muted-foreground">{item.modelo} {item.codigo_material && `• ${item.codigo_material}`}</p>
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => handleRemoveExtra(idx)}>
                         <X className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>
                   ))}
-                  <div className="flex gap-2">
-                    <Input id="manual-serial" placeholder="Serial Manual" className="h-9" />
-                    <Button onClick={() => {
-                      const input = document.getElementById('manual-serial') as HTMLInputElement;
-                      if (input.value) {
-                        handleAddExtra(input.value, "ONT");
-                        input.value = "";
-                      }
-                    }} size="sm">Adicionar</Button>
-                  </div>
+                  {extraItems.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum item extra adicionado.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -780,6 +942,7 @@ const Inventory = () => {
               <TabsList>
                 <TabsTrigger value="tracking">Acompanhamento</TabsTrigger>
                 <TabsTrigger value="upload">Carga de Base</TabsTrigger>
+                {isAdmin && <TabsTrigger value="catalogo">Catálogo Materiais</TabsTrigger>}
               </TabsList>
               
               {activeAdminTab === "tracking" && (
@@ -858,17 +1021,16 @@ const Inventory = () => {
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
-                        <h3 className="text-2xl font-bold">
-                          {allBaseTechnicians.filter(t => {
-                            const matchCoord = filterCoordenador === "todos" || t?.coordenador === filterCoordenador;
-                            const matchSuper = filterSupervisor === "todos" || t?.supervisor === filterSupervisor;
-                            const alreadyDone = allSubmissions.some(s => s.matricula_tt === t?.matricula_tt && s.status === 'finalizado');
-                            return matchCoord && matchSuper && !alreadyDone;
-                          }).length}</h3>
+                        <p className="text-sm font-medium text-muted-foreground">Em Andamento</p>
+                        <h3 className="text-2xl font-bold">{allSubmissions.filter(s => {
+                          const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
+                          const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+                          const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
+                          return matchCoord && matchSuper && s.status === 'em_andamento';
+                        }).length}</h3>
                       </div>
-                      <div className="p-2 bg-warning/10 rounded-full">
-                        <History className="w-5 h-5 text-warning" />
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <History className="w-5 h-5 text-primary" />
                       </div>
                     </div>
                   </CardContent>
@@ -878,47 +1040,39 @@ const Inventory = () => {
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Itens Faltantes</p>
-                        <h3 className="text-2xl font-bold">
-                          {allSubmissions.reduce((acc, sub) => {
-                            const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
-                            const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
-                            const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
-                            
-                            if (matchCoord && matchSuper && sub.status === 'finalizado') {
-                              return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'falta')?.length || 0);
-                            }
-                            return acc;
-                          }, 0)}
-                        </h3>
+                        <p className="text-sm font-medium text-muted-foreground">Técnicos na Base</p>
+                        <h3 className="text-2xl font-bold">{
+                          allBaseTechnicians.filter(t => {
+                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                            return matchCoord && matchSuper;
+                          }).length
+                        }</h3>
+                      </div>
+                      <div className="p-2 bg-secondary rounded-full">
+                        <UserCheck className="w-5 h-5 text-secondary-foreground" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Pendentes</p>
+                        <h3 className="text-2xl font-bold">{(() => {
+                          const filteredTechs = allBaseTechnicians.filter(t => {
+                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                            return matchCoord && matchSuper;
+                          });
+                          const submittedMatriculas = new Set(allSubmissions.map(s => s.matricula_tt));
+                          return filteredTechs.filter(t => !submittedMatriculas.has(t.matricula_tt)).length;
+                        })()}</h3>
                       </div>
                       <div className="p-2 bg-destructive/10 rounded-full">
                         <AlertCircle className="w-5 h-5 text-destructive" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="glass-card">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Novos Seriais</p>
-                        <h3 className="text-2xl font-bold">
-                          {allSubmissions.reduce((acc, sub) => {
-                            const tech = allBaseTechnicians.find(t => t.matricula_tt === sub.matricula_tt);
-                            const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
-                            const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
-                            
-                            if (matchCoord && matchSuper && sub.status === 'finalizado') {
-                              return acc + (sub.inventory_submission_items?.filter((i: any) => i.status === 'extra')?.length || 0);
-                            }
-                            return acc;
-                          }, 0)}
-                        </h3>
-                      </div>
-                      <div className="p-2 bg-blue-500/10 rounded-full">
-                        <Plus className="w-5 h-5 text-blue-500" />
                       </div>
                     </div>
                   </CardContent>
@@ -927,82 +1081,60 @@ const Inventory = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Acompanhamento por Técnico</CardTitle>
-                  <CardDescription>Status geral do inventário em tempo real.</CardDescription>
+                  <CardTitle>Inventários Submetidos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Técnico</TableHead>
-                        <TableHead>Supervisor</TableHead>
-                        <TableHead>Coordenador</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Data/Hora</TableHead>
-                        <TableHead className="text-right">Ação</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {allBaseTechnicians
-                        .filter(t => {
-                          const matchCoord = filterCoordenador === "todos" || t?.coordenador === filterCoordenador;
-                          const matchSuper = filterSupervisor === "todos" || t?.supervisor === filterSupervisor;
-                          return matchCoord && matchSuper;
-                        })
-                        .map(tech => {
-                          const sub = allSubmissions.find(s => s.matricula_tt === tech?.matricula_tt);
-                          return (
-                            <TableRow key={tech?.matricula_tt}>
+                  <div className="rounded-md border h-96 overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-secondary/80 sticky top-0 backdrop-blur-sm shadow-sm">
+                        <TableRow>
+                          <TableHead>Técnico</TableHead>
+                          <TableHead>Matrícula TT</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Data</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allSubmissions
+                          .filter(s => {
+                            const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
+                            const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
+                            return matchCoord && matchSuper;
+                          })
+                          .map((sub) => (
+                            <TableRow key={sub.id}>
+                              <TableCell className="font-medium text-sm">{sub.nome_tecnico}</TableCell>
+                              <TableCell className="font-mono text-xs">{sub.matricula_tt}</TableCell>
                               <TableCell>
-                                <div className="font-medium">{tech?.nome_tecnico}</div>
-                                <div className="text-xs text-muted-foreground font-mono">{tech?.matricula_tt}</div>
-                              </TableCell>
-                              <TableCell className="text-sm">{tech?.supervisor || "—"}</TableCell>
-                              <TableCell className="text-sm">{tech?.coordenador || "—"}</TableCell>
-                              <TableCell>
-                                {sub?.status === 'finalizado' ? (
-                                  <Badge className="bg-success text-success-foreground">Finalizado</Badge>
-                                ) : sub?.status === 'em_andamento' ? (
-                                  <Badge variant="secondary" className="border-warning text-warning">Em Andamento</Badge>
+                                {sub.status === 'finalizado' ? (
+                                  <Badge className="bg-success text-success-foreground hover:bg-success">Finalizado</Badge>
                                 ) : (
-                                  <Badge variant="outline" className="text-muted-foreground border-dashed">Pendente</Badge>
+                                  <Badge variant="outline" className="text-primary border-primary">Em Andamento</Badge>
                                 )}
                               </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {sub?.status === 'finalizado' ? new Date(sub.data_fim).toLocaleString('pt-BR') : "—"}
+                              <TableCell className="text-xs text-muted-foreground">
+                                {new Date(sub.data_fim || sub.data_inicio).toLocaleString('pt-BR')}
                               </TableCell>
-                              <TableCell className="text-right">
-                                {sub && (
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button 
-                                      size="sm" 
-                                      variant="ghost"
-                                      onClick={() => {
-                                        setSelectedSubmission(sub);
-                                        setSubmissionDetailsOpen(true);
-                                      }}
-                                    >
-                                      Detalhes
-                                    </Button>
-                                    {sub.status === 'finalizado' && (
-                                      <Button 
-                                        size="sm" 
-                                        variant="destructive" 
-                                        className="h-8"
-                                        onClick={() => handleReopenInventory(sub.id)}
-                                        title="Desfazer e reabrir o inventário deste técnico"
-                                      >
-                                        Reabrir
-                                      </Button>
-                                    )}
-                                  </div>
+                              <TableCell className="text-right space-x-2">
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                  setSelectedSubmission(sub);
+                                  setSubmissionDetailsOpen(true);
+                                }}>
+                                  <Search className="w-4 h-4 mr-1" /> Detalhes
+                                </Button>
+                                {isAdmin && sub.status === 'finalizado' && (
+                                  <Button variant="outline" size="sm" onClick={() => handleReopenInventory(sub.id)}>
+                                    <RefreshCw className="w-4 h-4 mr-1" /> Reabrir
+                                  </Button>
                                 )}
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1099,6 +1231,104 @@ const Inventory = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Catalog Admin Tab */}
+            {isAdmin && (
+              <TabsContent value="catalogo" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Catálogo de Materiais Disponíveis</CardTitle>
+                    <CardDescription>Importe a lista de materiais disponíveis para inclusão no inventário (Código, Material, Segmento).</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-8 space-y-4 hover:bg-secondary/10 transition-colors">
+                      <BookOpen className="w-10 h-10 text-muted-foreground" />
+                      <div className="text-center">
+                        <p className="font-medium">Fazer upload do catálogo</p>
+                        <p className="text-xs text-muted-foreground">Colunas esperadas: Código, Material, Segmento. O catálogo anterior será substituído.</p>
+                      </div>
+                      <Input 
+                        type="file" 
+                        accept=".xlsx, .xls" 
+                        className="hidden" 
+                        id="catalog-upload" 
+                        onChange={handleCatalogUpload}
+                        disabled={catalogUploadLoading}
+                      />
+                      <div className="flex gap-4">
+                        <Button asChild disabled={catalogUploadLoading}>
+                          <label htmlFor="catalog-upload" className="cursor-pointer">
+                            {catalogUploadLoading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+                            Selecionar Planilha
+                          </label>
+                        </Button>
+                        <Button variant="outline" onClick={downloadCatalogTemplate}>
+                          <FileSpreadsheet className="w-4 h-4 mr-2" />
+                          Baixar Modelo
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle>Catálogo Atual</CardTitle>
+                      <CardDescription>{catalogPreview.length} materiais cadastrados</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={fetchCatalogPreview} disabled={catalogLoading}>
+                      <RefreshCw className={`w-4 h-4 mr-2 ${catalogLoading ? 'animate-spin' : ''}`} />
+                      Atualizar
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border h-96 overflow-y-auto">
+                      <Table>
+                        <TableHeader className="bg-secondary/80 sticky top-0 backdrop-blur-sm shadow-sm">
+                          <TableRow>
+                            <TableHead>Código</TableHead>
+                            <TableHead>Material</TableHead>
+                            <TableHead>Segmento</TableHead>
+                            <TableHead>Serial Obrig.</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {catalogLoading ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center py-8">
+                                <RefreshCw className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          ) : catalogPreview.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                Nenhum material no catálogo. Importe uma planilha.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            catalogPreview.map((item, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-mono text-xs">{item.codigo}</TableCell>
+                                <TableCell className="text-xs font-medium">{item.nome_material}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{item.segmento || "—"}</TableCell>
+                                <TableCell>
+                                  {requiresSerial(item.nome_material) ? (
+                                    <Badge variant="destructive" className="text-[10px]">Sim</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px]">Não</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </TabsContent>
       </Tabs>
@@ -1109,7 +1339,7 @@ const Inventory = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Escanear Código de Barras</DialogTitle>
-            <DialogDescription>Posicione o serial da ONT dentro do quadro.</DialogDescription>
+            <DialogDescription>Posicione o serial dentro do quadro.</DialogDescription>
           </DialogHeader>
           <div id="inventory-scanner" className="w-full aspect-square bg-black rounded-lg overflow-hidden flex items-center justify-center">
             <RefreshCw className="w-10 h-10 animate-spin text-white opacity-20" />
@@ -1175,7 +1405,7 @@ const Inventory = () => {
                 .map((item, idx) => (
                   <div key={`extra-${idx}`} className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 flex items-center justify-between">
                     <div>
-                      <p className="font-mono text-sm font-bold">{item.serial}</p>
+                      <p className="font-mono text-sm font-bold">{item.serial.startsWith('SEM-SERIAL-') ? '(Sem Serial)' : item.serial}</p>
                       <div className="flex items-center gap-1">
                         <Badge variant="outline" className="text-[8px] h-3 px-1 border-blue-500 text-blue-500">INCLUÍDA</Badge>
                       </div>
@@ -1188,14 +1418,17 @@ const Inventory = () => {
             </div>
 
             <div className="pt-4 border-t border-dashed">
-              <Label className="text-xs text-muted-foreground mb-2 block">Deseja incluir um novo serial neste grupo?</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">Incluir material neste grupo ou do catálogo:</Label>
               <div className="flex gap-2">
                 <Button variant="outline" size="icon" title="Escanear com Câmera" onClick={() => startScanner(selectedCategory?.nome || "ONT", selectedCategory?.codigo || null)}>
                   <ScanBarcode className="w-4 h-4" />
                 </Button>
+                <Button variant="outline" size="sm" onClick={() => { setIsDetailOpen(false); openAddExtraDialog(selectedCategory || undefined); }}>
+                  <BookOpen className="w-4 h-4 mr-1" /> Incluir do Catálogo
+                </Button>
                 <Input 
                   id="modal-extra-serial" 
-                  placeholder="Novo Serial" 
+                  placeholder="Serial avulso" 
                   className="h-9 font-mono" 
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -1214,7 +1447,7 @@ const Inventory = () => {
                     input.value = "";
                   }
                 }}>
-                  <Plus className="w-4 h-4 mr-1" /> Incluir
+                  <Plus className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -1227,6 +1460,137 @@ const Inventory = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog for Adding Extra via Catalog */}
+      <Dialog open={addExtraDialogOpen} onOpenChange={setAddExtraDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-primary" />
+              Incluir Material do Catálogo
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o segmento para filtrar, depois busque pelo código ou nome do material.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Step 1: Segment filter */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Segmento</Label>
+              <Select value={catalogSegmentoFilter} onValueChange={(v) => { setCatalogSegmentoFilter(v); setSelectedCatalogItem(null); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o segmento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Segmentos</SelectItem>
+                  {catalogSegmentos.map(seg => (
+                    <SelectItem key={seg} value={seg}>{seg}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Step 2: Search */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Buscar Material</Label>
+              <Input 
+                placeholder="Digite o código ou nome do material..." 
+                value={catalogSearchQuery}
+                onChange={e => { setCatalogSearchQuery(e.target.value); setSelectedCatalogItem(null); }}
+              />
+            </div>
+
+            {/* Step 3: Results */}
+            <div className="rounded-md border max-h-48 overflow-y-auto">
+              {filteredCatalog.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {catalogItems.length === 0 ? "Catálogo vazio. Peça ao administrador para importar." : "Nenhum material encontrado."}
+                </p>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-secondary/50 sticky top-0">
+                    <TableRow>
+                      <TableHead className="text-xs">Código</TableHead>
+                      <TableHead className="text-xs">Material</TableHead>
+                      <TableHead className="text-xs">Segmento</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCatalog.slice(0, 50).map(item => (
+                      <TableRow 
+                        key={item.id} 
+                        className={`cursor-pointer transition-colors ${selectedCatalogItem?.id === item.id ? 'bg-primary/10' : 'hover:bg-secondary/30'}`}
+                        onClick={() => { setSelectedCatalogItem(item); setExtraSerial(""); }}
+                      >
+                        <TableCell className="font-mono text-xs py-2">{item.codigo}</TableCell>
+                        <TableCell className="text-xs py-2 font-medium">{item.nome_material}</TableCell>
+                        <TableCell className="text-xs py-2 text-muted-foreground">{item.segmento}</TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredCatalog.length > 50 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-2">
+                          Mostrando 50 de {filteredCatalog.length}. Refine sua busca.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
+            {/* Step 4: Selected item + Serial */}
+            {selectedCatalogItem && (
+              <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold">{selectedCatalogItem.nome_material}</p>
+                    <p className="text-xs text-muted-foreground">Código: {selectedCatalogItem.codigo} • {selectedCatalogItem.segmento}</p>
+                  </div>
+                  {requiresSerial(selectedCatalogItem.nome_material) && (
+                    <Badge variant="destructive" className="text-[10px]">Serial Obrigatório</Badge>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">
+                    Serial {requiresSerial(selectedCatalogItem.nome_material) ? "(Obrigatório)" : "(Opcional)"}
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder={requiresSerial(selectedCatalogItem.nome_material) ? "Informe o serial obrigatoriamente" : "Deixe vazio se não tiver serial"}
+                      value={extraSerial}
+                      onChange={e => setExtraSerial(e.target.value.toUpperCase())}
+                      className="font-mono h-9"
+                    />
+                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Bipar Serial" onClick={() => {
+                      setAddExtraDialogOpen(false);
+                      startScanner(selectedCatalogItem.nome_material, selectedCatalogItem.codigo);
+                    }}>
+                      <ScanBarcode className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  {requiresSerial(selectedCatalogItem.nome_material) && (
+                    <p className="text-[10px] text-destructive">Materiais do tipo ONT, DROP, EDD e Transceiver exigem serial.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setAddExtraDialogOpen(false)}>Cancelar</Button>
+            <Button 
+              onClick={handleAddExtraFromCatalog} 
+              disabled={!selectedCatalogItem || (requiresSerial(selectedCatalogItem?.nome_material || "") && !extraSerial.trim())}
+            >
+              <Plus className="w-4 h-4 mr-1" /> Incluir Material
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog for Confirming Read Serial */}
       <Dialog open={!!pendingSerial} onOpenChange={(open) => !open && setPendingSerial(null)}>
         <DialogContent className="sm:max-w-sm">
@@ -1242,16 +1606,22 @@ const Inventory = () => {
           <DialogFooter className="flex gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => {
               setPendingSerial(null);
-              // optionally reopen scanner
               if (scannerContext) startScanner(scannerContext.modelo, scannerContext.codigo);
             }}>
               <X className="w-4 h-4 mr-1" /> Ler Novamente
             </Button>
             <Button onClick={() => {
               if (pendingSerial) {
-                handleAddExtra(pendingSerial.serial, pendingSerial.modelo, pendingSerial.codigo);
-                setPendingSerial(null);
-                setIsDetailOpen(false); // fechar caso esteja na modal
+                // If we came from the catalog dialog with a selected item, use it as extra serial
+                if (selectedCatalogItem) {
+                  setExtraSerial(pendingSerial.serial);
+                  setPendingSerial(null);
+                  setAddExtraDialogOpen(true);
+                } else {
+                  handleAddExtra(pendingSerial.serial, pendingSerial.modelo, pendingSerial.codigo);
+                  setPendingSerial(null);
+                  setIsDetailOpen(false);
+                }
               }
             }}>
               <Check className="w-4 h-4 mr-1" /> Salvar Serial
@@ -1305,7 +1675,7 @@ const Inventory = () => {
                   <TableBody>
                     {selectedSubmission.inventory_submission_items?.map((item: any, idx: number) => (
                       <TableRow key={idx}>
-                        <TableCell className="font-mono text-sm font-semibold">{item.serial}</TableCell>
+                        <TableCell className="font-mono text-sm font-semibold">{item.serial.startsWith('SEM-SERIAL-') ? '(Sem Serial)' : item.serial}</TableCell>
                         <TableCell>
                           <div className="text-sm font-medium">{item.modelo || "—"}</div>
                           <div className="text-xs text-muted-foreground">Código: {item.codigo_material || "N/A"}</div>
@@ -1329,7 +1699,6 @@ const Inventory = () => {
               </div>
             </div>
           )}
-          
           
           <DialogFooter>
             <Button variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" onClick={() => window.print()}>
@@ -1394,13 +1763,13 @@ const Inventory = () => {
                   status: submissionItems[item.id] === 'presente' ? 'Possuo' : submissionItems[item.id] === 'falta' ? 'Faltante' : 'Pendente'
                 })).filter(i => i.status !== 'Pendente'), 
                 ...extraItems.map(item => ({
-                  serial: item.serial,
+                  serial: item.serial.startsWith('SEM-SERIAL-') ? '(Sem Serial)' : item.serial,
                   modelo: item.modelo,
                   codigo: item.codigo_material,
                   status: 'Extra (Possuo)'
                 }))
               ] : (selectedSubmission?.inventory_submission_items || []).map((i: any) => ({
-                  serial: i.serial,
+                  serial: i.serial.startsWith('SEM-SERIAL-') ? '(Sem Serial)' : i.serial,
                   modelo: i.modelo,
                   codigo: i.codigo_material,
                   status: i.status === 'presente' ? 'Possuo' : i.status === 'falta' ? 'Faltante' : 'Extra (Possuo)'
