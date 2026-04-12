@@ -140,6 +140,11 @@ const Inventory = () => {
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
   const [extraSerial, setExtraSerial] = useState("");
   const [addExtraContext, setAddExtraContext] = useState<{ fromCategory?: GroupedCategory } | null>(null);
+  const [extraQuantity, setExtraQuantity] = useState(1);
+  const [extraSerials, setExtraSerials] = useState<string[]>([]);
+
+  // Dashboard card filter
+  const [dashboardFilter, setDashboardFilter] = useState<'todos' | 'fechados' | 'andamento' | 'base' | 'pendentes'>('todos');
 
   useEffect(() => {
     trackAction("Acessou o Módulo de Inventário");
