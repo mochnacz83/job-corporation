@@ -1033,7 +1033,10 @@ const Inventory = () => {
 
             <TabsContent value="tracking" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'fechados' ? 'ring-2 ring-success' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'fechados' ? 'todos' : 'fechados')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1052,7 +1055,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'andamento' ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'andamento' ? 'todos' : 'andamento')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1071,7 +1077,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'base' ? 'ring-2 ring-secondary-foreground' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'base' ? 'todos' : 'base')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1091,7 +1100,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'pendentes' ? 'ring-2 ring-destructive' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'pendentes' ? 'todos' : 'pendentes')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1113,6 +1125,17 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
               </div>
+
+              {dashboardFilter !== 'todos' && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    Filtro: {dashboardFilter === 'fechados' ? 'Inventários Fechados' : dashboardFilter === 'andamento' ? 'Em Andamento' : dashboardFilter === 'base' ? 'Todos Técnicos' : 'Pendentes'}
+                  </Badge>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setDashboardFilter('todos')}>
+                    <X className="w-3 h-3 mr-1" /> Limpar
+                  </Button>
+                </div>
+              )}
 
               <Card>
                 <CardHeader>
