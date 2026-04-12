@@ -140,6 +140,11 @@ const Inventory = () => {
   const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
   const [extraSerial, setExtraSerial] = useState("");
   const [addExtraContext, setAddExtraContext] = useState<{ fromCategory?: GroupedCategory } | null>(null);
+  const [extraQuantity, setExtraQuantity] = useState(1);
+  const [extraSerials, setExtraSerials] = useState<string[]>([]);
+
+  // Dashboard card filter
+  const [dashboardFilter, setDashboardFilter] = useState<'todos' | 'fechados' | 'andamento' | 'base' | 'pendentes'>('todos');
 
   useEffect(() => {
     trackAction("Acessou o Módulo de Inventário");
@@ -291,37 +296,65 @@ const Inventory = () => {
     }
 
     const needsSerial = requiresSerial(selectedCatalogItem.nome_material);
-    
-    if (needsSerial && !extraSerial.trim()) {
-      toast.error("Este material requer Serial obrigatório (ONT, DROP, EDD ou Transceiver).");
-      return;
-    }
+    const qty = Math.max(1, extraQuantity);
 
-    const serial = extraSerial.trim() ? extraSerial.trim().toUpperCase() : `SEM-SERIAL-${Date.now()}`;
-
-    // Check duplicate
-    if (extraSerial.trim()) {
-      const inBase = baseItems.find(item => item.serial.toUpperCase() === serial);
-      if (inBase) {
-        toast.warning("Este serial já consta na sua carga original.");
+    if (needsSerial) {
+      // Validate all serials are filled
+      const serials = extraSerials.slice(0, qty);
+      const emptyIdx = serials.findIndex(s => !s.trim());
+      if (emptyIdx !== -1 || serials.length < qty) {
+        toast.error(`Preencha todos os ${qty} seriais obrigatórios antes de incluir.`);
         return;
       }
-      if (extraItems.find(item => item.serial === serial)) {
-        toast.error("Serial já adicionado.");
+
+      // Check duplicates
+      for (const s of serials) {
+        const upper = s.trim().toUpperCase();
+        if (baseItems.find(item => item.serial.toUpperCase() === upper)) {
+          toast.warning(`Serial ${upper} já consta na carga original.`);
+          return;
+        }
+        if (extraItems.find(item => item.serial === upper)) {
+          toast.error(`Serial ${upper} já foi adicionado.`);
+          return;
+        }
+      }
+
+      // Check for duplicates within the batch
+      const upperSerials = serials.map(s => s.trim().toUpperCase());
+      const uniqueSet = new Set(upperSerials);
+      if (uniqueSet.size !== upperSerials.length) {
+        toast.error("Há seriais duplicados na lista. Corrija antes de incluir.");
         return;
       }
+
+      // Add all items
+      const newItems: SubmissionItem[] = upperSerials.map(s => ({
+        serial: s,
+        modelo: selectedCatalogItem.nome_material,
+        codigo_material: selectedCatalogItem.codigo,
+        status: 'extra' as const
+      }));
+      setExtraItems(prev => [...prev, ...newItems]);
+    } else {
+      // No serial required - add qty items
+      const newItems: SubmissionItem[] = [];
+      for (let i = 0; i < qty; i++) {
+        newItems.push({
+          serial: `SEM-SERIAL-${Date.now()}-${i}`,
+          modelo: selectedCatalogItem.nome_material,
+          codigo_material: selectedCatalogItem.codigo,
+          status: 'extra'
+        });
+      }
+      setExtraItems(prev => [...prev, ...newItems]);
     }
 
-    setExtraItems(prev => [...prev, {
-      serial,
-      modelo: selectedCatalogItem.nome_material,
-      codigo_material: selectedCatalogItem.codigo,
-      status: 'extra'
-    }]);
-
-    toast.success("Item incluído com sucesso!");
+    toast.success(`${qty} item(ns) incluído(s) com sucesso!`);
     setSelectedCatalogItem(null);
     setExtraSerial("");
+    setExtraSerials([]);
+    setExtraQuantity(1);
     setCatalogSearchQuery("");
     setAddExtraDialogOpen(false);
   };
@@ -330,6 +363,8 @@ const Inventory = () => {
     setAddExtraContext(fromCategory ? { fromCategory } : null);
     setSelectedCatalogItem(null);
     setExtraSerial("");
+    setExtraSerials([]);
+    setExtraQuantity(1);
     setCatalogSearchQuery("");
     setCatalogSegmentoFilter("todos");
     setAddExtraDialogOpen(true);
@@ -998,7 +1033,10 @@ const Inventory = () => {
 
             <TabsContent value="tracking" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'fechados' ? 'ring-2 ring-success' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'fechados' ? 'todos' : 'fechados')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1017,7 +1055,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'andamento' ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'andamento' ? 'todos' : 'andamento')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1036,7 +1077,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'base' ? 'ring-2 ring-secondary-foreground' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'base' ? 'todos' : 'base')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1056,7 +1100,10 @@ const Inventory = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="glass-card">
+                <Card 
+                  className={`glass-card cursor-pointer transition-all ${dashboardFilter === 'pendentes' ? 'ring-2 ring-destructive' : 'hover:shadow-md'}`}
+                  onClick={() => setDashboardFilter(dashboardFilter === 'pendentes' ? 'todos' : 'pendentes')}
+                >
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1079,9 +1126,26 @@ const Inventory = () => {
                 </Card>
               </div>
 
+              {dashboardFilter !== 'todos' && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    Filtro: {dashboardFilter === 'fechados' ? 'Inventários Fechados' : dashboardFilter === 'andamento' ? 'Em Andamento' : dashboardFilter === 'base' ? 'Todos Técnicos' : 'Pendentes'}
+                  </Badge>
+                  <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setDashboardFilter('todos')}>
+                    <X className="w-3 h-3 mr-1" /> Limpar
+                  </Button>
+                </div>
+              )}
+
               <Card>
                 <CardHeader>
-                  <CardTitle>Inventários Submetidos</CardTitle>
+                  <CardTitle>
+                    {dashboardFilter === 'pendentes' ? 'Técnicos Pendentes' : 
+                     dashboardFilter === 'base' ? 'Todos os Técnicos na Base' :
+                     dashboardFilter === 'fechados' ? 'Inventários Fechados' :
+                     dashboardFilter === 'andamento' ? 'Inventários Em Andamento' :
+                     'Inventários Submetidos'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-md border h-96 overflow-y-auto">
@@ -1090,18 +1154,57 @@ const Inventory = () => {
                         <TableRow>
                           <TableHead>Técnico</TableHead>
                           <TableHead>Matrícula TT</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Data</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
+                          {dashboardFilter !== 'base' && <TableHead>Status</TableHead>}
+                          {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && <TableHead>Data</TableHead>}
+                          {dashboardFilter === 'base' && <TableHead>Supervisor</TableHead>}
+                          {dashboardFilter === 'base' && <TableHead>Coordenador</TableHead>}
+                          {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && <TableHead className="text-right">Ações</TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {allSubmissions
+                        {/* Pendentes view - show technicians without submissions */}
+                        {dashboardFilter === 'pendentes' && (() => {
+                          const submittedMatriculas = new Set(allSubmissions.map(s => s.matricula_tt));
+                          return allBaseTechnicians
+                            .filter(t => {
+                              const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                              const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                              return matchCoord && matchSuper && !submittedMatriculas.has(t.matricula_tt);
+                            })
+                            .map((tech, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium text-sm">{tech.nome_tecnico}</TableCell>
+                                <TableCell className="font-mono text-xs">{tech.matricula_tt}</TableCell>
+                              </TableRow>
+                            ));
+                        })()}
+
+                        {/* Base view - show all technicians */}
+                        {dashboardFilter === 'base' && allBaseTechnicians
+                          .filter(t => {
+                            const matchCoord = filterCoordenador === "todos" || t.coordenador === filterCoordenador;
+                            const matchSuper = filterSupervisor === "todos" || t.supervisor === filterSupervisor;
+                            return matchCoord && matchSuper;
+                          })
+                          .map((tech, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium text-sm">{tech.nome_tecnico}</TableCell>
+                              <TableCell className="font-mono text-xs">{tech.matricula_tt}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{tech.supervisor || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{tech.coordenador || "—"}</TableCell>
+                            </TableRow>
+                          ))}
+
+                        {/* Submissions view */}
+                        {dashboardFilter !== 'pendentes' && dashboardFilter !== 'base' && allSubmissions
                           .filter(s => {
                             const tech = allBaseTechnicians.find(t => t.matricula_tt === s.matricula_tt);
                             const matchCoord = filterCoordenador === "todos" || tech?.coordenador === filterCoordenador;
                             const matchSuper = filterSupervisor === "todos" || tech?.supervisor === filterSupervisor;
-                            return matchCoord && matchSuper;
+                            if (!matchCoord || !matchSuper) return false;
+                            if (dashboardFilter === 'fechados') return s.status === 'finalizado';
+                            if (dashboardFilter === 'andamento') return s.status === 'em_andamento';
+                            return true;
                           })
                           .map((sub) => (
                             <TableRow key={sub.id}>
@@ -1521,7 +1624,7 @@ const Inventory = () => {
                       <TableRow 
                         key={item.id} 
                         className={`cursor-pointer transition-colors ${selectedCatalogItem?.id === item.id ? 'bg-primary/10' : 'hover:bg-secondary/30'}`}
-                        onClick={() => { setSelectedCatalogItem(item); setExtraSerial(""); }}
+                        onClick={() => { setSelectedCatalogItem(item); setExtraSerial(""); setExtraQuantity(1); setExtraSerials([]); }}
                       >
                         <TableCell className="font-mono text-xs py-2">{item.codigo}</TableCell>
                         <TableCell className="text-xs py-2 font-medium">{item.nome_material}</TableCell>
@@ -1540,52 +1643,120 @@ const Inventory = () => {
               )}
             </div>
 
-            {/* Step 4: Selected item + Serial */}
-            {selectedCatalogItem && (
-              <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-bold">{selectedCatalogItem.nome_material}</p>
-                    <p className="text-xs text-muted-foreground">Código: {selectedCatalogItem.codigo} • {selectedCatalogItem.segmento}</p>
+            {/* Step 4: Selected item + Quantity + Serial(s) */}
+            {selectedCatalogItem && (() => {
+              const needsSerial = requiresSerial(selectedCatalogItem.nome_material);
+              const qty = Math.max(1, extraQuantity);
+              const allSerialsFilled = needsSerial ? extraSerials.slice(0, qty).filter(s => s.trim()).length === qty : true;
+              
+              return (
+                <div className="space-y-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">{selectedCatalogItem.nome_material}</p>
+                      <p className="text-xs text-muted-foreground">Código: {selectedCatalogItem.codigo} • {selectedCatalogItem.segmento}</p>
+                    </div>
+                    {needsSerial && (
+                      <Badge variant="destructive" className="text-[10px]">Serial Obrigatório</Badge>
+                    )}
                   </div>
-                  {requiresSerial(selectedCatalogItem.nome_material) && (
-                    <Badge variant="destructive" className="text-[10px]">Serial Obrigatório</Badge>
-                  )}
-                </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">
-                    Serial {requiresSerial(selectedCatalogItem.nome_material) ? "(Obrigatório)" : "(Opcional)"}
-                  </Label>
-                  <div className="flex gap-2">
+                  {/* Quantity */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Quantidade</Label>
                     <Input 
-                      placeholder={requiresSerial(selectedCatalogItem.nome_material) ? "Informe o serial obrigatoriamente" : "Deixe vazio se não tiver serial"}
-                      value={extraSerial}
-                      onChange={e => setExtraSerial(e.target.value.toUpperCase())}
-                      className="font-mono h-9"
+                      type="number" 
+                      min={1} 
+                      max={50}
+                      value={extraQuantity}
+                      onChange={e => {
+                        const val = Math.max(1, Math.min(50, parseInt(e.target.value) || 1));
+                        setExtraQuantity(val);
+                        setExtraSerials(prev => {
+                          const arr = [...prev];
+                          while (arr.length < val) arr.push("");
+                          return arr.slice(0, val);
+                        });
+                      }}
+                      className="h-9 w-24"
                     />
-                    <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Bipar Serial" onClick={() => {
-                      setAddExtraDialogOpen(false);
-                      startScanner(selectedCatalogItem.nome_material, selectedCatalogItem.codigo);
-                    }}>
-                      <ScanBarcode className="w-4 h-4" />
-                    </Button>
                   </div>
-                  {requiresSerial(selectedCatalogItem.nome_material) && (
-                    <p className="text-[10px] text-destructive">Materiais do tipo ONT, DROP, EDD e Transceiver exigem serial.</p>
+
+                  {/* Serials */}
+                  {needsSerial ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Seriais ({extraSerials.slice(0, qty).filter(s => s.trim()).length}/{qty} preenchidos)</Label>
+                      <div className="max-h-40 overflow-y-auto space-y-2">
+                        {Array.from({ length: qty }).map((_, idx) => (
+                          <div key={idx} className="flex gap-2 items-center">
+                            <span className="text-[10px] text-muted-foreground w-5 text-right">{idx + 1}.</span>
+                            <Input 
+                              placeholder={`Serial ${idx + 1}`}
+                              value={extraSerials[idx] || ""}
+                              onChange={e => {
+                                const val = e.target.value.toUpperCase();
+                                setExtraSerials(prev => {
+                                  const arr = [...prev];
+                                  while (arr.length <= idx) arr.push("");
+                                  arr[idx] = val;
+                                  return arr;
+                                });
+                              }}
+                              className={`font-mono h-8 text-xs ${extraSerials[idx]?.trim() ? 'border-success' : 'border-destructive/50'}`}
+                            />
+                            <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Bipar" onClick={() => {
+                              setAddExtraDialogOpen(false);
+                              // Store context for which serial index to fill
+                              setScannerContext({ modelo: selectedCatalogItem.nome_material, codigo: selectedCatalogItem.codigo });
+                              setScannerOpen(true);
+                              setTimeout(async () => {
+                                try {
+                                  const html5Qr = new Html5Qrcode("inventory-scanner");
+                                  scannerRef.current = html5Qr;
+                                  await html5Qr.start(
+                                    { facingMode: "environment" },
+                                    { fps: 10, qrbox: { width: 250, height: 150 } },
+                                    (decodedText) => {
+                                      stopScanner();
+                                      setExtraSerials(prev => {
+                                        const arr = [...prev];
+                                        while (arr.length <= idx) arr.push("");
+                                        arr[idx] = decodedText.toUpperCase();
+                                        return arr;
+                                      });
+                                      setAddExtraDialogOpen(true);
+                                    },
+                                    () => {}
+                                  );
+                                } catch (err) {
+                                  toast.error("Erro ao acessar câmera.");
+                                  setScannerOpen(false);
+                                  setAddExtraDialogOpen(true);
+                                }
+                              }, 300);
+                            }}>
+                              <ScanBarcode className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-destructive">Materiais do tipo ONT, DROP, EDD e Transceiver exigem serial.</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Este material não requer serial. Serão adicionados {qty} item(ns).</p>
                   )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setAddExtraDialogOpen(false)}>Cancelar</Button>
             <Button 
               onClick={handleAddExtraFromCatalog} 
-              disabled={!selectedCatalogItem || (requiresSerial(selectedCatalogItem?.nome_material || "") && !extraSerial.trim())}
+              disabled={!selectedCatalogItem || (requiresSerial(selectedCatalogItem?.nome_material || "") && extraSerials.slice(0, Math.max(1, extraQuantity)).filter(s => s.trim()).length < Math.max(1, extraQuantity))}
             >
-              <Plus className="w-4 h-4 mr-1" /> Incluir Material
+              <Plus className="w-4 h-4 mr-1" /> Incluir {extraQuantity > 1 ? `${extraQuantity} Itens` : 'Material'}
             </Button>
           </DialogFooter>
         </DialogContent>
