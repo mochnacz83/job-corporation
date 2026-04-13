@@ -76,7 +76,7 @@ export default function AdminIdeas() {
     const loadIdeas = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data, error } = await (supabase as any)
                 .from("module_ideas")
                 .select("*")
                 .order("created_at", { ascending: false });
@@ -123,7 +123,7 @@ export default function AdminIdeas() {
         setSubmitting(true);
         try {
             if (editingIdea) {
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from("module_ideas")
                     .update({
                         module_name: formData.module_name,
@@ -136,7 +136,7 @@ export default function AdminIdeas() {
                 if (error) throw error;
                 toast.success("Ideia atualizada com sucesso!");
             } else {
-                const { error } = await supabase
+                const { error } = await (supabase as any)
                     .from("module_ideas")
                     .insert([{
                         module_name: formData.module_name,
@@ -164,7 +164,7 @@ export default function AdminIdeas() {
         if (!window.confirm("Tem certeza que deseja excluir esta anotação?")) return;
         
         try {
-            const { error } = await supabase.from("module_ideas").delete().eq("id", id);
+            const { error } = await (supabase as any).from("module_ideas").delete().eq("id", id);
             if (error) throw error;
             toast.success("Anotação excluída.");
             setIdeas(prev => prev.filter(i => i.id !== id));
