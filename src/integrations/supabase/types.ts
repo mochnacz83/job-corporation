@@ -465,6 +465,42 @@ export type Database = {
         }
         Relationships: []
       }
+      module_ideas: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          idea_type: string
+          module_name: string
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          idea_type: string
+          module_name: string
+          status: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          idea_type?: string
+          module_name?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       powerbi_links: {
         Row: {
           ativo: boolean | null
