@@ -1605,7 +1605,7 @@ const MaterialColeta = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="formulario">Formulário</TabsTrigger>
-            <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
+            {isAdmin && <TabsTrigger value="cadastros">Cadastros</TabsTrigger>}
             <TabsTrigger value="consulta">Consulta / Exportar</TabsTrigger>
           </TabsList>
 
