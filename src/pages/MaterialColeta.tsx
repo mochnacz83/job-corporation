@@ -16,9 +16,10 @@ import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, Ima
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import { Html5Qrcode } from "html5-qrcode";
+// Dynamic imports for heavy libs – loaded on demand
+const loadXLSX = () => import("xlsx");
+const loadJsPDF = () => import("jspdf").then(m => m.default);
+const loadHtml5Qrcode = () => import("html5-qrcode").then(m => m.Html5Qrcode);
 
 interface MaterialItem {
   id: string;

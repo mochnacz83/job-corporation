@@ -10,6 +10,10 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Activity, Users, Circle, Calendar, ChevronDown, ChevronUp, Trash2, Search, Loader2 } from "lucide-react";
+import { lazy, Suspense } from "react";
+const RechartsComponents = lazy(() => import("recharts").then(m => ({
+  default: () => null // placeholder, we use individual components below
+})));
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
