@@ -13,8 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { supabase } from "@/integrations/supabase/client";
-// Dynamic import for heavy lib
-const loadXLSX = () => import("xlsx");
+import * as XLSX from "xlsx";
 import {
     Dialog,
     DialogContent,

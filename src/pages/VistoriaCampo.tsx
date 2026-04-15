@@ -12,9 +12,8 @@ import { ArrowLeft, Trash2, ImageIcon, FileText, Download, Camera, CheckCircle2,
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-// Dynamic imports for heavy libs
-const loadJsPDF = () => import("jspdf").then(m => m.default);
-const loadXLSX = () => import("xlsx");
+import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
 
 interface TecnicoIndicadores {
   id?: string;
