@@ -722,6 +722,55 @@ const AdminUsers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* WhatsApp share dialog (after reset) */}
+      <Dialog open={waDialogOpen} onOpenChange={setWaDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <MessageCircle className="w-5 h-5" /> Enviar nova senha por WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              A senha de <strong>{waUser?.nome}</strong> foi redefinida com sucesso. Escolha como deseja entregar a nova senha ao usuário.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="bg-muted/40 border rounded-lg p-3 space-y-1 text-sm">
+              <div><span className="text-muted-foreground">Matrícula:</span> <strong>{waUser?.matricula}</strong></div>
+              <div><span className="text-muted-foreground">Telefone:</span> <strong>{waUser?.telefone || "— não cadastrado —"}</strong></div>
+              <div><span className="text-muted-foreground">Senha temporária:</span> <strong className="font-mono text-primary">{waPassword}</strong></div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Mensagem que será enviada / copiada</Label>
+              <textarea
+                readOnly
+                value={waUser ? `Olá, ${waUser.nome}! 👋\n\nSua senha de acesso ao Portal Corporativo Ability foi redefinida.\n\n🔑 Matrícula: ${waUser.matricula}\n🔐 Senha temporária: ${waPassword}\n\n⚠️ Por segurança, você será solicitado a alterar a senha no próximo login.\n\nAcesse: https://job-corporation.lovable.app` : ""}
+                className="w-full min-h-[140px] mt-1 text-xs font-mono p-2 rounded-md border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCopyWhatsAppMessage} className="w-full sm:w-auto">
+              {waCopied ? <CheckCheck className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
+              {waCopied ? "Copiado!" : "Copiar mensagem"}
+            </Button>
+            <Button
+              onClick={handleSendWhatsApp}
+              disabled={!waUser?.telefone}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Abrir WhatsApp
+            </Button>
+            <Button variant="ghost" onClick={() => setWaDialogOpen(false)} className="w-full sm:w-auto">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
