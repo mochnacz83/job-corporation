@@ -25,7 +25,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail, UserMinus, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail, UserMinus, Loader2, MessageCircle, Copy, CheckCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
