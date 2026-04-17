@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ArrowLeft, BarChart3, Loader2, GripVertical, RotateCcw } from "lucide-react";
 import { 
   DndContext, 
@@ -211,30 +212,52 @@ const PowerBI = () => {
   const selectedLink = sortedLinks.find((l) => l.id === selectedLinkId) || null;
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Compact toolbar */}
-      <div className="border-b bg-card/60 backdrop-blur-sm shrink-0">
-        <div className="px-4 h-11 flex items-center gap-3">
-          {selectedLinkId ? (
-            <Button variant="ghost" size="sm" onClick={() => navigate("/powerbi")} className="gap-1 px-2">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm">Voltar</span>
-            </Button>
-          ) : null}
-          <div className="p-0.5 bg-transparent w-7 h-7 flex items-center justify-center overflow-hidden shrink-0">
-            <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
-          </div>
-          <h1 className="text-sm font-semibold text-foreground truncate">
-            {selectedLink ? selectedLink.titulo : "Relatórios Power BI"}
-          </h1>
-          <div className="ml-auto">
-            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading} className="gap-1.5 h-8">
-              <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline text-xs">Atualizar</span>
-            </Button>
+    <div className="h-full flex flex-col overflow-hidden relative">
+      {/* Compact toolbar - only shown on the cards listing (no BI selected) */}
+      {!selectedLinkId && (
+        <div className="border-b bg-card/60 backdrop-blur-sm shrink-0">
+          <div className="px-4 h-11 flex items-center gap-3">
+            <div className="p-0.5 bg-transparent w-7 h-7 flex items-center justify-center overflow-hidden shrink-0">
+              <img src="/ability-logo.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <h1 className="text-sm font-semibold text-foreground truncate">
+              Relatórios Power BI
+            </h1>
+            <div className="ml-auto">
+              <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading} className="gap-1.5 h-8">
+                <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span className="hidden sm:inline text-xs">Atualizar</span>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Floating minimal controls when a BI is open - keeps full screen for the report */}
+      {selectedLinkId && (
+        <div className="absolute top-2 left-2 z-30 flex items-center gap-1 bg-card/85 backdrop-blur-sm border border-border/60 rounded-full shadow-md px-1.5 py-1">
+          <SidebarTrigger className="h-7 w-7" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/powerbi")}
+            className="h-7 w-7"
+            title="Voltar aos relatórios"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={loading}
+            className="h-7 w-7"
+            title="Atualizar"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      )}
 
       <div className="flex-1 relative overflow-hidden">
         {loading ? (
