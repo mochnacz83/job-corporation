@@ -83,6 +83,12 @@ const AdminUsers = () => {
   const [saving, setSaving] = useState(false);
   const [cleaningGhosts, setCleaningGhosts] = useState(false);
 
+  // WhatsApp share dialog after reset
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waUser, setWaUser] = useState<UserProfile | null>(null);
+  const [waPassword, setWaPassword] = useState("");
+  const [waCopied, setWaCopied] = useState(false);
+
   useEffect(() => {
     checkAdminAndLoad();
   }, [user]);
