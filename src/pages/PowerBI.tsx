@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAccessTracking } from "@/hooks/useAccessTracking";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ArrowLeft, BarChart3, Loader2, GripVertical, RotateCcw } from "lucide-react";
 import { 
   DndContext, 
