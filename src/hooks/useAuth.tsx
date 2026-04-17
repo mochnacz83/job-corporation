@@ -125,26 +125,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (matricula: string, password: string) => {
-    // Try both domains in parallel for faster login
+    // Try domains SEQUENTIALLY to avoid race conditions where a failing
+    // parallel attempt clears the session of the successful one.
     const newEmail = `${matricula.toLowerCase()}@corporativo.local`;
-    const oldEmail = `${matricula}@empresa.local`;
+    const oldEmail = `${matricula.toLowerCase()}@empresa.local`;
+    const oldEmailUpper = `${matricula}@empresa.local`;
 
-    const [newResult, oldResult] = await Promise.allSettled([
-      supabase.auth.signInWithPassword({ email: newEmail, password }),
-      supabase.auth.signInWithPassword({ email: oldEmail, password }),
-    ]);
+    // 1) Try the new domain first (where most users live now)
+    const r1 = await supabase.auth.signInWithPassword({ email: newEmail, password });
+    if (!r1.error) return;
 
-    // Check new domain first
-    if (newResult.status === "fulfilled" && !newResult.value.error) return;
-    // Then old domain
-    if (oldResult.status === "fulfilled" && !oldResult.value.error) return;
+    // 2) Fall back to legacy domain (lowercase)
+    const r2 = await supabase.auth.signInWithPassword({ email: oldEmail, password });
+    if (!r2.error) return;
 
-    // Both failed — sign out any partial session and throw
-    await supabase.auth.signOut().catch(() => {});
-    const errorMsg = newResult.status === "fulfilled" 
-      ? newResult.value.error?.message 
-      : "Erro de conexão";
-    throw new Error(errorMsg || "Matrícula ou senha incorretos.");
+    // 3) Fall back to legacy domain preserving original case (some old accounts)
+    if (oldEmailUpper !== oldEmail) {
+      const r3 = await supabase.auth.signInWithPassword({ email: oldEmailUpper, password });
+      if (!r3.error) return;
+    }
+
+    throw new Error(r1.error?.message || "Matrícula ou senha incorretos.");
   };
 
   const signOut = async () => {
