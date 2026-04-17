@@ -163,7 +163,17 @@ serve(async (req) => {
       });
 
       if (updateError) {
-        throw new Error(`Failed to reset password: ${updateError.message}`);
+        // Map common Auth errors (HIBP leaked password, weak password, etc.) to friendly messages
+        const rawMsg = (updateError.message || '').toLowerCase();
+        let friendly = updateError.message;
+        if (rawMsg.includes('pwned') || rawMsg.includes('compromis') || rawMsg.includes('leaked') || rawMsg.includes('hibp')) {
+          friendly = 'Esta senha foi identificada em vazamentos públicos e foi rejeitada pelo sistema de segurança. Escolha uma senha diferente (evite sequências comuns como 123456, abc123, qwerty etc.).';
+        } else if (rawMsg.includes('weak') || rawMsg.includes('short') || rawMsg.includes('at least')) {
+          friendly = 'A senha não atende aos requisitos mínimos de segurança. Use no mínimo 6 caracteres com letras maiúsculas, minúsculas, número e caractere especial.';
+        }
+        return new Response(JSON.stringify({ error: friendly, rawError: updateError.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       await serviceClient

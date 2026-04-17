@@ -25,7 +25,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail, UserMinus, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Shield, Users, KeyRound, Trash2, Crown, Pencil, Info, Mail, UserMinus, Loader2, MessageCircle, Copy, CheckCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UserProfile {
@@ -82,6 +82,12 @@ const AdminUsers = () => {
   const [editForm, setEditForm] = useState({ nome: "", cargo: "", area: "", email: "", empresa: "", telefone: "" });
   const [saving, setSaving] = useState(false);
   const [cleaningGhosts, setCleaningGhosts] = useState(false);
+
+  // WhatsApp share dialog after reset
+  const [waDialogOpen, setWaDialogOpen] = useState(false);
+  const [waUser, setWaUser] = useState<UserProfile | null>(null);
+  const [waPassword, setWaPassword] = useState("");
+  const [waCopied, setWaCopied] = useState(false);
 
   useEffect(() => {
     checkAdminAndLoad();
@@ -233,11 +239,48 @@ const AdminUsers = () => {
         variant: "default"
       });
       setResetDialogOpen(false);
+
+      // Abrir modal de envio por WhatsApp
+      setWaUser(resetUser);
+      setWaPassword(passwordUsed || newPassword);
+      setWaCopied(false);
+      setWaDialogOpen(true);
+
       await loadUsers(); // Refresh to clear badges
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro ao redefinir senha", description: err.message, variant: "destructive", duration: 9000 });
     } finally {
       setResetting(false);
+    }
+  };
+
+  const buildWhatsAppMessage = (nome: string, matricula: string, password: string) =>
+    `Olá, ${nome}! 👋\n\nSua senha de acesso ao Portal Corporativo Ability foi redefinida.\n\n🔑 *Matrícula:* ${matricula}\n🔐 *Senha temporária:* ${password}\n\n⚠️ Por segurança, você será solicitado a alterar a senha no próximo login.\n\nAcesse: https://job-corporation.lovable.app`;
+
+  const handleSendWhatsApp = () => {
+    if (!waUser) return;
+    const phone = (waUser.telefone || "").replace(/\D/g, "");
+    if (!phone) {
+      toast({ title: "Sem telefone", description: "Este usuário não possui telefone cadastrado. Use 'Copiar mensagem'.", variant: "destructive" });
+      return;
+    }
+    // Brazilian numbers: prefix 55 if missing
+    const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
+    const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
+    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCopyWhatsAppMessage = async () => {
+    if (!waUser) return;
+    const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
+    try {
+      await navigator.clipboard.writeText(msg);
+      setWaCopied(true);
+      toast({ title: "Mensagem copiada!", description: "Cole no WhatsApp ou onde preferir." });
+      setTimeout(() => setWaCopied(false), 2500);
+    } catch {
+      toast({ title: "Erro ao copiar", description: "Selecione e copie manualmente abaixo.", variant: "destructive" });
     }
   };
 
@@ -679,6 +722,55 @@ const AdminUsers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* WhatsApp share dialog (after reset) */}
+      <Dialog open={waDialogOpen} onOpenChange={setWaDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <MessageCircle className="w-5 h-5" /> Enviar nova senha por WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              A senha de <strong>{waUser?.nome}</strong> foi redefinida com sucesso. Escolha como deseja entregar a nova senha ao usuário.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="bg-muted/40 border rounded-lg p-3 space-y-1 text-sm">
+              <div><span className="text-muted-foreground">Matrícula:</span> <strong>{waUser?.matricula}</strong></div>
+              <div><span className="text-muted-foreground">Telefone:</span> <strong>{waUser?.telefone || "— não cadastrado —"}</strong></div>
+              <div><span className="text-muted-foreground">Senha temporária:</span> <strong className="font-mono text-primary">{waPassword}</strong></div>
+            </div>
+
+            <div>
+              <Label className="text-xs">Mensagem que será enviada / copiada</Label>
+              <textarea
+                readOnly
+                value={waUser ? `Olá, ${waUser.nome}! 👋\n\nSua senha de acesso ao Portal Corporativo Ability foi redefinida.\n\n🔑 Matrícula: ${waUser.matricula}\n🔐 Senha temporária: ${waPassword}\n\n⚠️ Por segurança, você será solicitado a alterar a senha no próximo login.\n\nAcesse: https://job-corporation.lovable.app` : ""}
+                className="w-full min-h-[140px] mt-1 text-xs font-mono p-2 rounded-md border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCopyWhatsAppMessage} className="w-full sm:w-auto">
+              {waCopied ? <CheckCheck className="w-4 h-4 mr-2 text-green-600" /> : <Copy className="w-4 h-4 mr-2" />}
+              {waCopied ? "Copiado!" : "Copiar mensagem"}
+            </Button>
+            <Button
+              onClick={handleSendWhatsApp}
+              disabled={!waUser?.telefone}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Abrir WhatsApp
+            </Button>
+            <Button variant="ghost" onClick={() => setWaDialogOpen(false)} className="w-full sm:w-auto">
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

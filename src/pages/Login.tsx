@@ -161,24 +161,21 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // 🕵️ Verificação de Duplicidade (Matrícula, Nome, E-mail ou Telefone)
-      const { data: existingProfile, error: checkError } = await supabase
-        .from("profiles")
-        .select("matricula, nome, email, telefone")
-        .or(`matricula.eq."${matricula.trim()}",nome.eq."${nome.trim()}",email.eq."${emailContato.trim()}",telefone.eq."${phoneDigits}"`)
-        .maybeSingle();
+      // 🕵️ Verificação de Duplicidade — usar 4 queries paralelas (mais robusto que .or() com aspas)
+      const [matRes, nomeRes, mailRes, telRes] = await Promise.all([
+        supabase.from("profiles").select("matricula").eq("matricula", matricula.trim()).maybeSingle(),
+        supabase.from("profiles").select("nome").eq("nome", nome.trim()).maybeSingle(),
+        supabase.from("profiles").select("email").eq("email", emailContato.trim()).maybeSingle(),
+        supabase.from("profiles").select("telefone").eq("telefone", phoneDigits).maybeSingle(),
+      ]);
 
-      if (checkError) {
-        console.error("[Signup] Erro ao verificar duplicidade:", checkError);
-      }
+      let duplicatedField: string | null = null;
+      if (matRes.data) duplicatedField = "Matrícula";
+      else if (nomeRes.data) duplicatedField = "Nome";
+      else if (mailRes.data) duplicatedField = "E-mail";
+      else if (telRes.data) duplicatedField = "Telefone";
 
-      if (existingProfile) {
-        let duplicatedField = "dados";
-        if (existingProfile.matricula === matricula.trim()) duplicatedField = "Matrícula";
-        else if (existingProfile.nome === nome.trim()) duplicatedField = "Nome";
-        else if (existingProfile.email === emailContato.trim()) duplicatedField = "E-mail";
-        else if (existingProfile.telefone === phoneDigits) duplicatedField = "Telefone";
-
+      if (duplicatedField) {
         setLoading(false);
         toast({
           title: "Cadastro já identificado",
