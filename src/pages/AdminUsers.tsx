@@ -233,11 +233,48 @@ const AdminUsers = () => {
         variant: "default"
       });
       setResetDialogOpen(false);
+
+      // Abrir modal de envio por WhatsApp
+      setWaUser(resetUser);
+      setWaPassword(passwordUsed || newPassword);
+      setWaCopied(false);
+      setWaDialogOpen(true);
+
       await loadUsers(); // Refresh to clear badges
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro ao redefinir senha", description: err.message, variant: "destructive", duration: 9000 });
     } finally {
       setResetting(false);
+    }
+  };
+
+  const buildWhatsAppMessage = (nome: string, matricula: string, password: string) =>
+    `Olá, ${nome}! 👋\n\nSua senha de acesso ao Portal Corporativo Ability foi redefinida.\n\n🔑 *Matrícula:* ${matricula}\n🔐 *Senha temporária:* ${password}\n\n⚠️ Por segurança, você será solicitado a alterar a senha no próximo login.\n\nAcesse: https://job-corporation.lovable.app`;
+
+  const handleSendWhatsApp = () => {
+    if (!waUser) return;
+    const phone = (waUser.telefone || "").replace(/\D/g, "");
+    if (!phone) {
+      toast({ title: "Sem telefone", description: "Este usuário não possui telefone cadastrado. Use 'Copiar mensagem'.", variant: "destructive" });
+      return;
+    }
+    // Brazilian numbers: prefix 55 if missing
+    const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
+    const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
+    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCopyWhatsAppMessage = async () => {
+    if (!waUser) return;
+    const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
+    try {
+      await navigator.clipboard.writeText(msg);
+      setWaCopied(true);
+      toast({ title: "Mensagem copiada!", description: "Cole no WhatsApp ou onde preferir." });
+      setTimeout(() => setWaCopied(false), 2500);
+    } catch {
+      toast({ title: "Erro ao copiar", description: "Selecione e copie manualmente abaixo.", variant: "destructive" });
     }
   };
 
