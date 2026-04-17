@@ -54,6 +54,23 @@ async function sendEmail(to: string, subject: string, html: string): Promise<{ o
   }
 }
 
+// Generates a strong, unique password unlikely to appear in HIBP leaks
+function generateStrongPassword(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%&*?';
+  const all = upper + lower + digits + special;
+  const rand = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+  const base = [rand(upper), rand(lower), rand(digits), rand(special)];
+  for (let i = 0; i < 8; i++) base.push(rand(all));
+  for (let i = base.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [base[i], base[j]] = [base[j], base[i]];
+  }
+  return base.join('');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
