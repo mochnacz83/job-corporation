@@ -84,7 +84,10 @@ serve(async (req) => {
     const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
     const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user'];
-    const publicActions = ['get-user-status', 'reset-my-ghost', 'finalize-signup'];
+    // complete-signup & finalize-signup must be public because new users have no
+    // valid session yet (email_not_confirmed). Both internally use service_role
+    // and look up the user via auth.admin.getUserById / verify userId matches.
+    const publicActions = ['get-user-status', 'reset-my-ghost', 'finalize-signup', 'complete-signup'];
 
     const authHeader = req.headers.get('Authorization');
     let caller: { id: string } | null = null;
