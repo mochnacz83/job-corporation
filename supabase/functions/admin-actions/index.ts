@@ -657,6 +657,15 @@ serve(async (req) => {
 
       console.log(`[complete-signup] Completing profile for user ${userId}:`, JSON.stringify(profileData));
 
+      // Security: validate that this userId really exists in auth (anti-spoof)
+      const { data: authCheck, error: authCheckErr } = await serviceClient.auth.admin.getUserById(userId);
+      if (authCheckErr || !authCheck?.user) {
+        console.error('[complete-signup] Invalid userId:', authCheckErr);
+        return new Response(JSON.stringify({ error: 'Invalid userId' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Map keys to match the profiles table precisely
       const mappedData = {
         user_id: userId,
@@ -668,7 +677,7 @@ serve(async (req) => {
         cargo: profileData.reg_cargo || profileData.cargo || '',
         area: profileData.reg_area || profileData.area || '',
         status: 'pendente',
-        must_change_password: false
+        must_change_password: false,
       };
 
       // Use upsert to handle cases where the trigger might have already created a partial profile
@@ -681,6 +690,7 @@ serve(async (req) => {
         throw new Error(`Failed to complete signup: ${upsertError.message}`);
       }
 
+      console.log(`[complete-signup] Success: area=${mappedData.area}, cargo=${mappedData.cargo}`);
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
