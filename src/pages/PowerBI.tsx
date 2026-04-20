@@ -235,7 +235,7 @@ const PowerBI = () => {
 
       {/* Floating minimal controls when a BI is open - keeps full screen for the report */}
       {selectedLinkId && (
-        <div className="absolute top-2 left-2 z-30 flex items-center gap-1 bg-card/85 backdrop-blur-sm border border-border/60 rounded-full shadow-md px-1.5 py-1">
+        <div className="absolute bottom-3 left-3 z-30 flex items-center gap-1 bg-card/85 backdrop-blur-sm border border-border/60 rounded-full shadow-md px-1.5 py-1 opacity-60 hover:opacity-100 transition-opacity">
           <SidebarTrigger className="h-7 w-7" />
           <Button
             variant="ghost"
