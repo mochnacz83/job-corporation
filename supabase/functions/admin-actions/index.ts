@@ -94,22 +94,27 @@ serve(async (req) => {
     let isAdmin = false;
 
     if (authHeader) {
-      const anonClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
+      // Extract bearer token explicitly and validate via service client.
+      // Using getUser(token) instead of header-based client avoids stale-session
+      // issues where the SDK silently fails to attach the header.
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      if (token) {
+        const { data: { user }, error: userError } = await serviceClient.auth.getUser(token);
+        if (userError) {
+          console.warn(`[AUTH] getUser failed: ${userError.message}`);
+        }
+        if (user) {
+          caller = { id: user.id };
 
-      const { data: { user }, error: userError } = await anonClient.auth.getUser();
-      if (!userError && user) {
-        caller = { id: user.id };
+          const { data: roleData } = await serviceClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .maybeSingle();
 
-        const { data: roleData } = await serviceClient
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle();
-
-        isAdmin = !!roleData;
+          isAdmin = !!roleData;
+        }
       }
     }
 
