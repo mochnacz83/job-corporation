@@ -267,8 +267,17 @@ const AdminUsers = () => {
     // Brazilian numbers: prefix 55 if missing
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
-    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+    const encoded = encodeURIComponent(msg);
+    // Usar wa.me via <a> evita bloqueios de popup/iframe (ERR_BLOCKED_BY_RESPONSE)
+    // que ocorrem com window.open dentro do preview e com api.whatsapp.com.
+    const url = `https://wa.me/${fullPhone}?text=${encoded}`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleCopyWhatsAppMessage = async () => {
