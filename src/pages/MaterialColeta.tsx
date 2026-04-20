@@ -755,16 +755,30 @@ const MaterialColeta = () => {
         }
       });
 
+      // Largura disponível para serial (até a margem direita)
+      const serialMaxW = pageW - margin - cols[4] - 1;
+      const nomeMaxW = cols[2] - cols[1] - 1;
+
       flatItems.forEach((item, i) => {
+        // Quebra serial e nome em múltiplas linhas se necessário (sem truncar)
+        const serialLines = item.serial
+          ? doc.splitTextToSize(String(item.serial), serialMaxW)
+          : ["-"];
+        const nomeLines = item.nome
+          ? doc.splitTextToSize(String(item.nome), nomeMaxW)
+          : [""];
+        const lineCount = Math.max(serialLines.length, nomeLines.length, 1);
+        const rowH = Math.max(4, lineCount * 3);
+
         const bg = i % 2 === 0 ? 245 : 255;
         doc.setFillColor(bg, bg, bg);
-        doc.rect(margin, y, pageW - 2 * margin, 4, "F");
+        doc.rect(margin, y, pageW - 2 * margin, rowH, "F");
         doc.text(item.codigo, cols[0], y + 3);
-        doc.text(item.nome.substring(0, 28), cols[1], y + 3);
+        doc.text(nomeLines, cols[1], y + 3);
         doc.text(item.qtde, cols[2], y + 3);
         doc.text(item.un, cols[3], y + 3);
-        doc.text(item.serial.substring(0, 20), cols[4], y + 3);
-        y += 4;
+        doc.text(serialLines, cols[4], y + 3);
+        y += rowH;
       });
       y += 3;
     } else {
