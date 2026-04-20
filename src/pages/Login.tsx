@@ -110,8 +110,17 @@ const Login = () => {
       } else {
         navigate("/dashboard");
       }
-    } catch {
-      toast({ title: "Erro no login", description: "Matrícula ou senha incorretos.", variant: "destructive" });
+    } catch (err: any) {
+      if (err?.code === "email_not_confirmed" || err?.message === "PENDING_APPROVAL") {
+        toast({
+          title: "⏳ Aguarde a ativação do Administrador",
+          description: "Seu cadastro ainda não foi aprovado. Para liberação imediata, entre em contato:\n📱 WhatsApp: (48) 99146-1983 — Juniomar Alex Mochnacz\n💬 Telegram: @juniomar",
+          variant: "destructive",
+          duration: 12000,
+        });
+      } else {
+        toast({ title: "Erro no login", description: "Matrícula ou senha incorretos.", variant: "destructive" });
+      }
     } finally {
       setLoading(false);
     }

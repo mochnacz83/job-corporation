@@ -145,6 +145,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!r3.error) return;
     }
 
+    // Collect all errors to detect "email not confirmed" (= account pending admin approval)
+    const errors = [r1.error, r2.error].filter(Boolean) as any[];
+    const isPending = errors.some((e) =>
+      e?.code === "email_not_confirmed" ||
+      /email.*not.*confirmed/i.test(e?.message || "")
+    );
+    if (isPending) {
+      const err: any = new Error("PENDING_APPROVAL");
+      err.code = "email_not_confirmed";
+      throw err;
+    }
+
     throw new Error(r1.error?.message || "Matrícula ou senha incorretos.");
   };
 
