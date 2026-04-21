@@ -1328,6 +1328,19 @@ const VistoriaCampo = () => {
     return ind.re?.toLowerCase().includes(q) || ind.nome?.toLowerCase().includes(q) || ind.tt?.toLowerCase().includes(q) || ind.supervisor?.toLowerCase().includes(q);
   });
 
+  const filteredColaboradores = allColaboradores.filter((c) => {
+    if (!filterColaboradores) return true;
+    const q = filterColaboradores.toLowerCase();
+    return (
+      c.nome_tecnico?.toLowerCase().includes(q) ||
+      (c.tt || "").toLowerCase().includes(q) ||
+      (c.tr || "").toLowerCase().includes(q) ||
+      (c.supervisor || "").toLowerCase().includes(q) ||
+      (c.coordenador || "").toLowerCase().includes(q) ||
+      (c.nome_empresa || "").toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
