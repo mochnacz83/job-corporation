@@ -55,7 +55,6 @@ const PersistentPage = ({ path, children }: { path: string; children: ReactNode 
 
 // Pages that should persist their state
 const persistentPages = [
-  { path: "/alterar-senha", element: <ChangePassword /> },
   { path: "/powerbi", element: <PowerBI /> },
   { path: "/admin/usuarios", element: <AdminUsers /> },
   { path: "/admin/analytics", element: <AdminAnalytics /> },
@@ -73,6 +72,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const AppRoutes = () => {
   const location = useLocation();
   const isLoginRoute = location.pathname === "/";
+  const isChangePasswordRoute = location.pathname === "/alterar-senha";
   const isPersistentRoute = persistentPages.some(p => p.path === location.pathname);
   const isDashboard = location.pathname === "/dashboard";
   const isProtectedArea = isPersistentRoute || isDashboard;
@@ -84,6 +84,15 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Login />} />
         </Routes>
+      )}
+
+      {/* Change password page - standalone (no sidebar/layout) */}
+      {isChangePasswordRoute && (
+        <ProtectedRoute>
+          <Suspense fallback={<PageLoader />}>
+            <ChangePassword />
+          </Suspense>
+        </ProtectedRoute>
       )}
 
       {/* Protected pages with sidebar layout */}
@@ -108,7 +117,7 @@ const AppRoutes = () => {
       )}
 
       {/* 404 */}
-      {!isLoginRoute && !isProtectedArea && !isPersistentRoute && (
+      {!isLoginRoute && !isProtectedArea && !isPersistentRoute && !isChangePasswordRoute && (
         <Routes>
           <Route path="*" element={<NotFound />} />
         </Routes>

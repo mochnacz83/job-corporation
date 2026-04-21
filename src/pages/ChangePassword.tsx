@@ -78,13 +78,14 @@ const ChangePassword = () => {
         if (profileError) throw profileError;
       }
 
-      if (profile?.status === 'pendente' && profile?.must_change_password) {
+      if (isFirstRegistration) {
         // Primeiro cadastro — precisa aprovação
         setShowSuccessDialog(true);
       } else {
-        // Usuário ativo trocando senha — sem aprovação
-        toast({ title: "Senha alterada com sucesso!", description: "Sua nova senha já está ativa." });
-        navigate("/dashboard");
+        // Usuário ativo trocando senha — desloga e volta ao login
+        toast({ title: "Senha alterada com sucesso!", description: "Faça login novamente com sua nova senha." });
+        await signOut();
+        navigate("/", { replace: true });
       }
     } catch (err: any) {
       toast({ title: "Erro ao alterar senha", description: err.message, variant: "destructive" });
@@ -95,7 +96,7 @@ const ChangePassword = () => {
 
   const handleFinalize = async () => {
     await signOut();
-    navigate("/login");
+    navigate("/", { replace: true });
   };
 
   return (
