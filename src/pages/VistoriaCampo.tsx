@@ -17,15 +17,54 @@ import * as XLSX from "xlsx";
 
 interface TecnicoIndicadores {
   id?: string;
-  re: string;
+  re: string; // Pode ser TR ou TT do tecnicos_cadastro (usado no lookup)
   tt: string;
   nome: string;
   supervisor: string;
+  // Dimensão (vinda de tecnicos_cadastro)
+  empresa?: string;
+  coordenador?: string;
+  // Indicadores (vinda de tecnicos_indicadores - última carga ou mês)
+  mes_referencia?: string;
   eficacia: string;
   produtividade: string;
   dias_trabalhados: string;
-  repetida: string;
-  infancia: string;
+  repetida: string; // % calculado/exibido
+  infancia: string; // % calculado/exibido
+  // Detalhamento
+  repetida_entrantes?: number;
+  repetida_repetiu?: number;
+  infancia_instaladas?: number;
+  infancia_chamados_30d?: number;
+}
+
+interface ColaboradorRow {
+  id: string;
+  nome_tecnico: string;
+  tr: string | null;
+  tt: string | null;
+  nome_empresa: string | null;
+  supervisor: string | null;
+  coordenador: string | null;
+  telefone: string | null;
+  cidade_residencia: string | null;
+}
+
+interface IndicadorFatoRow {
+  id: string;
+  tt: string;
+  mes_referencia: string;
+  eficacia: number | null;
+  produtividade: number | null;
+  dias_trabalhados: number | null;
+  repetida_entrantes: number | null;
+  repetida_repetiu: number | null;
+  repetida_pct: number | null;
+  infancia_instaladas: number | null;
+  infancia_chamados_30d: number | null;
+  infancia_pct: number | null;
+  lote_importacao: string | null;
+  updated_at: string;
 }
 
 interface EvolucaoRecord {
@@ -109,6 +148,14 @@ const VistoriaCampo = () => {
   const [editingIndicador, setEditingIndicador] = useState<TecnicoIndicadores | null>(null);
   const [editForm, setEditForm] = useState<TecnicoIndicadores | null>(null);
   const [filterIndicadores, setFilterIndicadores] = useState("");
+  const [indicadoresSubTab, setIndicadoresSubTab] = useState<"colaboradores" | "indicadores">("colaboradores");
+
+  // Colaboradores (Dimensão - tecnicos_cadastro)
+  const [allColaboradores, setAllColaboradores] = useState<ColaboradorRow[]>([]);
+  const [loadingColaboradores, setLoadingColaboradores] = useState(false);
+  const [filterColaboradores, setFilterColaboradores] = useState("");
+  const [editingColaborador, setEditingColaborador] = useState<ColaboradorRow | null>(null);
+  const [editColaboradorForm, setEditColaboradorForm] = useState<ColaboradorRow | null>(null);
 
   // Histórico state
   const [historicoData, setHistoricoData] = useState<any[]>([]);
@@ -150,16 +197,73 @@ const VistoriaCampo = () => {
     observacoes: ""
   });
 
-  // Load all indicadores
+  // Load colaboradores (Dimensão)
+  const loadColaboradores = useCallback(async () => {
+    setLoadingColaboradores(true);
+    try {
+      const { data, error } = await supabase
+        .from("tecnicos_cadastro")
+        .select("*")
+        .order("nome_tecnico");
+      if (error) throw error;
+      setAllColaboradores((data as any[]) || []);
+    } catch (err: any) {
+      console.error("Error loading colaboradores:", err);
+    } finally {
+      setLoadingColaboradores(false);
+    }
+  }, []);
+
+  // Load indicadores (Fato) - última carga por TT, com JOIN dos dados do colaborador
   const loadIndicadores = useCallback(async () => {
     setLoadingIndicadores(true);
     try {
-      const { data, error } = await supabase
-        .from("tecnicos_indicadores" as any)
-        .select("*")
-        .order("nome");
-      if (error) throw error;
-      setAllIndicadores((data as any[]) || []);
+      const [indRes, colabRes] = await Promise.all([
+        supabase
+          .from("tecnicos_indicadores" as any)
+          .select("*")
+          .order("mes_referencia", { ascending: false }),
+        supabase
+          .from("tecnicos_cadastro")
+          .select("tt,tr,nome_tecnico,supervisor,nome_empresa,coordenador"),
+      ]);
+      if (indRes.error) throw indRes.error;
+      if (colabRes.error) throw colabRes.error;
+
+      const colabMap = new Map<string, any>();
+      (colabRes.data || []).forEach((c: any) => {
+        if (c.tt) colabMap.set(c.tt.toUpperCase(), c);
+      });
+
+      // Mantém só o registro mais recente por TT (já vem ordenado desc)
+      const seen = new Set<string>();
+      const merged: TecnicoIndicadores[] = [];
+      ((indRes.data as any[]) || []).forEach((r: IndicadorFatoRow) => {
+        const ttKey = (r.tt || "").toUpperCase();
+        if (!ttKey || seen.has(ttKey)) return;
+        seen.add(ttKey);
+        const colab = colabMap.get(ttKey);
+        merged.push({
+          id: r.id,
+          re: colab?.tr || colab?.tt || ttKey,
+          tt: ttKey,
+          nome: colab?.nome_tecnico || "(não cadastrado)",
+          supervisor: colab?.supervisor || "",
+          empresa: colab?.nome_empresa || "",
+          coordenador: colab?.coordenador || "",
+          mes_referencia: r.mes_referencia,
+          eficacia: r.eficacia != null ? String(r.eficacia) : "-",
+          produtividade: r.produtividade != null ? String(r.produtividade) : "-",
+          dias_trabalhados: r.dias_trabalhados != null ? String(r.dias_trabalhados) : "-",
+          repetida: r.repetida_pct != null ? `${r.repetida_pct}%` : "-",
+          infancia: r.infancia_pct != null ? `${r.infancia_pct}%` : "-",
+          repetida_entrantes: r.repetida_entrantes ?? 0,
+          repetida_repetiu: r.repetida_repetiu ?? 0,
+          infancia_instaladas: r.infancia_instaladas ?? 0,
+          infancia_chamados_30d: r.infancia_chamados_30d ?? 0,
+        });
+      });
+      setAllIndicadores(merged);
     } catch (err: any) {
       console.error("Error loading indicadores:", err);
     } finally {
@@ -169,7 +273,8 @@ const VistoriaCampo = () => {
 
   useEffect(() => {
     loadIndicadores();
-  }, [loadIndicadores]);
+    loadColaboradores();
+  }, [loadIndicadores, loadColaboradores]);
 
   // Auto-fill Logic
   useEffect(() => {
@@ -185,36 +290,51 @@ const VistoriaCampo = () => {
 
   const handleLookupRE = async (val: string) => {
     try {
-      const { data: indData } = await supabase
-        .from("tecnicos_indicadores" as any)
-        .select("*")
-        .eq("re", val.toUpperCase())
-        .maybeSingle();
-
-      if (indData) {
-        setIndicadores(indData as unknown as TecnicoIndicadores);
-        return;
-      }
-
+      const upper = val.toUpperCase();
+      // 1) Busca colaborador (Dimensão) por TR ou TT
       const { data: tecData } = await supabase
         .from("tecnicos_cadastro")
         .select("*")
-        .or(`tr.eq.${val.toUpperCase()},tt.eq.${val.toUpperCase()}`)
+        .or(`tr.eq.${upper},tt.eq.${upper}`)
         .maybeSingle();
 
-      if (tecData) {
-        setIndicadores({
-          re: val.toUpperCase(),
-          tt: tecData.tt || "",
-          nome: tecData.nome_tecnico,
-          supervisor: tecData.supervisor || "",
-          eficacia: "-",
-          produtividade: "-",
-          dias_trabalhados: "-",
-          repetida: "-",
-          infancia: "-"
-        });
+      if (!tecData) {
+        setIndicadores(null);
+        return;
       }
+
+      const ttKey = (tecData.tt || "").toUpperCase();
+
+      // 2) Busca o indicador mais recente para o TT (Fato)
+      let indRow: IndicadorFatoRow | null = null;
+      if (ttKey) {
+        const { data: indList } = await supabase
+          .from("tecnicos_indicadores" as any)
+          .select("*")
+          .eq("tt", ttKey)
+          .order("mes_referencia", { ascending: false })
+          .limit(1);
+        indRow = ((indList as any[]) || [])[0] || null;
+      }
+
+      setIndicadores({
+        re: tecData.tr || tecData.tt || upper,
+        tt: ttKey,
+        nome: tecData.nome_tecnico,
+        supervisor: tecData.supervisor || "",
+        empresa: tecData.nome_empresa || "",
+        coordenador: tecData.coordenador || "",
+        mes_referencia: indRow?.mes_referencia,
+        eficacia: indRow?.eficacia != null ? String(indRow.eficacia) : "-",
+        produtividade: indRow?.produtividade != null ? String(indRow.produtividade) : "-",
+        dias_trabalhados: indRow?.dias_trabalhados != null ? String(indRow.dias_trabalhados) : "-",
+        repetida: indRow?.repetida_pct != null ? `${indRow.repetida_pct}%` : "-",
+        infancia: indRow?.infancia_pct != null ? `${indRow.infancia_pct}%` : "-",
+        repetida_entrantes: indRow?.repetida_entrantes ?? 0,
+        repetida_repetiu: indRow?.repetida_repetiu ?? 0,
+        infancia_instaladas: indRow?.infancia_instaladas ?? 0,
+        infancia_chamados_30d: indRow?.infancia_chamados_30d ?? 0,
+      });
     } catch (err) {
       console.error("Error looking up RE:", err);
     }
@@ -824,56 +944,72 @@ const VistoriaCampo = () => {
     }
   };
 
-  // Import indicadores - replace matching RE/TT/Nome, insert new
+  // ============= IMPORT: INDICADORES (Fato) por TT + mes_referencia =============
+  const parseNum = (v: any): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const s = String(v).replace(",", ".").replace("%", "").trim();
+    const n = Number(s);
+    return isNaN(n) ? null : n;
+  };
+
+  const parseMes = (v: any): string => {
+    if (!v) return new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), 1).toISOString().slice(0, 10);
+    const s = String(v).trim();
+    // Aceita YYYY-MM, YYYY-MM-DD, MM/YYYY, DD/MM/YYYY
+    const m1 = s.match(/^(\d{4})-(\d{2})/);
+    if (m1) return `${m1[1]}-${m1[2]}-01`;
+    const m2 = s.match(/^(\d{2})\/(\d{4})$/);
+    if (m2) return `${m2[2]}-${m2[1]}-01`;
+    const m3 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m3) return `${m3[3]}-${m3[2]}-01`;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    return new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  };
+
   const handleImportIndicadores = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     try {
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
+      const wb = XLSX.read(data, { cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-      let createdCount = 0;
-      let updatedCount = 0;
       const loteId = new Date().toISOString();
+      const payloads = rows
+        .map((r) => {
+          const tt = String(r.TT || r.tt || "").trim().toUpperCase();
+          if (!tt) return null;
+          return {
+            tt,
+            mes_referencia: parseMes(r["Mês Referência"] || r["Mes Referencia"] || r.mes_referencia || r.Mes),
+            eficacia: parseNum(r.Eficácia ?? r.Eficacia ?? r.eficacia),
+            produtividade: parseNum(r.Produtividade ?? r.produtividade),
+            dias_trabalhados: parseNum(r["Dias Trabalhados"] ?? r["Dias Trab."] ?? r.dias_trabalhados),
+            repetida_entrantes: parseNum(r["Repetida Entrantes"] ?? r["Entrantes"] ?? r.repetida_entrantes) ?? 0,
+            repetida_repetiu: parseNum(r["Repetida Repetiu"] ?? r["Repetiu"] ?? r.repetida_repetiu) ?? 0,
+            infancia_instaladas: parseNum(r["Infância Instaladas"] ?? r["Instaladas"] ?? r.infancia_instaladas) ?? 0,
+            infancia_chamados_30d: parseNum(r["Infância Chamados 30d"] ?? r["Chamados 30d"] ?? r.infancia_chamados_30d) ?? 0,
+            lote_importacao: loteId,
+            uploaded_by: user.id,
+          };
+        })
+        .filter(Boolean) as any[];
 
-      for (const r of rows) {
-        const reVal = String(r.RE || r.re || "").trim().toUpperCase();
-        if (!reVal) continue;
-
-        const payload = {
-          re: reVal,
-          tt: String(r.TT || r.tt || "").trim(),
-          nome: String(r["Nome"] || r.nome || r["Nome Técnico"] || "").trim(),
-          supervisor: String(r.Supervisor || r.supervisor || "").trim(),
-          eficacia: String(r.Eficácia || r.eficacia || r["Eficacia"] || "-").trim(),
-          produtividade: String(r.Produtividade || r.produtividade || "-").trim(),
-          dias_trabalhados: String(r["Dias Trabalhados"] || r.dias_trabalhados || r["Dias Trab."] || "-").trim(),
-          repetida: String(r.Repetida || r.repetida || "-").trim(),
-          infancia: String(r.Infância || r.infancia || r["Infancia"] || "-").trim(),
-          lote_importacao: loteId,
-          uploaded_by: user.id,
-          updated_at: new Date().toISOString()
-        };
-
-        // Check existing by RE
-        const { data: existing } = await supabase
-          .from("tecnicos_indicadores" as any)
-          .select("id")
-          .eq("re", reVal)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("tecnicos_indicadores" as any).update(payload).eq("re", reVal);
-          updatedCount++;
-        } else {
-          await supabase.from("tecnicos_indicadores" as any).insert(payload);
-          createdCount++;
-        }
+      if (payloads.length === 0) {
+        toast.error("Planilha vazia ou sem coluna TT.");
+        return;
       }
 
-      toast.success(`Importação concluída! ${createdCount} novos, ${updatedCount} atualizados.`);
+      // UPSERT por (tt, mes_referencia) — não duplica
+      const { error } = await supabase
+        .from("tecnicos_indicadores" as any)
+        .upsert(payloads, { onConflict: "tt,mes_referencia" });
+      if (error) throw error;
+
+      toast.success(`Importação concluída! ${payloads.length} registros processados.`);
       trackAction("importar_indicadores");
       loadIndicadores();
     } catch (err: any) {
@@ -883,35 +1019,133 @@ const VistoriaCampo = () => {
   };
 
   const downloadTemplateIndicadores = () => {
-    const ws = XLSX.utils.aoa_to_sheet([["RE", "TT", "Nome", "Supervisor", "Eficácia", "Produtividade", "Dias Trabalhados", "Repetida", "Infância"]]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      [
+        "TT",
+        "Mês Referência",
+        "Eficácia",
+        "Produtividade",
+        "Dias Trabalhados",
+        "Repetida Entrantes",
+        "Repetida Repetiu",
+        "Infância Instaladas",
+        "Infância Chamados 30d",
+      ],
+      ["TT123456", "2026-04", 95, 88, 22, 100, 5, 50, 2],
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Indicadores");
     XLSX.writeFile(wb, "modelo_indicadores_vistoria.xlsx");
   };
 
-  // Edit individual indicador
+  // ============= IMPORT: COLABORADORES (Dimensão) =============
+  const handleImportColaboradores = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws);
+
+      // Carrega existentes por TT e TR para deduplicação
+      const { data: existing } = await supabase
+        .from("tecnicos_cadastro")
+        .select("id,tt,tr,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
+      const byTT = new Map<string, any>();
+      const byTR = new Map<string, any>();
+      (existing || []).forEach((c: any) => {
+        if (c.tt) byTT.set(String(c.tt).toUpperCase(), c);
+        if (c.tr) byTR.set(String(c.tr).toUpperCase(), c);
+      });
+
+      let inserted = 0;
+      let updated = 0;
+      let skipped = 0;
+
+      for (const r of rows) {
+        const tt = String(r.TT || r.tt || "").trim().toUpperCase();
+        const tr = String(r.TR || r.tr || r.RE || r.re || "").trim().toUpperCase();
+        const nome = String(r["Nome Técnico"] || r["Nome"] || r.nome_tecnico || r.nome || "").trim();
+        if (!nome || (!tt && !tr)) continue;
+
+        const payload: any = {
+          nome_tecnico: nome,
+          tt: tt || null,
+          tr: tr || null,
+          nome_empresa: String(r["Empresa"] || r.nome_empresa || "").trim() || null,
+          supervisor: String(r["Supervisor"] || r.supervisor || "").trim() || null,
+          coordenador: String(r["Coordenador"] || r.coordenador || "").trim() || null,
+          telefone: String(r["Telefone"] || r.telefone || "").trim() || null,
+          cidade_residencia: String(r["Cidade"] || r.cidade_residencia || "").trim() || null,
+          uploaded_by: user.id,
+        };
+
+        const found = (tt && byTT.get(tt)) || (tr && byTR.get(tr));
+        if (found) {
+          // Não altera se todos os campos relevantes forem iguais
+          const isSame =
+            (found.nome_tecnico || "") === payload.nome_tecnico &&
+            (found.tt || "") === (payload.tt || "") &&
+            (found.tr || "") === (payload.tr || "") &&
+            (found.nome_empresa || "") === (payload.nome_empresa || "") &&
+            (found.supervisor || "") === (payload.supervisor || "") &&
+            (found.coordenador || "") === (payload.coordenador || "") &&
+            (found.telefone || "") === (payload.telefone || "") &&
+            (found.cidade_residencia || "") === (payload.cidade_residencia || "");
+          if (isSame) {
+            skipped++;
+            continue;
+          }
+          await supabase.from("tecnicos_cadastro").update(payload).eq("id", found.id);
+          updated++;
+        } else {
+          await supabase.from("tecnicos_cadastro").insert(payload);
+          inserted++;
+        }
+      }
+
+      toast.success(`${inserted} novos, ${updated} atualizados, ${skipped} sem alteração.`);
+      trackAction("importar_colaboradores");
+      loadColaboradores();
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro ao importar colaboradores: " + err.message);
+    }
+    e.target.value = "";
+  };
+
+  const downloadTemplateColaboradores = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
+      ["TT123456", "RE12345", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
+    XLSX.writeFile(wb, "modelo_colaboradores_vistoria.xlsx");
+  };
+
+  // Edit individual indicador (Fato — opera por id)
   const handleStartEdit = (ind: TecnicoIndicadores) => {
     setEditingIndicador(ind);
     setEditForm({ ...ind });
   };
 
   const handleSaveEdit = async () => {
-    if (!editForm || !editingIndicador) return;
+    if (!editForm || !editingIndicador?.id) return;
     try {
       const { error } = await supabase
         .from("tecnicos_indicadores" as any)
         .update({
-          tt: editForm.tt,
-          nome: editForm.nome,
-          supervisor: editForm.supervisor,
-          eficacia: editForm.eficacia,
-          produtividade: editForm.produtividade,
-          dias_trabalhados: editForm.dias_trabalhados,
-          repetida: editForm.repetida,
-          infancia: editForm.infancia,
-          updated_at: new Date().toISOString()
+          eficacia: parseNum(editForm.eficacia),
+          produtividade: parseNum(editForm.produtividade),
+          dias_trabalhados: parseNum(editForm.dias_trabalhados),
+          repetida_entrantes: editForm.repetida_entrantes ?? 0,
+          repetida_repetiu: editForm.repetida_repetiu ?? 0,
+          infancia_instaladas: editForm.infancia_instaladas ?? 0,
+          infancia_chamados_30d: editForm.infancia_chamados_30d ?? 0,
         })
-        .eq("re", editingIndicador.re);
+        .eq("id", editingIndicador.id);
 
       if (error) throw error;
       toast.success("Indicador atualizado!");
@@ -923,12 +1157,59 @@ const VistoriaCampo = () => {
     }
   };
 
-  const handleDeleteIndicador = async (reVal: string) => {
+  const handleDeleteIndicador = async (idVal?: string) => {
+    if (!idVal) return;
     if (!confirm("Deseja excluir este registro?")) return;
     try {
-      const { error } = await supabase.from("tecnicos_indicadores" as any).delete().eq("re", reVal);
+      const { error } = await supabase.from("tecnicos_indicadores" as any).delete().eq("id", idVal);
       if (error) throw error;
       toast.success("Registro excluído!");
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    }
+  };
+
+  // Edit individual colaborador (Dimensão)
+  const handleStartEditColab = (c: ColaboradorRow) => {
+    setEditingColaborador(c);
+    setEditColaboradorForm({ ...c });
+  };
+
+  const handleSaveColaborador = async () => {
+    if (!editColaboradorForm || !editingColaborador?.id) return;
+    try {
+      const { error } = await supabase
+        .from("tecnicos_cadastro")
+        .update({
+          nome_tecnico: editColaboradorForm.nome_tecnico,
+          tt: editColaboradorForm.tt || null,
+          tr: editColaboradorForm.tr || null,
+          nome_empresa: editColaboradorForm.nome_empresa || null,
+          supervisor: editColaboradorForm.supervisor || null,
+          coordenador: editColaboradorForm.coordenador || null,
+          telefone: editColaboradorForm.telefone || null,
+          cidade_residencia: editColaboradorForm.cidade_residencia || null,
+        })
+        .eq("id", editingColaborador.id);
+      if (error) throw error;
+      toast.success("Colaborador atualizado!");
+      setEditingColaborador(null);
+      setEditColaboradorForm(null);
+      loadColaboradores();
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    }
+  };
+
+  const handleDeleteColaborador = async (id: string) => {
+    if (!confirm("Deseja excluir este colaborador? Os indicadores históricos do TT permanecem na tabela de Fato.")) return;
+    try {
+      const { error } = await supabase.from("tecnicos_cadastro").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Colaborador excluído!");
+      loadColaboradores();
       loadIndicadores();
     } catch (err: any) {
       toast.error("Erro: " + err.message);
@@ -984,18 +1265,8 @@ const VistoriaCampo = () => {
       });
       if (error) throw error;
 
-      // Update indicadores with new values
-      await supabase.from("tecnicos_indicadores" as any).update({
-        eficacia: novaEvolucao.eficacia_atual || evolucaoTecnico.eficacia,
-        produtividade: novaEvolucao.produtividade_atual || evolucaoTecnico.produtividade,
-        repetida: novaEvolucao.repetida_atual || evolucaoTecnico.repetida,
-        infancia: novaEvolucao.infancia_atual || evolucaoTecnico.infancia,
-        updated_at: new Date().toISOString()
-      }).eq("re", evolucaoTecnico.re);
-
       toast.success("Evolução registrada com sucesso!");
       loadEvolucao(evolucaoTecnico.re);
-      loadIndicadores();
       setNovaEvolucao({ eficacia_atual: "", produtividade_atual: "", repetida_atual: "", infancia_atual: "", observacoes: "" });
     } catch (err: any) {
       toast.error("Erro: " + err.message);
@@ -1055,6 +1326,19 @@ const VistoriaCampo = () => {
     if (!filterIndicadores) return true;
     const q = filterIndicadores.toLowerCase();
     return ind.re?.toLowerCase().includes(q) || ind.nome?.toLowerCase().includes(q) || ind.tt?.toLowerCase().includes(q) || ind.supervisor?.toLowerCase().includes(q);
+  });
+
+  const filteredColaboradores = allColaboradores.filter((c) => {
+    if (!filterColaboradores) return true;
+    const q = filterColaboradores.toLowerCase();
+    return (
+      c.nome_tecnico?.toLowerCase().includes(q) ||
+      (c.tt || "").toLowerCase().includes(q) ||
+      (c.tr || "").toLowerCase().includes(q) ||
+      (c.supervisor || "").toLowerCase().includes(q) ||
+      (c.coordenador || "").toLowerCase().includes(q) ||
+      (c.nome_empresa || "").toLowerCase().includes(q)
+    );
   });
 
   return (
@@ -1485,137 +1769,285 @@ const VistoriaCampo = () => {
 
           {/* ========== TAB: INDICADORES / IMPORTAR ========== */}
           <TabsContent value="indicadores" className="space-y-6">
-            {/* Import Section */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                  <Upload className="w-5 h-5" /> Importação de Indicadores
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
-                  <div className="text-sm space-y-1">
-                    <p className="font-bold text-foreground">Instruções:</p>
-                    <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
-                      <li>Use o modelo Excel disponível abaixo.</li>
-                      <li>A coluna <strong>RE</strong> é obrigatória para identificação.</li>
-                      <li>Ao importar, registros com mesma RE serão atualizados; novos serão incluídos.</li>
-                    </ul>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
-                      <Upload className="w-4 h-4" /> Selecionar Planilha
-                      <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportIndicadores} />
-                    </label>
-                    <Button variant="outline" size="sm" onClick={downloadTemplateIndicadores} className="h-auto py-2.5">
-                      <Download className="w-4 h-4 mr-2" /> Baixar Modelo
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tabs value={indicadoresSubTab} onValueChange={(v) => setIndicadoresSubTab(v as "colaboradores" | "indicadores")}>
+              <TabsList>
+                <TabsTrigger value="colaboradores">Colaboradores (Dimensão)</TabsTrigger>
+                <TabsTrigger value="indicadores">Indicadores (Fato)</TabsTrigger>
+              </TabsList>
 
-            {/* Indicadores Table */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3 border-b">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                    <FileText className="w-5 h-5" /> Colaboradores Cadastrados ({allIndicadores.length})
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Filtrar por nome, RE, TT..."
-                      value={filterIndicadores}
-                      onChange={(e) => setFilterIndicadores(e.target.value)}
-                      className="w-[250px] h-9 text-sm"
-                    />
-                    <Button variant="ghost" size="icon" onClick={loadIndicadores} title="Recarregar">
-                      <RefreshCw className={`w-4 h-4 ${loadingIndicadores ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-primary/5">
-                        <TableHead className="font-bold text-foreground text-xs">RE</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Eficácia</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Produt.</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Dias Trab.</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Repetida</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Infância</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs w-[100px]">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredIndicadores.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                            {loadingIndicadores ? "Carregando..." : "Nenhum indicador cadastrado. Importe uma planilha acima."}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredIndicadores.map((ind) => (
-                          <TableRow key={ind.re} className="hover:bg-muted/30">
-                            {editingIndicador?.re === ind.re ? (
-                              <>
-                                <TableCell className="text-xs font-mono">{ind.re}</TableCell>
-                                <TableCell><Input value={editForm?.tt || ""} onChange={(e) => setEditForm(f => f ? { ...f, tt: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.nome || ""} onChange={(e) => setEditForm(f => f ? { ...f, nome: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.supervisor || ""} onChange={(e) => setEditForm(f => f ? { ...f, supervisor: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.eficacia || ""} onChange={(e) => setEditForm(f => f ? { ...f, eficacia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.produtividade || ""} onChange={(e) => setEditForm(f => f ? { ...f, produtividade: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.dias_trabalhados || ""} onChange={(e) => setEditForm(f => f ? { ...f, dias_trabalhados: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.repetida || ""} onChange={(e) => setEditForm(f => f ? { ...f, repetida: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.infancia || ""} onChange={(e) => setEditForm(f => f ? { ...f, infancia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
-                                    <Button size="icon" variant="ghost" onClick={() => { setEditingIndicador(null); setEditForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
-                                  </div>
-                                </TableCell>
-                              </>
-                            ) : (
-                              <>
-                                <TableCell className="text-xs font-mono">{ind.re}</TableCell>
-                                <TableCell className="text-xs">{ind.tt}</TableCell>
-                                <TableCell className="text-xs font-medium">{ind.nome}</TableCell>
-                                <TableCell className="text-xs">{ind.supervisor}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.eficacia}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.produtividade}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.dias_trabalhados}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.repetida}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.infancia}</TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handleStartEdit(ind)} className="h-7 w-7" title="Editar">
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => openEvolucao(ind)} className="h-7 w-7 text-primary" title="Evolução">
-                                      <TrendingUp className="w-3.5 h-3.5" />
-                                    </Button>
-                                    {isAdmin && (
-                                      <Button size="icon" variant="ghost" onClick={() => handleDeleteIndicador(ind.re)} className="h-7 w-7 text-destructive" title="Excluir">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </>
-                            )}
+              {/* ===== Sub-aba COLABORADORES ===== */}
+              <TabsContent value="colaboradores" className="space-y-6 mt-4">
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                      <Upload className="w-5 h-5" /> Importação de Colaboradores
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
+                      <div className="text-sm space-y-1">
+                        <p className="font-bold text-foreground">Instruções:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
+                          <li>Tabela base de colaboradores. Atualize livremente: edite ou inclua via planilha.</li>
+                          <li>Chave de deduplicação: <strong>TT</strong> (ou TR). Registros idênticos são ignorados na carga massiva.</li>
+                          <li>O TT é a chave que cruza com a tabela de Indicadores (Fato).</li>
+                        </ul>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
+                          <Upload className="w-4 h-4" /> Selecionar Planilha
+                          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportColaboradores} />
+                        </label>
+                        <Button variant="outline" size="sm" onClick={downloadTemplateColaboradores} className="h-auto py-2.5">
+                          <Download className="w-4 h-4 mr-2" /> Baixar Modelo
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <FileText className="w-5 h-5" /> Colaboradores ({allColaboradores.length})
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Filtrar por nome, TT, TR, supervisor..."
+                          value={filterColaboradores}
+                          onChange={(e) => setFilterColaboradores(e.target.value)}
+                          className="w-[280px] h-9 text-sm"
+                        />
+                        <Button variant="ghost" size="icon" onClick={loadColaboradores} title="Recarregar">
+                          <RefreshCw className={`w-4 h-4 ${loadingColaboradores ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">TR</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Empresa</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Coordenador</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Telefone</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Cidade</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs w-[100px]">Ações</TableHead>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredColaboradores.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                {loadingColaboradores ? "Carregando..." : "Nenhum colaborador cadastrado."}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredColaboradores.map((c) => (
+                              <TableRow key={c.id} className="hover:bg-muted/30">
+                                {editingColaborador?.id === c.id ? (
+                                  <>
+                                    <TableCell><Input value={editColaboradorForm?.tt || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tt: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.tr || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tr: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.nome_tecnico || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_tecnico: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.nome_empresa || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_empresa: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.supervisor || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, supervisor: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.coordenador || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, coordenador: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.telefone || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, telefone: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.cidade_residencia || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, cidade_residencia: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={handleSaveColaborador} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
+                                        <Button size="icon" variant="ghost" onClick={() => { setEditingColaborador(null); setEditColaboradorForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{c.tt || "-"}</TableCell>
+                                    <TableCell className="text-xs font-mono">{c.tr || "-"}</TableCell>
+                                    <TableCell className="text-xs font-medium">{c.nome_tecnico}</TableCell>
+                                    <TableCell className="text-xs">{c.nome_empresa || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.supervisor || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.coordenador || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.telefone || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.cidade_residencia || "-"}</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={() => handleStartEditColab(c)} className="h-7 w-7" title="Editar">
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        {isAdmin && (
+                                          <Button size="icon" variant="ghost" onClick={() => handleDeleteColaborador(c.id)} className="h-7 w-7 text-destructive" title="Excluir">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ===== Sub-aba INDICADORES (Fato) ===== */}
+              <TabsContent value="indicadores" className="space-y-6 mt-4">
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                      <Upload className="w-5 h-5" /> Importação de Indicadores (Fato)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
+                      <div className="text-sm space-y-1">
+                        <p className="font-bold text-foreground">Instruções:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
+                          <li>Tabela de Fato — atualizada constantemente via carga massiva.</li>
+                          <li>Chave: <strong>TT + Mês Referência</strong> (cruza com Colaboradores).</li>
+                          <li><strong>Repetida</strong>: informe Entrantes e quantos Repetiu — % calculado automaticamente.</li>
+                          <li><strong>Infância</strong>: informe Instaladas e Chamados em até 30 dias — % calculado.</li>
+                        </ul>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
+                          <Upload className="w-4 h-4" /> Selecionar Planilha
+                          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportIndicadores} />
+                        </label>
+                        <Button variant="outline" size="sm" onClick={downloadTemplateIndicadores} className="h-auto py-2.5">
+                          <Download className="w-4 h-4 mr-2" /> Baixar Modelo
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <FileText className="w-5 h-5" /> Indicadores por TT (última carga) — {allIndicadores.length} registros
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Filtrar por nome, TT, RE..."
+                          value={filterIndicadores}
+                          onChange={(e) => setFilterIndicadores(e.target.value)}
+                          className="w-[250px] h-9 text-sm"
+                        />
+                        <Button variant="ghost" size="icon" onClick={loadIndicadores} title="Recarregar">
+                          <RefreshCw className={`w-4 h-4 ${loadingIndicadores ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Mês Ref.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Eficácia</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Produt.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Dias Trab.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Rep. Entr.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Repetiu</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Repetida %</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Infân. Instal.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Cham. 30d</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Infância %</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs w-[110px]">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredIndicadores.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                                {loadingIndicadores ? "Carregando..." : "Nenhum indicador cadastrado. Importe uma planilha acima."}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredIndicadores.map((ind) => (
+                              <TableRow key={ind.id || ind.tt} className="hover:bg-muted/30">
+                                {editingIndicador?.id === ind.id ? (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{ind.tt}</TableCell>
+                                    <TableCell className="text-xs">{ind.nome}</TableCell>
+                                    <TableCell className="text-xs">{ind.supervisor}</TableCell>
+                                    <TableCell className="text-xs text-center">{ind.mes_referencia ? new Date(ind.mes_referencia).toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "-"}</TableCell>
+                                    <TableCell><Input type="number" value={editForm?.eficacia ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, eficacia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.produtividade ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, produtividade: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.dias_trabalhados ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, dias_trabalhados: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.repetida_entrantes ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, repetida_entrantes: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.repetida_repetiu ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, repetida_repetiu: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell className="text-center text-xs text-muted-foreground">auto</TableCell>
+                                    <TableCell><Input type="number" value={editForm?.infancia_instaladas ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, infancia_instaladas: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.infancia_chamados_30d ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, infancia_chamados_30d: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell className="text-center text-xs text-muted-foreground">auto</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
+                                        <Button size="icon" variant="ghost" onClick={() => { setEditingIndicador(null); setEditForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{ind.tt}</TableCell>
+                                    <TableCell className="text-xs font-medium">{ind.nome}</TableCell>
+                                    <TableCell className="text-xs">{ind.supervisor}</TableCell>
+                                    <TableCell className="text-xs text-center">{ind.mes_referencia ? new Date(ind.mes_referencia).toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "-"}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.eficacia}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.produtividade}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.dias_trabalhados}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.repetida_entrantes ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.repetida_repetiu ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs font-semibold">{ind.repetida}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.infancia_instaladas ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.infancia_chamados_30d ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs font-semibold">{ind.infancia}</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={() => handleStartEdit(ind)} className="h-7 w-7" title="Editar">
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={() => openEvolucao(ind)} className="h-7 w-7 text-primary" title="Evolução">
+                                          <TrendingUp className="w-3.5 h-3.5" />
+                                        </Button>
+                                        {isAdmin && (
+                                          <Button size="icon" variant="ghost" onClick={() => handleDeleteIndicador(ind.id)} className="h-7 w-7 text-destructive" title="Excluir">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* ========== TAB: EVOLUÇÃO ========== */}

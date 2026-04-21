@@ -852,49 +852,55 @@ export type Database = {
       tecnicos_indicadores: {
         Row: {
           created_at: string
-          dias_trabalhados: string | null
-          eficacia: string | null
+          dias_trabalhados: number | null
+          eficacia: number | null
           id: string
-          infancia: string | null
+          infancia_chamados_30d: number | null
+          infancia_instaladas: number | null
+          infancia_pct: number | null
           lote_importacao: string | null
-          nome: string
-          produtividade: string | null
-          re: string
-          repetida: string | null
-          supervisor: string | null
-          tt: string | null
+          mes_referencia: string
+          produtividade: number | null
+          repetida_entrantes: number | null
+          repetida_pct: number | null
+          repetida_repetiu: number | null
+          tt: string
           updated_at: string
           uploaded_by: string | null
         }
         Insert: {
           created_at?: string
-          dias_trabalhados?: string | null
-          eficacia?: string | null
+          dias_trabalhados?: number | null
+          eficacia?: number | null
           id?: string
-          infancia?: string | null
+          infancia_chamados_30d?: number | null
+          infancia_instaladas?: number | null
+          infancia_pct?: number | null
           lote_importacao?: string | null
-          nome?: string
-          produtividade?: string | null
-          re: string
-          repetida?: string | null
-          supervisor?: string | null
-          tt?: string | null
+          mes_referencia?: string
+          produtividade?: number | null
+          repetida_entrantes?: number | null
+          repetida_pct?: number | null
+          repetida_repetiu?: number | null
+          tt: string
           updated_at?: string
           uploaded_by?: string | null
         }
         Update: {
           created_at?: string
-          dias_trabalhados?: string | null
-          eficacia?: string | null
+          dias_trabalhados?: number | null
+          eficacia?: number | null
           id?: string
-          infancia?: string | null
+          infancia_chamados_30d?: number | null
+          infancia_instaladas?: number | null
+          infancia_pct?: number | null
           lote_importacao?: string | null
-          nome?: string
-          produtividade?: string | null
-          re?: string
-          repetida?: string | null
-          supervisor?: string | null
-          tt?: string | null
+          mes_referencia?: string
+          produtividade?: number | null
+          repetida_entrantes?: number | null
+          repetida_pct?: number | null
+          repetida_repetiu?: number | null
+          tt?: string
           updated_at?: string
           uploaded_by?: string | null
         }
