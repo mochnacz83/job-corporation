@@ -268,16 +268,35 @@ const AdminUsers = () => {
     const fullPhone = phone.startsWith("55") ? phone : `55${phone}`;
     const msg = buildWhatsAppMessage(waUser.nome, waUser.matricula, waPassword);
     const encoded = encodeURIComponent(msg);
-    // Usar wa.me via <a> evita bloqueios de popup/iframe (ERR_BLOCKED_BY_RESPONSE)
-    // que ocorrem com window.open dentro do preview e com api.whatsapp.com.
-    const url = `https://wa.me/${fullPhone}?text=${encoded}`;
-    const link = document.createElement("a");
-    link.href = url;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const appUrl = `whatsapp://send?phone=${fullPhone}&text=${encoded}`;
+    const webUrl = `https://web.whatsapp.com/send?phone=${fullPhone}&text=${encoded}`;
+
+    const openLink = (href: string, target: "_self" | "_blank" = "_self") => {
+      const link = document.createElement("a");
+      link.href = href;
+      link.target = target;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    let appOpened = false;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        appOpened = true;
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    openLink(appUrl);
+
+    window.setTimeout(() => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (!appOpened && document.visibilityState === "visible") {
+        openLink(webUrl, "_blank");
+      }
+    }, 900);
   };
 
   const handleCopyWhatsAppMessage = async () => {
