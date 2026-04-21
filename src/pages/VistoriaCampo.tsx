@@ -290,36 +290,51 @@ const VistoriaCampo = () => {
 
   const handleLookupRE = async (val: string) => {
     try {
-      const { data: indData } = await supabase
-        .from("tecnicos_indicadores" as any)
-        .select("*")
-        .eq("re", val.toUpperCase())
-        .maybeSingle();
-
-      if (indData) {
-        setIndicadores(indData as unknown as TecnicoIndicadores);
-        return;
-      }
-
+      const upper = val.toUpperCase();
+      // 1) Busca colaborador (Dimensão) por TR ou TT
       const { data: tecData } = await supabase
         .from("tecnicos_cadastro")
         .select("*")
-        .or(`tr.eq.${val.toUpperCase()},tt.eq.${val.toUpperCase()}`)
+        .or(`tr.eq.${upper},tt.eq.${upper}`)
         .maybeSingle();
 
-      if (tecData) {
-        setIndicadores({
-          re: val.toUpperCase(),
-          tt: tecData.tt || "",
-          nome: tecData.nome_tecnico,
-          supervisor: tecData.supervisor || "",
-          eficacia: "-",
-          produtividade: "-",
-          dias_trabalhados: "-",
-          repetida: "-",
-          infancia: "-"
-        });
+      if (!tecData) {
+        setIndicadores(null);
+        return;
       }
+
+      const ttKey = (tecData.tt || "").toUpperCase();
+
+      // 2) Busca o indicador mais recente para o TT (Fato)
+      let indRow: IndicadorFatoRow | null = null;
+      if (ttKey) {
+        const { data: indList } = await supabase
+          .from("tecnicos_indicadores" as any)
+          .select("*")
+          .eq("tt", ttKey)
+          .order("mes_referencia", { ascending: false })
+          .limit(1);
+        indRow = ((indList as any[]) || [])[0] || null;
+      }
+
+      setIndicadores({
+        re: tecData.tr || tecData.tt || upper,
+        tt: ttKey,
+        nome: tecData.nome_tecnico,
+        supervisor: tecData.supervisor || "",
+        empresa: tecData.nome_empresa || "",
+        coordenador: tecData.coordenador || "",
+        mes_referencia: indRow?.mes_referencia,
+        eficacia: indRow?.eficacia != null ? String(indRow.eficacia) : "-",
+        produtividade: indRow?.produtividade != null ? String(indRow.produtividade) : "-",
+        dias_trabalhados: indRow?.dias_trabalhados != null ? String(indRow.dias_trabalhados) : "-",
+        repetida: indRow?.repetida_pct != null ? `${indRow.repetida_pct}%` : "-",
+        infancia: indRow?.infancia_pct != null ? `${indRow.infancia_pct}%` : "-",
+        repetida_entrantes: indRow?.repetida_entrantes ?? 0,
+        repetida_repetiu: indRow?.repetida_repetiu ?? 0,
+        infancia_instaladas: indRow?.infancia_instaladas ?? 0,
+        infancia_chamados_30d: indRow?.infancia_chamados_30d ?? 0,
+      });
     } catch (err) {
       console.error("Error looking up RE:", err);
     }
