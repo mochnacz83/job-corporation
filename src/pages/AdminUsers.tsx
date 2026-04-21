@@ -58,6 +58,26 @@ const validatePassword = (password: string): string | null => {
   return null;
 };
 
+// Gera senha temporária aleatória que atende aos requisitos de validação
+const generateTempPassword = (): string => {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%&*?";
+  const all = upper + lower + digits + special;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  // Garante ao menos um de cada categoria
+  let chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  // Completa até 10 caracteres
+  while (chars.length < 10) chars.push(pick(all));
+  // Embaralha
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+};
+
 const AdminUsers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -207,7 +227,9 @@ const AdminUsers = () => {
 
   const openResetDialog = (u: UserProfile) => {
     setResetUser(u);
-    setNewPassword(u.requested_password || "");
+    // Se o usuário já solicitou uma senha específica, mantém ela.
+    // Caso contrário, gera automaticamente uma senha temporária forte.
+    setNewPassword(u.requested_password || generateTempPassword());
     setPasswordError(null);
     setResetDialogOpen(true);
   };
@@ -621,21 +643,33 @@ const AdminUsers = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1">
-            <Label>Nova Senha Temporária</Label>
-            <Input type="text" placeholder={resetUser?.requested_password ? "Senha solicitada" : (resetUser?.email ? "Nova senha temporária" : "12345@Ab")} value={newPassword}
-              disabled={!resetUser?.email && !resetUser?.requested_password}
-              onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); }} />
+            <Label>Nova Senha Temporária (gerada automaticamente)</Label>
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={newPassword}
+                readOnly
+                className="font-mono tracking-wider bg-muted"
+              />
+              {!resetUser?.requested_password && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => { setNewPassword(generateTempPassword()); setPasswordError(null); }}
+                  title="Gerar nova senha"
+                >
+                  ↻
+                </Button>
+              )}
+            </div>
             {resetUser?.requested_password ? (
               <p className="text-[10px] text-blue-600 font-medium pt-1">
                 ⭐ O usuário escolheu esta senha. Clique em redefinir para aprovar.
               </p>
-            ) : !resetUser?.email ? (
-              <p className="text-[10px] text-amber-600 font-medium">
-                Usuário sem e-mail cadastrado. A senha será resetada para o padrão: 12345@Ab
-              </p>
             ) : (
-              <p className="text-[10px] text-blue-600 font-medium">
-                A senha temporária será enviada para: {resetUser.email}
+              <p className="text-[10px] text-blue-600 font-medium pt-1">
+                Senha temporária gerada automaticamente. Após redefinir, será aberta a tela para envio via WhatsApp.
+                {resetUser?.email ? ` Também será enviada por e-mail para: ${resetUser.email}` : ""}
               </p>
             )}
           </div>
