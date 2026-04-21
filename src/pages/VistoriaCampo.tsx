@@ -1125,29 +1125,27 @@ const VistoriaCampo = () => {
     XLSX.writeFile(wb, "modelo_colaboradores_vistoria.xlsx");
   };
 
-  // Edit individual indicador
+  // Edit individual indicador (Fato — opera por id)
   const handleStartEdit = (ind: TecnicoIndicadores) => {
     setEditingIndicador(ind);
     setEditForm({ ...ind });
   };
 
   const handleSaveEdit = async () => {
-    if (!editForm || !editingIndicador) return;
+    if (!editForm || !editingIndicador?.id) return;
     try {
       const { error } = await supabase
         .from("tecnicos_indicadores" as any)
         .update({
-          tt: editForm.tt,
-          nome: editForm.nome,
-          supervisor: editForm.supervisor,
-          eficacia: editForm.eficacia,
-          produtividade: editForm.produtividade,
-          dias_trabalhados: editForm.dias_trabalhados,
-          repetida: editForm.repetida,
-          infancia: editForm.infancia,
-          updated_at: new Date().toISOString()
+          eficacia: parseNum(editForm.eficacia),
+          produtividade: parseNum(editForm.produtividade),
+          dias_trabalhados: parseNum(editForm.dias_trabalhados),
+          repetida_entrantes: editForm.repetida_entrantes ?? 0,
+          repetida_repetiu: editForm.repetida_repetiu ?? 0,
+          infancia_instaladas: editForm.infancia_instaladas ?? 0,
+          infancia_chamados_30d: editForm.infancia_chamados_30d ?? 0,
         })
-        .eq("re", editingIndicador.re);
+        .eq("id", editingIndicador.id);
 
       if (error) throw error;
       toast.success("Indicador atualizado!");
@@ -1159,12 +1157,59 @@ const VistoriaCampo = () => {
     }
   };
 
-  const handleDeleteIndicador = async (reVal: string) => {
+  const handleDeleteIndicador = async (idVal?: string) => {
+    if (!idVal) return;
     if (!confirm("Deseja excluir este registro?")) return;
     try {
-      const { error } = await supabase.from("tecnicos_indicadores" as any).delete().eq("re", reVal);
+      const { error } = await supabase.from("tecnicos_indicadores" as any).delete().eq("id", idVal);
       if (error) throw error;
       toast.success("Registro excluído!");
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    }
+  };
+
+  // Edit individual colaborador (Dimensão)
+  const handleStartEditColab = (c: ColaboradorRow) => {
+    setEditingColaborador(c);
+    setEditColaboradorForm({ ...c });
+  };
+
+  const handleSaveColaborador = async () => {
+    if (!editColaboradorForm || !editingColaborador?.id) return;
+    try {
+      const { error } = await supabase
+        .from("tecnicos_cadastro")
+        .update({
+          nome_tecnico: editColaboradorForm.nome_tecnico,
+          tt: editColaboradorForm.tt || null,
+          tr: editColaboradorForm.tr || null,
+          nome_empresa: editColaboradorForm.nome_empresa || null,
+          supervisor: editColaboradorForm.supervisor || null,
+          coordenador: editColaboradorForm.coordenador || null,
+          telefone: editColaboradorForm.telefone || null,
+          cidade_residencia: editColaboradorForm.cidade_residencia || null,
+        })
+        .eq("id", editingColaborador.id);
+      if (error) throw error;
+      toast.success("Colaborador atualizado!");
+      setEditingColaborador(null);
+      setEditColaboradorForm(null);
+      loadColaboradores();
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro: " + err.message);
+    }
+  };
+
+  const handleDeleteColaborador = async (id: string) => {
+    if (!confirm("Deseja excluir este colaborador? Os indicadores históricos do TT permanecem na tabela de Fato.")) return;
+    try {
+      const { error } = await supabase.from("tecnicos_cadastro").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Colaborador excluído!");
+      loadColaboradores();
       loadIndicadores();
     } catch (err: any) {
       toast.error("Erro: " + err.message);
