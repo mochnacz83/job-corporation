@@ -197,16 +197,73 @@ const VistoriaCampo = () => {
     observacoes: ""
   });
 
-  // Load all indicadores
+  // Load colaboradores (Dimensão)
+  const loadColaboradores = useCallback(async () => {
+    setLoadingColaboradores(true);
+    try {
+      const { data, error } = await supabase
+        .from("tecnicos_cadastro")
+        .select("*")
+        .order("nome_tecnico");
+      if (error) throw error;
+      setAllColaboradores((data as any[]) || []);
+    } catch (err: any) {
+      console.error("Error loading colaboradores:", err);
+    } finally {
+      setLoadingColaboradores(false);
+    }
+  }, []);
+
+  // Load indicadores (Fato) - última carga por TT, com JOIN dos dados do colaborador
   const loadIndicadores = useCallback(async () => {
     setLoadingIndicadores(true);
     try {
-      const { data, error } = await supabase
-        .from("tecnicos_indicadores" as any)
-        .select("*")
-        .order("nome");
-      if (error) throw error;
-      setAllIndicadores((data as any[]) || []);
+      const [indRes, colabRes] = await Promise.all([
+        supabase
+          .from("tecnicos_indicadores" as any)
+          .select("*")
+          .order("mes_referencia", { ascending: false }),
+        supabase
+          .from("tecnicos_cadastro")
+          .select("tt,tr,nome_tecnico,supervisor,nome_empresa,coordenador"),
+      ]);
+      if (indRes.error) throw indRes.error;
+      if (colabRes.error) throw colabRes.error;
+
+      const colabMap = new Map<string, any>();
+      (colabRes.data || []).forEach((c: any) => {
+        if (c.tt) colabMap.set(c.tt.toUpperCase(), c);
+      });
+
+      // Mantém só o registro mais recente por TT (já vem ordenado desc)
+      const seen = new Set<string>();
+      const merged: TecnicoIndicadores[] = [];
+      ((indRes.data as any[]) || []).forEach((r: IndicadorFatoRow) => {
+        const ttKey = (r.tt || "").toUpperCase();
+        if (!ttKey || seen.has(ttKey)) return;
+        seen.add(ttKey);
+        const colab = colabMap.get(ttKey);
+        merged.push({
+          id: r.id,
+          re: colab?.tr || colab?.tt || ttKey,
+          tt: ttKey,
+          nome: colab?.nome_tecnico || "(não cadastrado)",
+          supervisor: colab?.supervisor || "",
+          empresa: colab?.nome_empresa || "",
+          coordenador: colab?.coordenador || "",
+          mes_referencia: r.mes_referencia,
+          eficacia: r.eficacia != null ? String(r.eficacia) : "-",
+          produtividade: r.produtividade != null ? String(r.produtividade) : "-",
+          dias_trabalhados: r.dias_trabalhados != null ? String(r.dias_trabalhados) : "-",
+          repetida: r.repetida_pct != null ? `${r.repetida_pct}%` : "-",
+          infancia: r.infancia_pct != null ? `${r.infancia_pct}%` : "-",
+          repetida_entrantes: r.repetida_entrantes ?? 0,
+          repetida_repetiu: r.repetida_repetiu ?? 0,
+          infancia_instaladas: r.infancia_instaladas ?? 0,
+          infancia_chamados_30d: r.infancia_chamados_30d ?? 0,
+        });
+      });
+      setAllIndicadores(merged);
     } catch (err: any) {
       console.error("Error loading indicadores:", err);
     } finally {
@@ -216,7 +273,8 @@ const VistoriaCampo = () => {
 
   useEffect(() => {
     loadIndicadores();
-  }, [loadIndicadores]);
+    loadColaboradores();
+  }, [loadIndicadores, loadColaboradores]);
 
   // Auto-fill Logic
   useEffect(() => {
