@@ -241,8 +241,17 @@ const AdminUsers = () => {
 
     setResetting(true);
     try {
+      // Garantir que o token da sessão atual seja enviado explicitamente.
+      // Em alguns cenários o invoke não anexa o header automaticamente,
+      // o que resulta em "Forbidden: admin role required" na edge function.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
       const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
         body: { action: "reset-password", userId: resetUser.user_id, newPassword },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
 
