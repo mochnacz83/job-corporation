@@ -944,56 +944,72 @@ const VistoriaCampo = () => {
     }
   };
 
-  // Import indicadores - replace matching RE/TT/Nome, insert new
+  // ============= IMPORT: INDICADORES (Fato) por TT + mes_referencia =============
+  const parseNum = (v: any): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const s = String(v).replace(",", ".").replace("%", "").trim();
+    const n = Number(s);
+    return isNaN(n) ? null : n;
+  };
+
+  const parseMes = (v: any): string => {
+    if (!v) return new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+    if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), 1).toISOString().slice(0, 10);
+    const s = String(v).trim();
+    // Aceita YYYY-MM, YYYY-MM-DD, MM/YYYY, DD/MM/YYYY
+    const m1 = s.match(/^(\d{4})-(\d{2})/);
+    if (m1) return `${m1[1]}-${m1[2]}-01`;
+    const m2 = s.match(/^(\d{2})\/(\d{4})$/);
+    if (m2) return `${m2[2]}-${m2[1]}-01`;
+    const m3 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m3) return `${m3[3]}-${m3[2]}-01`;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    return new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  };
+
   const handleImportIndicadores = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     try {
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
+      const wb = XLSX.read(data, { cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-      let createdCount = 0;
-      let updatedCount = 0;
       const loteId = new Date().toISOString();
+      const payloads = rows
+        .map((r) => {
+          const tt = String(r.TT || r.tt || "").trim().toUpperCase();
+          if (!tt) return null;
+          return {
+            tt,
+            mes_referencia: parseMes(r["Mês Referência"] || r["Mes Referencia"] || r.mes_referencia || r.Mes),
+            eficacia: parseNum(r.Eficácia ?? r.Eficacia ?? r.eficacia),
+            produtividade: parseNum(r.Produtividade ?? r.produtividade),
+            dias_trabalhados: parseNum(r["Dias Trabalhados"] ?? r["Dias Trab."] ?? r.dias_trabalhados),
+            repetida_entrantes: parseNum(r["Repetida Entrantes"] ?? r["Entrantes"] ?? r.repetida_entrantes) ?? 0,
+            repetida_repetiu: parseNum(r["Repetida Repetiu"] ?? r["Repetiu"] ?? r.repetida_repetiu) ?? 0,
+            infancia_instaladas: parseNum(r["Infância Instaladas"] ?? r["Instaladas"] ?? r.infancia_instaladas) ?? 0,
+            infancia_chamados_30d: parseNum(r["Infância Chamados 30d"] ?? r["Chamados 30d"] ?? r.infancia_chamados_30d) ?? 0,
+            lote_importacao: loteId,
+            uploaded_by: user.id,
+          };
+        })
+        .filter(Boolean) as any[];
 
-      for (const r of rows) {
-        const reVal = String(r.RE || r.re || "").trim().toUpperCase();
-        if (!reVal) continue;
-
-        const payload = {
-          re: reVal,
-          tt: String(r.TT || r.tt || "").trim(),
-          nome: String(r["Nome"] || r.nome || r["Nome Técnico"] || "").trim(),
-          supervisor: String(r.Supervisor || r.supervisor || "").trim(),
-          eficacia: String(r.Eficácia || r.eficacia || r["Eficacia"] || "-").trim(),
-          produtividade: String(r.Produtividade || r.produtividade || "-").trim(),
-          dias_trabalhados: String(r["Dias Trabalhados"] || r.dias_trabalhados || r["Dias Trab."] || "-").trim(),
-          repetida: String(r.Repetida || r.repetida || "-").trim(),
-          infancia: String(r.Infância || r.infancia || r["Infancia"] || "-").trim(),
-          lote_importacao: loteId,
-          uploaded_by: user.id,
-          updated_at: new Date().toISOString()
-        };
-
-        // Check existing by RE
-        const { data: existing } = await supabase
-          .from("tecnicos_indicadores" as any)
-          .select("id")
-          .eq("re", reVal)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("tecnicos_indicadores" as any).update(payload).eq("re", reVal);
-          updatedCount++;
-        } else {
-          await supabase.from("tecnicos_indicadores" as any).insert(payload);
-          createdCount++;
-        }
+      if (payloads.length === 0) {
+        toast.error("Planilha vazia ou sem coluna TT.");
+        return;
       }
 
-      toast.success(`Importação concluída! ${createdCount} novos, ${updatedCount} atualizados.`);
+      // UPSERT por (tt, mes_referencia) — não duplica
+      const { error } = await supabase
+        .from("tecnicos_indicadores" as any)
+        .upsert(payloads, { onConflict: "tt,mes_referencia" });
+      if (error) throw error;
+
+      toast.success(`Importação concluída! ${payloads.length} registros processados.`);
       trackAction("importar_indicadores");
       loadIndicadores();
     } catch (err: any) {
@@ -1003,10 +1019,110 @@ const VistoriaCampo = () => {
   };
 
   const downloadTemplateIndicadores = () => {
-    const ws = XLSX.utils.aoa_to_sheet([["RE", "TT", "Nome", "Supervisor", "Eficácia", "Produtividade", "Dias Trabalhados", "Repetida", "Infância"]]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      [
+        "TT",
+        "Mês Referência",
+        "Eficácia",
+        "Produtividade",
+        "Dias Trabalhados",
+        "Repetida Entrantes",
+        "Repetida Repetiu",
+        "Infância Instaladas",
+        "Infância Chamados 30d",
+      ],
+      ["TT123456", "2026-04", 95, 88, 22, 100, 5, 50, 2],
+    ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Indicadores");
     XLSX.writeFile(wb, "modelo_indicadores_vistoria.xlsx");
+  };
+
+  // ============= IMPORT: COLABORADORES (Dimensão) =============
+  const handleImportColaboradores = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(ws);
+
+      // Carrega existentes por TT e TR para deduplicação
+      const { data: existing } = await supabase
+        .from("tecnicos_cadastro")
+        .select("id,tt,tr,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
+      const byTT = new Map<string, any>();
+      const byTR = new Map<string, any>();
+      (existing || []).forEach((c: any) => {
+        if (c.tt) byTT.set(String(c.tt).toUpperCase(), c);
+        if (c.tr) byTR.set(String(c.tr).toUpperCase(), c);
+      });
+
+      let inserted = 0;
+      let updated = 0;
+      let skipped = 0;
+
+      for (const r of rows) {
+        const tt = String(r.TT || r.tt || "").trim().toUpperCase();
+        const tr = String(r.TR || r.tr || r.RE || r.re || "").trim().toUpperCase();
+        const nome = String(r["Nome Técnico"] || r["Nome"] || r.nome_tecnico || r.nome || "").trim();
+        if (!nome || (!tt && !tr)) continue;
+
+        const payload: any = {
+          nome_tecnico: nome,
+          tt: tt || null,
+          tr: tr || null,
+          nome_empresa: String(r["Empresa"] || r.nome_empresa || "").trim() || null,
+          supervisor: String(r["Supervisor"] || r.supervisor || "").trim() || null,
+          coordenador: String(r["Coordenador"] || r.coordenador || "").trim() || null,
+          telefone: String(r["Telefone"] || r.telefone || "").trim() || null,
+          cidade_residencia: String(r["Cidade"] || r.cidade_residencia || "").trim() || null,
+          uploaded_by: user.id,
+        };
+
+        const found = (tt && byTT.get(tt)) || (tr && byTR.get(tr));
+        if (found) {
+          // Não altera se todos os campos relevantes forem iguais
+          const isSame =
+            (found.nome_tecnico || "") === payload.nome_tecnico &&
+            (found.tt || "") === (payload.tt || "") &&
+            (found.tr || "") === (payload.tr || "") &&
+            (found.nome_empresa || "") === (payload.nome_empresa || "") &&
+            (found.supervisor || "") === (payload.supervisor || "") &&
+            (found.coordenador || "") === (payload.coordenador || "") &&
+            (found.telefone || "") === (payload.telefone || "") &&
+            (found.cidade_residencia || "") === (payload.cidade_residencia || "");
+          if (isSame) {
+            skipped++;
+            continue;
+          }
+          await supabase.from("tecnicos_cadastro").update(payload).eq("id", found.id);
+          updated++;
+        } else {
+          await supabase.from("tecnicos_cadastro").insert(payload);
+          inserted++;
+        }
+      }
+
+      toast.success(`${inserted} novos, ${updated} atualizados, ${skipped} sem alteração.`);
+      trackAction("importar_colaboradores");
+      loadColaboradores();
+      loadIndicadores();
+    } catch (err: any) {
+      toast.error("Erro ao importar colaboradores: " + err.message);
+    }
+    e.target.value = "";
+  };
+
+  const downloadTemplateColaboradores = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
+      ["TT123456", "RE12345", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
+    XLSX.writeFile(wb, "modelo_colaboradores_vistoria.xlsx");
   };
 
   // Edit individual indicador
