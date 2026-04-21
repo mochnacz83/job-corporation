@@ -1265,18 +1265,8 @@ const VistoriaCampo = () => {
       });
       if (error) throw error;
 
-      // Update indicadores with new values
-      await supabase.from("tecnicos_indicadores" as any).update({
-        eficacia: novaEvolucao.eficacia_atual || evolucaoTecnico.eficacia,
-        produtividade: novaEvolucao.produtividade_atual || evolucaoTecnico.produtividade,
-        repetida: novaEvolucao.repetida_atual || evolucaoTecnico.repetida,
-        infancia: novaEvolucao.infancia_atual || evolucaoTecnico.infancia,
-        updated_at: new Date().toISOString()
-      }).eq("re", evolucaoTecnico.re);
-
       toast.success("Evolução registrada com sucesso!");
       loadEvolucao(evolucaoTecnico.re);
-      loadIndicadores();
       setNovaEvolucao({ eficacia_atual: "", produtividade_atual: "", repetida_atual: "", infancia_atual: "", observacoes: "" });
     } catch (err: any) {
       toast.error("Erro: " + err.message);
