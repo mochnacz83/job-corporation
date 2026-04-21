@@ -227,7 +227,9 @@ const AdminUsers = () => {
 
   const openResetDialog = (u: UserProfile) => {
     setResetUser(u);
-    setNewPassword(u.requested_password || "");
+    // Se o usuário já solicitou uma senha específica, mantém ela.
+    // Caso contrário, gera automaticamente uma senha temporária forte.
+    setNewPassword(u.requested_password || generateTempPassword());
     setPasswordError(null);
     setResetDialogOpen(true);
   };
