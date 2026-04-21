@@ -17,15 +17,54 @@ import * as XLSX from "xlsx";
 
 interface TecnicoIndicadores {
   id?: string;
-  re: string;
+  re: string; // Pode ser TR ou TT do tecnicos_cadastro (usado no lookup)
   tt: string;
   nome: string;
   supervisor: string;
+  // Dimensão (vinda de tecnicos_cadastro)
+  empresa?: string;
+  coordenador?: string;
+  // Indicadores (vinda de tecnicos_indicadores - última carga ou mês)
+  mes_referencia?: string;
   eficacia: string;
   produtividade: string;
   dias_trabalhados: string;
-  repetida: string;
-  infancia: string;
+  repetida: string; // % calculado/exibido
+  infancia: string; // % calculado/exibido
+  // Detalhamento
+  repetida_entrantes?: number;
+  repetida_repetiu?: number;
+  infancia_instaladas?: number;
+  infancia_chamados_30d?: number;
+}
+
+interface ColaboradorRow {
+  id: string;
+  nome_tecnico: string;
+  tr: string | null;
+  tt: string | null;
+  nome_empresa: string | null;
+  supervisor: string | null;
+  coordenador: string | null;
+  telefone: string | null;
+  cidade_residencia: string | null;
+}
+
+interface IndicadorFatoRow {
+  id: string;
+  tt: string;
+  mes_referencia: string;
+  eficacia: number | null;
+  produtividade: number | null;
+  dias_trabalhados: number | null;
+  repetida_entrantes: number | null;
+  repetida_repetiu: number | null;
+  repetida_pct: number | null;
+  infancia_instaladas: number | null;
+  infancia_chamados_30d: number | null;
+  infancia_pct: number | null;
+  lote_importacao: string | null;
+  updated_at: string;
 }
 
 interface EvolucaoRecord {
