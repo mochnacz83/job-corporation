@@ -148,6 +148,14 @@ const VistoriaCampo = () => {
   const [editingIndicador, setEditingIndicador] = useState<TecnicoIndicadores | null>(null);
   const [editForm, setEditForm] = useState<TecnicoIndicadores | null>(null);
   const [filterIndicadores, setFilterIndicadores] = useState("");
+  const [indicadoresSubTab, setIndicadoresSubTab] = useState<"colaboradores" | "indicadores">("colaboradores");
+
+  // Colaboradores (Dimensão - tecnicos_cadastro)
+  const [allColaboradores, setAllColaboradores] = useState<ColaboradorRow[]>([]);
+  const [loadingColaboradores, setLoadingColaboradores] = useState(false);
+  const [filterColaboradores, setFilterColaboradores] = useState("");
+  const [editingColaborador, setEditingColaborador] = useState<ColaboradorRow | null>(null);
+  const [editColaboradorForm, setEditColaboradorForm] = useState<ColaboradorRow | null>(null);
 
   // Histórico state
   const [historicoData, setHistoricoData] = useState<any[]>([]);
