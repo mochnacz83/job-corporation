@@ -241,11 +241,21 @@ const AdminUsers = () => {
 
     setResetting(true);
     try {
-      // Garantir que o token da sessão atual seja enviado explicitamente.
-      // Em alguns cenários o invoke não anexa o header automaticamente,
-      // o que resulta em "Forbidden: admin role required" na edge function.
-      const { data: { session } } = await supabase.auth.getSession();
+      // Força refresh da sessão antes de chamar — caso o token local esteja
+      // "stale" (existe no localStorage mas foi invalidado no servidor após
+      // outro reset/logout), o getUser() na edge function falharia e cairia
+      // em "Forbidden: admin role required".
+      let { data: { session } } = await supabase.auth.getSession();
+      if (session?.refresh_token) {
+        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+        if (refreshErr || !refreshed?.session) {
+          await supabase.auth.signOut();
+          throw new Error("Sua sessão expirou. Faça login novamente.");
+        }
+        session = refreshed.session;
+      }
       if (!session?.access_token) {
+        await supabase.auth.signOut();
         throw new Error("Sessão expirada. Faça login novamente.");
       }
 
