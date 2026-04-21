@@ -1769,137 +1769,285 @@ const VistoriaCampo = () => {
 
           {/* ========== TAB: INDICADORES / IMPORTAR ========== */}
           <TabsContent value="indicadores" className="space-y-6">
-            {/* Import Section */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                  <Upload className="w-5 h-5" /> Importação de Indicadores
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
-                  <div className="text-sm space-y-1">
-                    <p className="font-bold text-foreground">Instruções:</p>
-                    <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
-                      <li>Use o modelo Excel disponível abaixo.</li>
-                      <li>A coluna <strong>RE</strong> é obrigatória para identificação.</li>
-                      <li>Ao importar, registros com mesma RE serão atualizados; novos serão incluídos.</li>
-                    </ul>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
-                      <Upload className="w-4 h-4" /> Selecionar Planilha
-                      <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportIndicadores} />
-                    </label>
-                    <Button variant="outline" size="sm" onClick={downloadTemplateIndicadores} className="h-auto py-2.5">
-                      <Download className="w-4 h-4 mr-2" /> Baixar Modelo
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tabs value={indicadoresSubTab} onValueChange={(v) => setIndicadoresSubTab(v as "colaboradores" | "indicadores")}>
+              <TabsList>
+                <TabsTrigger value="colaboradores">Colaboradores (Dimensão)</TabsTrigger>
+                <TabsTrigger value="indicadores">Indicadores (Fato)</TabsTrigger>
+              </TabsList>
 
-            {/* Indicadores Table */}
-            <Card className="glass-card">
-              <CardHeader className="pb-3 border-b">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <CardTitle className="text-lg flex items-center gap-2 text-primary">
-                    <FileText className="w-5 h-5" /> Colaboradores Cadastrados ({allIndicadores.length})
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Filtrar por nome, RE, TT..."
-                      value={filterIndicadores}
-                      onChange={(e) => setFilterIndicadores(e.target.value)}
-                      className="w-[250px] h-9 text-sm"
-                    />
-                    <Button variant="ghost" size="icon" onClick={loadIndicadores} title="Recarregar">
-                      <RefreshCw className={`w-4 h-4 ${loadingIndicadores ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-primary/5">
-                        <TableHead className="font-bold text-foreground text-xs">RE</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
-                        <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Eficácia</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Produt.</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Dias Trab.</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Repetida</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs">Infância</TableHead>
-                        <TableHead className="text-center font-bold text-foreground text-xs w-[100px]">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredIndicadores.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                            {loadingIndicadores ? "Carregando..." : "Nenhum indicador cadastrado. Importe uma planilha acima."}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredIndicadores.map((ind) => (
-                          <TableRow key={ind.re} className="hover:bg-muted/30">
-                            {editingIndicador?.re === ind.re ? (
-                              <>
-                                <TableCell className="text-xs font-mono">{ind.re}</TableCell>
-                                <TableCell><Input value={editForm?.tt || ""} onChange={(e) => setEditForm(f => f ? { ...f, tt: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.nome || ""} onChange={(e) => setEditForm(f => f ? { ...f, nome: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.supervisor || ""} onChange={(e) => setEditForm(f => f ? { ...f, supervisor: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
-                                <TableCell><Input value={editForm?.eficacia || ""} onChange={(e) => setEditForm(f => f ? { ...f, eficacia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.produtividade || ""} onChange={(e) => setEditForm(f => f ? { ...f, produtividade: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.dias_trabalhados || ""} onChange={(e) => setEditForm(f => f ? { ...f, dias_trabalhados: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.repetida || ""} onChange={(e) => setEditForm(f => f ? { ...f, repetida: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell><Input value={editForm?.infancia || ""} onChange={(e) => setEditForm(f => f ? { ...f, infancia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
-                                    <Button size="icon" variant="ghost" onClick={() => { setEditingIndicador(null); setEditForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
-                                  </div>
-                                </TableCell>
-                              </>
-                            ) : (
-                              <>
-                                <TableCell className="text-xs font-mono">{ind.re}</TableCell>
-                                <TableCell className="text-xs">{ind.tt}</TableCell>
-                                <TableCell className="text-xs font-medium">{ind.nome}</TableCell>
-                                <TableCell className="text-xs">{ind.supervisor}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.eficacia}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.produtividade}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.dias_trabalhados}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.repetida}</TableCell>
-                                <TableCell className="text-center text-xs">{ind.infancia}</TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    <Button size="icon" variant="ghost" onClick={() => handleStartEdit(ind)} className="h-7 w-7" title="Editar">
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" onClick={() => openEvolucao(ind)} className="h-7 w-7 text-primary" title="Evolução">
-                                      <TrendingUp className="w-3.5 h-3.5" />
-                                    </Button>
-                                    {isAdmin && (
-                                      <Button size="icon" variant="ghost" onClick={() => handleDeleteIndicador(ind.re)} className="h-7 w-7 text-destructive" title="Excluir">
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </>
-                            )}
+              {/* ===== Sub-aba COLABORADORES ===== */}
+              <TabsContent value="colaboradores" className="space-y-6 mt-4">
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                      <Upload className="w-5 h-5" /> Importação de Colaboradores
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
+                      <div className="text-sm space-y-1">
+                        <p className="font-bold text-foreground">Instruções:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
+                          <li>Tabela base de colaboradores. Atualize livremente: edite ou inclua via planilha.</li>
+                          <li>Chave de deduplicação: <strong>TT</strong> (ou TR). Registros idênticos são ignorados na carga massiva.</li>
+                          <li>O TT é a chave que cruza com a tabela de Indicadores (Fato).</li>
+                        </ul>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
+                          <Upload className="w-4 h-4" /> Selecionar Planilha
+                          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportColaboradores} />
+                        </label>
+                        <Button variant="outline" size="sm" onClick={downloadTemplateColaboradores} className="h-auto py-2.5">
+                          <Download className="w-4 h-4 mr-2" /> Baixar Modelo
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <FileText className="w-5 h-5" /> Colaboradores ({allColaboradores.length})
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Filtrar por nome, TT, TR, supervisor..."
+                          value={filterColaboradores}
+                          onChange={(e) => setFilterColaboradores(e.target.value)}
+                          className="w-[280px] h-9 text-sm"
+                        />
+                        <Button variant="ghost" size="icon" onClick={loadColaboradores} title="Recarregar">
+                          <RefreshCw className={`w-4 h-4 ${loadingColaboradores ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">TR</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Empresa</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Coordenador</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Telefone</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Cidade</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs w-[100px]">Ações</TableHead>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredColaboradores.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                {loadingColaboradores ? "Carregando..." : "Nenhum colaborador cadastrado."}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredColaboradores.map((c) => (
+                              <TableRow key={c.id} className="hover:bg-muted/30">
+                                {editingColaborador?.id === c.id ? (
+                                  <>
+                                    <TableCell><Input value={editColaboradorForm?.tt || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tt: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.tr || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tr: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.nome_tecnico || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_tecnico: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.nome_empresa || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_empresa: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.supervisor || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, supervisor: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.coordenador || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, coordenador: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.telefone || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, telefone: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell><Input value={editColaboradorForm?.cidade_residencia || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, cidade_residencia: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={handleSaveColaborador} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
+                                        <Button size="icon" variant="ghost" onClick={() => { setEditingColaborador(null); setEditColaboradorForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{c.tt || "-"}</TableCell>
+                                    <TableCell className="text-xs font-mono">{c.tr || "-"}</TableCell>
+                                    <TableCell className="text-xs font-medium">{c.nome_tecnico}</TableCell>
+                                    <TableCell className="text-xs">{c.nome_empresa || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.supervisor || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.coordenador || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.telefone || "-"}</TableCell>
+                                    <TableCell className="text-xs">{c.cidade_residencia || "-"}</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={() => handleStartEditColab(c)} className="h-7 w-7" title="Editar">
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        {isAdmin && (
+                                          <Button size="icon" variant="ghost" onClick={() => handleDeleteColaborador(c.id)} className="h-7 w-7 text-destructive" title="Excluir">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* ===== Sub-aba INDICADORES (Fato) ===== */}
+              <TabsContent value="indicadores" className="space-y-6 mt-4">
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                      <Upload className="w-5 h-5" /> Importação de Indicadores (Fato)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="p-4 bg-primary/5 border border-dashed border-primary/20 rounded-xl space-y-3">
+                      <div className="text-sm space-y-1">
+                        <p className="font-bold text-foreground">Instruções:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-1 text-xs">
+                          <li>Tabela de Fato — atualizada constantemente via carga massiva.</li>
+                          <li>Chave: <strong>TT + Mês Referência</strong> (cruza com Colaboradores).</li>
+                          <li><strong>Repetida</strong>: informe Entrantes e quantos Repetiu — % calculado automaticamente.</li>
+                          <li><strong>Infância</strong>: informe Instaladas e Chamados em até 30 dias — % calculado.</li>
+                        </ul>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg cursor-pointer hover:bg-primary/90 transition-all shadow-md text-sm">
+                          <Upload className="w-4 h-4" /> Selecionar Planilha
+                          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportIndicadores} />
+                        </label>
+                        <Button variant="outline" size="sm" onClick={downloadTemplateIndicadores} className="h-auto py-2.5">
+                          <Download className="w-4 h-4 mr-2" /> Baixar Modelo
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader className="pb-3 border-b">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <FileText className="w-5 h-5" /> Indicadores por TT (última carga) — {allIndicadores.length} registros
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Filtrar por nome, TT, RE..."
+                          value={filterIndicadores}
+                          onChange={(e) => setFilterIndicadores(e.target.value)}
+                          className="w-[250px] h-9 text-sm"
+                        />
+                        <Button variant="ghost" size="icon" onClick={loadIndicadores} title="Recarregar">
+                          <RefreshCw className={`w-4 h-4 ${loadingIndicadores ? "animate-spin" : ""}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4">
+                    <div className="overflow-x-auto rounded-lg border max-h-[500px] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
+                            <TableHead className="font-bold text-foreground text-xs">Supervisor</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Mês Ref.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Eficácia</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Produt.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Dias Trab.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Rep. Entr.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Repetiu</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Repetida %</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Infân. Instal.</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Cham. 30d</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs">Infância %</TableHead>
+                            <TableHead className="text-center font-bold text-foreground text-xs w-[110px]">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredIndicadores.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                                {loadingIndicadores ? "Carregando..." : "Nenhum indicador cadastrado. Importe uma planilha acima."}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredIndicadores.map((ind) => (
+                              <TableRow key={ind.id || ind.tt} className="hover:bg-muted/30">
+                                {editingIndicador?.id === ind.id ? (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{ind.tt}</TableCell>
+                                    <TableCell className="text-xs">{ind.nome}</TableCell>
+                                    <TableCell className="text-xs">{ind.supervisor}</TableCell>
+                                    <TableCell className="text-xs text-center">{ind.mes_referencia ? new Date(ind.mes_referencia).toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "-"}</TableCell>
+                                    <TableCell><Input type="number" value={editForm?.eficacia ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, eficacia: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.produtividade ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, produtividade: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.dias_trabalhados ?? ""} onChange={(e) => setEditForm(f => f ? { ...f, dias_trabalhados: e.target.value } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.repetida_entrantes ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, repetida_entrantes: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.repetida_repetiu ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, repetida_repetiu: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell className="text-center text-xs text-muted-foreground">auto</TableCell>
+                                    <TableCell><Input type="number" value={editForm?.infancia_instaladas ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, infancia_instaladas: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell><Input type="number" value={editForm?.infancia_chamados_30d ?? 0} onChange={(e) => setEditForm(f => f ? { ...f, infancia_chamados_30d: Number(e.target.value) } : f)} className="h-7 text-xs text-center" /></TableCell>
+                                    <TableCell className="text-center text-xs text-muted-foreground">auto</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={handleSaveEdit} className="h-7 w-7 text-primary"><Save className="w-3.5 h-3.5" /></Button>
+                                        <Button size="icon" variant="ghost" onClick={() => { setEditingIndicador(null); setEditForm(null); }} className="h-7 w-7"><X className="w-3.5 h-3.5" /></Button>
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                ) : (
+                                  <>
+                                    <TableCell className="text-xs font-mono">{ind.tt}</TableCell>
+                                    <TableCell className="text-xs font-medium">{ind.nome}</TableCell>
+                                    <TableCell className="text-xs">{ind.supervisor}</TableCell>
+                                    <TableCell className="text-xs text-center">{ind.mes_referencia ? new Date(ind.mes_referencia).toLocaleDateString("pt-BR", { month: "2-digit", year: "numeric" }) : "-"}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.eficacia}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.produtividade}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.dias_trabalhados}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.repetida_entrantes ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.repetida_repetiu ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs font-semibold">{ind.repetida}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.infancia_instaladas ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs">{ind.infancia_chamados_30d ?? 0}</TableCell>
+                                    <TableCell className="text-center text-xs font-semibold">{ind.infancia}</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Button size="icon" variant="ghost" onClick={() => handleStartEdit(ind)} className="h-7 w-7" title="Editar">
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button size="icon" variant="ghost" onClick={() => openEvolucao(ind)} className="h-7 w-7 text-primary" title="Evolução">
+                                          <TrendingUp className="w-3.5 h-3.5" />
+                                        </Button>
+                                        {isAdmin && (
+                                          <Button size="icon" variant="ghost" onClick={() => handleDeleteIndicador(ind.id)} className="h-7 w-7 text-destructive" title="Excluir">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* ========== TAB: EVOLUÇÃO ========== */}
