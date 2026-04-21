@@ -58,6 +58,26 @@ const validatePassword = (password: string): string | null => {
   return null;
 };
 
+// Gera senha temporária aleatória que atende aos requisitos de validação
+const generateTempPassword = (): string => {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%&*?";
+  const all = upper + lower + digits + special;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  // Garante ao menos um de cada categoria
+  let chars = [pick(upper), pick(lower), pick(digits), pick(special)];
+  // Completa até 10 caracteres
+  while (chars.length < 10) chars.push(pick(all));
+  // Embaralha
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+};
+
 const AdminUsers = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
