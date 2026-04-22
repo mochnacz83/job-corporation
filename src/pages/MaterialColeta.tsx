@@ -1463,6 +1463,162 @@ const MaterialColeta = () => {
     }
   };
 
+  // ===== Edit-request workflow handlers =====
+  const handleSubmitEditRequest = async () => {
+    if (!requestEditColeta) return;
+    const reason = requestEditReason.trim();
+    if (reason.length < 5) {
+      toast.error("Descreva o motivo da solicita\u00e7\u00e3o (m\u00ednimo 5 caracteres).");
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          edit_requested: true,
+          edit_request_reason: reason,
+          edit_requested_at: new Date().toISOString(),
+        } as any)
+        .eq("id", requestEditColeta.id);
+      if (error) throw error;
+      toast.success("Solicita\u00e7\u00e3o enviada ao Administrador.");
+      const patch = { edit_requested: true, edit_request_reason: reason } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
+      setColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
+      setRequestEditColeta(null);
+      setRequestEditReason("");
+    } catch (err: any) {
+      toast.error("Erro ao enviar solicita\u00e7\u00e3o: " + err.message);
+    }
+  };
+
+  const handleAdminUnlockEdit = async (c: ColetaRecord) => {
+    if (!user) return;
+    if (!confirm(`Liberar edi\u00e7\u00e3o para ${c.nome_tecnico}?\n\nMotivo: ${c.edit_request_reason || "-"}`)) return;
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          edit_unlocked: true,
+          edit_unlocked_at: new Date().toISOString(),
+          edit_unlocked_by: user.id,
+          edit_requested: false,
+        } as any)
+        .eq("id", c.id);
+      if (error) throw error;
+      toast.success("Edi\u00e7\u00e3o liberada para o usu\u00e1rio.");
+      const patch = { edit_unlocked: true, edit_requested: false } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+      setColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+    } catch (err: any) {
+      toast.error("Erro ao liberar: " + err.message);
+    }
+  };
+
+  const handleOpenPostUnlockEdit = (c: ColetaRecord) => {
+    // Build editable materials list from existing items, grouping by codigo (preserve seriais arrays)
+    const items: MaterialItem[] = c.material_coleta_items.map((it) => ({
+      id: crypto.randomUUID(),
+      codigo_material: it.codigo_material,
+      nome_material: it.nome_material,
+      quantidade: typeof it.quantidade === "number" ? it.quantidade : Number(it.quantidade) || 1,
+      unidade: it.unidade || "Un",
+      serial: it.serial || "",
+      seriais: [],
+      askSeriais: false,
+    }));
+    setEditMateriais(items.length > 0 ? items : [newMaterial()]);
+    setEditingColeta(c);
+    setEditColetaForm({
+      ba: c.ba || "",
+      circuito: c.circuito || "",
+      cidade: c.cidade || "",
+      sigla_cidade: c.sigla_cidade || "",
+      uf: c.uf || "",
+      data_execucao: c.data_execucao || "",
+    });
+  };
+
+  const updateEditMaterial = (id: string, field: keyof MaterialItem, value: any) => {
+    setEditMateriais(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
+  };
+
+  const handleSavePostUnlockEdit = async () => {
+    if (!editingColeta) return;
+    if (!editingColeta.edit_unlocked || editingColeta.post_edit_locked) {
+      toast.error("Esta coleta n\u00e3o est\u00e1 liberada para edi\u00e7\u00e3o.");
+      return;
+    }
+    // Validate materials
+    for (const m of editMateriais) {
+      if (!m.codigo_material || !m.nome_material) {
+        toast.error("Preencha c\u00f3digo e nome de todos os materiais"); return;
+      }
+      if (m.quantidade === "" || Number(m.quantidade) <= 0) {
+        toast.error(`Quantidade inv\u00e1lida em ${m.codigo_material}`); return;
+      }
+    }
+    // Serial uniqueness check (excluding this coleta's own items)
+    const dup = await validateSeriaisUnique(editMateriais, editingColeta.id);
+    if (!dup.ok) { toast.error(dup.message!); return; }
+
+    try {
+      // Replace items: delete then insert
+      const { error: delErr } = await supabase.from("material_coleta_items").delete().eq("coleta_id", editingColeta.id);
+      if (delErr) throw delErr;
+
+      const newItems = editMateriais.map(m => ({
+        coleta_id: editingColeta.id,
+        codigo_material: m.codigo_material,
+        nome_material: m.nome_material,
+        quantidade: m.quantidade,
+        unidade: m.unidade,
+        serial: m.serial || null,
+      }));
+      if (newItems.length > 0) {
+        const { error: insErr } = await supabase.from("material_coleta_items").insert(newItems as any);
+        if (insErr) throw insErr;
+      }
+
+      // Lock the record
+      const { error: lockErr } = await supabase
+        .from("material_coletas")
+        .update({
+          post_edit_locked: true,
+          edit_unlocked: false,
+          ba: editColetaForm.ba.toUpperCase() || null,
+          circuito: editColetaForm.circuito.toUpperCase() || null,
+          data_execucao: editColetaForm.data_execucao || null,
+        } as any)
+        .eq("id", editingColeta.id);
+      if (lockErr) throw lockErr;
+
+      toast.success("Altera\u00e7\u00f5es salvas. Registro travado.");
+      // Refresh local state
+      const refreshedItems = newItems.map(it => ({
+        codigo_material: it.codigo_material,
+        nome_material: it.nome_material,
+        quantidade: it.quantidade,
+        unidade: it.unidade,
+        serial: it.serial,
+      }));
+      const patch = {
+        post_edit_locked: true,
+        edit_unlocked: false,
+        ba: editColetaForm.ba.toUpperCase() || null,
+        circuito: editColetaForm.circuito.toUpperCase() || null,
+        data_execucao: editColetaForm.data_execucao || null,
+        material_coleta_items: refreshedItems,
+      } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === editingColeta.id ? { ...x, ...patch } as ColetaRecord : x));
+      setColetas(prev => prev.map(x => x.id === editingColeta.id ? { ...x, ...patch } as ColetaRecord : x));
+      setEditingColeta(null);
+      setEditMateriais([]);
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + err.message);
+    }
+  };
+
   const buildExportRows = (records: ColetaRecord[]) => records.flatMap((c) => {
     const items = c.material_coleta_items.length > 0
       ? c.material_coleta_items
