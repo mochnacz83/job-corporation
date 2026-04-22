@@ -949,6 +949,13 @@ const MaterialColeta = () => {
       }
     }
 
+    // Validate seriais uniqueness — within form and against database
+    const isSemMaterialEarly = tipoAplicacao === "SEM MATERIAL";
+    if (!isSemMaterialEarly) {
+      const dupCheck = await validateSeriaisUnique(materiais, null);
+      if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
+    }
+
     if (isReversa) {
       const colabSig = getCanvasDataUrl(sigColabCanvasRef.current);
       if (!colabSig || colabSig === "data:,") {
