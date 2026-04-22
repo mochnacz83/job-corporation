@@ -631,6 +631,60 @@ const MaterialColeta = () => {
     setMateriais((prev) => prev.filter((m) => m.id !== id));
   };
 
+  // Validate seriais uniqueness: in-form duplicates AND global DB duplicates.
+  // excludeColetaId allows the same record's existing items (when re-editing) to be ignored.
+  const validateSeriaisUnique = async (
+    items: MaterialItem[],
+    excludeColetaId: string | null
+  ): Promise<{ ok: boolean; message?: string }> => {
+    const normalize = (s: string) => s.toUpperCase().trim();
+    const isIgnorable = (s: string) => {
+      const n = normalize(s);
+      return n === "" || n === "N/A" || n === "-";
+    };
+
+    const allSeriais: string[] = [];
+    for (const m of items) {
+      if (m.seriais.length > 0) {
+        m.seriais.forEach((s) => { if (!isIgnorable(s)) allSeriais.push(normalize(s)); });
+      } else if (m.serial && !isIgnorable(m.serial)) {
+        allSeriais.push(normalize(m.serial));
+      }
+    }
+    if (allSeriais.length === 0) return { ok: true };
+
+    // In-form duplicates
+    const seen = new Set<string>();
+    for (const s of allSeriais) {
+      if (seen.has(s)) {
+        return { ok: false, message: `Serial duplicado neste formulário: ${s}` };
+      }
+      seen.add(s);
+    }
+
+    // DB check
+    try {
+      const { data, error } = await supabase
+        .from("material_coleta_items")
+        .select("serial, coleta_id")
+        .in("serial", allSeriais);
+      if (error) throw error;
+      const conflict = (data || []).find((row: any) => {
+        if (!row.serial) return false;
+        const norm = normalize(row.serial);
+        if (!allSeriais.includes(norm)) return false;
+        if (excludeColetaId && row.coleta_id === excludeColetaId) return false;
+        return true;
+      });
+      if (conflict) {
+        return { ok: false, message: `Serial "${(conflict as any).serial}" já cadastrado em outra coleta.` };
+      }
+    } catch (err: any) {
+      return { ok: false, message: "Erro ao validar seriais: " + err.message };
+    }
+    return { ok: true };
+  };
+
   // Generate PDF for Reversa - fit in 1 A4 page
   const generatePDF = (coletaData: {
     matriculaTt: string;
