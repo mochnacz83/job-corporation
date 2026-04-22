@@ -217,6 +217,11 @@ const MaterialColeta = () => {
   const [editFotoPreview, setEditFotoPreview] = useState<string | null>(null);
   const editGalleryInputRef = useRef<HTMLInputElement>(null);
 
+  // Edit-request workflow
+  const [requestEditColeta, setRequestEditColeta] = useState<ColetaRecord | null>(null);
+  const [requestEditReason, setRequestEditReason] = useState("");
+  const [editMateriais, setEditMateriais] = useState<MaterialItem[]>([]);
+
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
     setScannerOpen(true);
