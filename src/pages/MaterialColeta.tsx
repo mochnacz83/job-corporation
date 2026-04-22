@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle, Truck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle, Truck, Lock, Unlock, KeyRound } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
