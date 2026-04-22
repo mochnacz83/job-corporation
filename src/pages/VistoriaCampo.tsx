@@ -41,6 +41,7 @@ interface TecnicoIndicadores {
 interface ColaboradorRow {
   id: string;
   nome_tecnico: string;
+  re: string | null;
   tr: string | null;
   tt: string | null;
   nome_empresa: string | null;
