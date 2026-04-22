@@ -1191,6 +1191,7 @@ const VistoriaCampo = () => {
           nome_tecnico: editColaboradorForm.nome_tecnico,
           tt: editColaboradorForm.tt || null,
           tr: editColaboradorForm.tr || null,
+          re: editColaboradorForm.re || null,
           nome_empresa: editColaboradorForm.nome_empresa || null,
           supervisor: editColaboradorForm.supervisor || null,
           coordenador: editColaboradorForm.coordenador || null,
