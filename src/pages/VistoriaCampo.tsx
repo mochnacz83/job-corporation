@@ -226,7 +226,7 @@ const VistoriaCampo = () => {
           .order("mes_referencia", { ascending: false }),
         supabase
           .from("tecnicos_cadastro")
-          .select("tt,tr,nome_tecnico,supervisor,nome_empresa,coordenador"),
+          .select("tt,tr,re,nome_tecnico,supervisor,nome_empresa,coordenador"),
       ]);
       if (indRes.error) throw indRes.error;
       if (colabRes.error) throw colabRes.error;
@@ -246,7 +246,7 @@ const VistoriaCampo = () => {
         const colab = colabMap.get(ttKey);
         merged.push({
           id: r.id,
-          re: colab?.tr || colab?.tt || ttKey,
+          re: colab?.re || colab?.tr || colab?.tt || ttKey,
           tt: ttKey,
           nome: colab?.nome_tecnico || "(não cadastrado)",
           supervisor: colab?.supervisor || "",
