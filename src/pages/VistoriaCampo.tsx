@@ -1052,12 +1052,14 @@ const VistoriaCampo = () => {
       // Carrega existentes por TT e TR para deduplicação
       const { data: existing } = await supabase
         .from("tecnicos_cadastro")
-        .select("id,tt,tr,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
+        .select("id,tt,tr,re,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
       const byTT = new Map<string, any>();
       const byTR = new Map<string, any>();
+      const byRE = new Map<string, any>();
       (existing || []).forEach((c: any) => {
         if (c.tt) byTT.set(String(c.tt).toUpperCase(), c);
         if (c.tr) byTR.set(String(c.tr).toUpperCase(), c);
+        if (c.re) byRE.set(String(c.re).toUpperCase(), c);
       });
 
       let inserted = 0;
@@ -1066,14 +1068,16 @@ const VistoriaCampo = () => {
 
       for (const r of rows) {
         const tt = String(r.TT || r.tt || "").trim().toUpperCase();
-        const tr = String(r.TR || r.tr || r.RE || r.re || "").trim().toUpperCase();
+        const tr = String(r.TR || r.tr || "").trim().toUpperCase();
+        const re = String(r.RE || r.re || "").trim().toUpperCase();
         const nome = String(r["Nome Técnico"] || r["Nome"] || r.nome_tecnico || r.nome || "").trim();
-        if (!nome || (!tt && !tr)) continue;
+        if (!nome || (!tt && !tr && !re)) continue;
 
         const payload: any = {
           nome_tecnico: nome,
           tt: tt || null,
           tr: tr || null,
+          re: re || null,
           nome_empresa: String(r["Empresa"] || r.nome_empresa || "").trim() || null,
           supervisor: String(r["Supervisor"] || r.supervisor || "").trim() || null,
           coordenador: String(r["Coordenador"] || r.coordenador || "").trim() || null,
@@ -1082,13 +1086,14 @@ const VistoriaCampo = () => {
           uploaded_by: user.id,
         };
 
-        const found = (tt && byTT.get(tt)) || (tr && byTR.get(tr));
+        const found = (re && byRE.get(re)) || (tt && byTT.get(tt)) || (tr && byTR.get(tr));
         if (found) {
           // Não altera se todos os campos relevantes forem iguais
           const isSame =
             (found.nome_tecnico || "") === payload.nome_tecnico &&
             (found.tt || "") === (payload.tt || "") &&
             (found.tr || "") === (payload.tr || "") &&
+            (found.re || "") === (payload.re || "") &&
             (found.nome_empresa || "") === (payload.nome_empresa || "") &&
             (found.supervisor || "") === (payload.supervisor || "") &&
             (found.coordenador || "") === (payload.coordenador || "") &&
