@@ -2959,7 +2959,10 @@ const MaterialColeta = () => {
       </Dialog >
 
       {/* Edit Coleta Dialog */}
-      <Dialog open={!!editingColeta} onOpenChange={() => setEditingColeta(null)}>
+      <Dialog
+        open={!!editingColeta && !(editingColeta.edit_unlocked && !editingColeta.post_edit_locked && editMateriais.length > 0)}
+        onOpenChange={() => { setEditingColeta(null); setEditMateriais([]); }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Informações Complementares</DialogTitle>
