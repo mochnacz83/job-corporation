@@ -397,6 +397,12 @@ export type Database = {
           classificacao_cenario: string | null
           created_at: string
           data_execucao: string
+          edit_request_reason: string | null
+          edit_requested: boolean
+          edit_requested_at: string | null
+          edit_unlocked: boolean
+          edit_unlocked_at: string | null
+          edit_unlocked_by: string | null
           foto_url: string | null
           id: string
           last_exported_at: string | null
@@ -405,6 +411,7 @@ export type Database = {
           nome_tecnico: string
           opcoes_adicionais: string | null
           pdf_url: string | null
+          post_edit_locked: boolean
           sigla_cidade: string | null
           tipo_aplicacao: string
           uf: string | null
@@ -423,6 +430,12 @@ export type Database = {
           classificacao_cenario?: string | null
           created_at?: string
           data_execucao?: string
+          edit_request_reason?: string | null
+          edit_requested?: boolean
+          edit_requested_at?: string | null
+          edit_unlocked?: boolean
+          edit_unlocked_at?: string | null
+          edit_unlocked_by?: string | null
           foto_url?: string | null
           id?: string
           last_exported_at?: string | null
@@ -431,6 +444,7 @@ export type Database = {
           nome_tecnico: string
           opcoes_adicionais?: string | null
           pdf_url?: string | null
+          post_edit_locked?: boolean
           sigla_cidade?: string | null
           tipo_aplicacao: string
           uf?: string | null
@@ -449,6 +463,12 @@ export type Database = {
           classificacao_cenario?: string | null
           created_at?: string
           data_execucao?: string
+          edit_request_reason?: string | null
+          edit_requested?: boolean
+          edit_requested_at?: string | null
+          edit_unlocked?: boolean
+          edit_unlocked_at?: string | null
+          edit_unlocked_by?: string | null
           foto_url?: string | null
           id?: string
           last_exported_at?: string | null
@@ -457,6 +477,7 @@ export type Database = {
           nome_tecnico?: string
           opcoes_adicionais?: string | null
           pdf_url?: string | null
+          post_edit_locked?: boolean
           sigla_cidade?: string | null
           tipo_aplicacao?: string
           uf?: string | null
