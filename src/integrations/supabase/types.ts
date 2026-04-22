@@ -815,6 +815,7 @@ export type Database = {
           id: string
           nome_empresa: string | null
           nome_tecnico: string
+          re: string | null
           supervisor: string | null
           telefone: string | null
           tr: string | null
@@ -828,6 +829,7 @@ export type Database = {
           id?: string
           nome_empresa?: string | null
           nome_tecnico: string
+          re?: string | null
           supervisor?: string | null
           telefone?: string | null
           tr?: string | null
@@ -841,6 +843,7 @@ export type Database = {
           id?: string
           nome_empresa?: string | null
           nome_tecnico?: string
+          re?: string | null
           supervisor?: string | null
           telefone?: string | null
           tr?: string | null
