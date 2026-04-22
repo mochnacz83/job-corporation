@@ -3072,6 +3072,120 @@ const MaterialColeta = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Solicitar edi\u00e7\u00e3o (usu\u00e1rio dono) */}
+      <Dialog open={!!requestEditColeta} onOpenChange={(o) => { if (!o) { setRequestEditColeta(null); setRequestEditReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar edi\u00e7\u00e3o ao Administrador</DialogTitle>
+            <DialogDescription>
+              Descreva o motivo da solicita\u00e7\u00e3o. Ap\u00f3s a libera\u00e7\u00e3o pelo Administrador voc\u00ea poder\u00e1 alterar seriais, quantidades e materiais. Ap\u00f3s salvar, o registro ser\u00e1 travado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {requestEditColeta?.edit_requested && (
+              <p className="text-xs text-warning">J\u00e1 existe uma solicita\u00e7\u00e3o pendente. Voc\u00ea pode atualizar o motivo abaixo.</p>
+            )}
+            <Label className="text-sm">Motivo</Label>
+            <textarea
+              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={requestEditReason}
+              onChange={(e) => setRequestEditReason(e.target.value)}
+              placeholder="Ex.: Serial digitado incorretamente, quantidade errada, faltou um material..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRequestEditColeta(null); setRequestEditReason(""); }}>Cancelar</Button>
+            <Button onClick={handleSubmitEditRequest}>Enviar Solicita\u00e7\u00e3o</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edi\u00e7\u00e3o p\u00f3s-libera\u00e7\u00e3o de materiais/seriais */}
+      <Dialog
+        open={!!editingColeta && !!editingColeta.edit_unlocked && !editingColeta.post_edit_locked && editMateriais.length > 0}
+        onOpenChange={(o) => { if (!o) { setEditingColeta(null); setEditMateriais([]); } }}
+      >
+        <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Edi\u00e7\u00e3o liberada \u2014 Materiais e Seriais</DialogTitle>
+            <DialogDescription>
+              Atualize seriais, quantidades, adicione ou remova materiais. <strong>Ap\u00f3s salvar, o registro ser\u00e1 travado e n\u00e3o poder\u00e1 mais ser editado.</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">BA</Label>
+                <Input value={editColetaForm.ba} onChange={(e) => setEditColetaForm(p => ({ ...p, ba: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Circuito</Label>
+                <Input value={editColetaForm.circuito} onChange={(e) => setEditColetaForm(p => ({ ...p, circuito: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data Execu\u00e7\u00e3o</Label>
+                <Input type="date" value={editColetaForm.data_execucao} onChange={(e) => setEditColetaForm(p => ({ ...p, data_execucao: e.target.value }))} />
+              </div>
+            </div>
+            <div className="border rounded-md p-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Materiais</Label>
+                <Button size="sm" variant="outline" onClick={() => setEditMateriais(prev => [...prev, newMaterial()])}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+                </Button>
+              </div>
+              {editMateriais.map((mat, idx) => (
+                <div key={mat.id} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
+                  <div className="col-span-3 space-y-1">
+                    <Label className="text-xs">C\u00f3digo</Label>
+                    <Input
+                      value={mat.codigo_material}
+                      onChange={(e) => {
+                        const code = e.target.value.toUpperCase();
+                        const found = materiaisCadastro.find(mc => mc.codigo.toUpperCase() === code);
+                        updateEditMaterial(mat.id, "codigo_material", code);
+                        if (found) updateEditMaterial(mat.id, "nome_material", found.nome_material);
+                      }}
+                      className="uppercase"
+                    />
+                  </div>
+                  <div className="col-span-4 space-y-1">
+                    <Label className="text-xs">Nome</Label>
+                    <Input value={mat.nome_material} onChange={(e) => updateEditMaterial(mat.id, "nome_material", e.target.value.toUpperCase())} className="uppercase" />
+                  </div>
+                  <div className="col-span-1 space-y-1">
+                    <Label className="text-xs">Qtd</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={mat.quantidade}
+                      onChange={(e) => updateEditMaterial(mat.id, "quantidade", e.target.value === "" ? "" : Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-1">
+                    <Label className="text-xs">Un</Label>
+                    <Input value={mat.unidade} onChange={(e) => updateEditMaterial(mat.id, "unidade", e.target.value)} />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Serial</Label>
+                    <Input value={mat.serial} onChange={(e) => updateEditMaterial(mat.id, "serial", e.target.value.toUpperCase())} className="uppercase" />
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setEditMateriais(prev => prev.length > 1 ? prev.filter(m => m.id !== mat.id) : prev)} title="Remover">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingColeta(null); setEditMateriais([]); }}>Cancelar</Button>
+            <Button onClick={handleSavePostUnlockEdit}>Salvar e Travar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div >
   );
 };
