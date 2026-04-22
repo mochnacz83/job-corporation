@@ -292,11 +292,11 @@ const VistoriaCampo = () => {
   const handleLookupRE = async (val: string) => {
     try {
       const upper = val.toUpperCase();
-      // 1) Busca colaborador (Dimensão) por TR ou TT
+      // 1) Busca colaborador (Dimensão) por RE, TR ou TT
       const { data: tecData } = await supabase
         .from("tecnicos_cadastro")
         .select("*")
-        .or(`tr.eq.${upper},tt.eq.${upper}`)
+        .or(`re.eq.${upper},tr.eq.${upper},tt.eq.${upper}`)
         .maybeSingle();
 
       if (!tecData) {
@@ -319,7 +319,7 @@ const VistoriaCampo = () => {
       }
 
       setIndicadores({
-        re: tecData.tr || tecData.tt || upper,
+        re: tecData.re || tecData.tr || tecData.tt || upper,
         tt: ttKey,
         nome: tecData.nome_tecnico,
         supervisor: tecData.supervisor || "",
