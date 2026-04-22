@@ -1822,7 +1822,7 @@ const VistoriaCampo = () => {
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <Input
-                          placeholder="Filtrar por nome, TT, TR, supervisor..."
+                          placeholder="Filtrar por nome, RE, TT, TR, supervisor..."
                           value={filterColaboradores}
                           onChange={(e) => setFilterColaboradores(e.target.value)}
                           className="w-[280px] h-9 text-sm"
