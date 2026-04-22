@@ -41,6 +41,7 @@ interface TecnicoIndicadores {
 interface ColaboradorRow {
   id: string;
   nome_tecnico: string;
+  re: string | null;
   tr: string | null;
   tt: string | null;
   nome_empresa: string | null;
@@ -225,7 +226,7 @@ const VistoriaCampo = () => {
           .order("mes_referencia", { ascending: false }),
         supabase
           .from("tecnicos_cadastro")
-          .select("tt,tr,nome_tecnico,supervisor,nome_empresa,coordenador"),
+          .select("tt,tr,re,nome_tecnico,supervisor,nome_empresa,coordenador"),
       ]);
       if (indRes.error) throw indRes.error;
       if (colabRes.error) throw colabRes.error;
@@ -245,7 +246,7 @@ const VistoriaCampo = () => {
         const colab = colabMap.get(ttKey);
         merged.push({
           id: r.id,
-          re: colab?.tr || colab?.tt || ttKey,
+          re: colab?.re || colab?.tr || colab?.tt || ttKey,
           tt: ttKey,
           nome: colab?.nome_tecnico || "(não cadastrado)",
           supervisor: colab?.supervisor || "",
@@ -291,11 +292,11 @@ const VistoriaCampo = () => {
   const handleLookupRE = async (val: string) => {
     try {
       const upper = val.toUpperCase();
-      // 1) Busca colaborador (Dimensão) por TR ou TT
+      // 1) Busca colaborador (Dimensão) por RE, TR ou TT
       const { data: tecData } = await supabase
         .from("tecnicos_cadastro")
         .select("*")
-        .or(`tr.eq.${upper},tt.eq.${upper}`)
+        .or(`re.eq.${upper},tr.eq.${upper},tt.eq.${upper}`)
         .maybeSingle();
 
       if (!tecData) {
@@ -318,7 +319,7 @@ const VistoriaCampo = () => {
       }
 
       setIndicadores({
-        re: tecData.tr || tecData.tt || upper,
+        re: tecData.re || tecData.tr || tecData.tt || upper,
         tt: ttKey,
         nome: tecData.nome_tecnico,
         supervisor: tecData.supervisor || "",
@@ -1051,12 +1052,14 @@ const VistoriaCampo = () => {
       // Carrega existentes por TT e TR para deduplicação
       const { data: existing } = await supabase
         .from("tecnicos_cadastro")
-        .select("id,tt,tr,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
+        .select("id,tt,tr,re,nome_tecnico,supervisor,coordenador,nome_empresa,telefone,cidade_residencia");
       const byTT = new Map<string, any>();
       const byTR = new Map<string, any>();
+      const byRE = new Map<string, any>();
       (existing || []).forEach((c: any) => {
         if (c.tt) byTT.set(String(c.tt).toUpperCase(), c);
         if (c.tr) byTR.set(String(c.tr).toUpperCase(), c);
+        if (c.re) byRE.set(String(c.re).toUpperCase(), c);
       });
 
       let inserted = 0;
@@ -1065,14 +1068,16 @@ const VistoriaCampo = () => {
 
       for (const r of rows) {
         const tt = String(r.TT || r.tt || "").trim().toUpperCase();
-        const tr = String(r.TR || r.tr || r.RE || r.re || "").trim().toUpperCase();
+        const tr = String(r.TR || r.tr || "").trim().toUpperCase();
+        const re = String(r.RE || r.re || "").trim().toUpperCase();
         const nome = String(r["Nome Técnico"] || r["Nome"] || r.nome_tecnico || r.nome || "").trim();
-        if (!nome || (!tt && !tr)) continue;
+        if (!nome || (!tt && !tr && !re)) continue;
 
         const payload: any = {
           nome_tecnico: nome,
           tt: tt || null,
           tr: tr || null,
+          re: re || null,
           nome_empresa: String(r["Empresa"] || r.nome_empresa || "").trim() || null,
           supervisor: String(r["Supervisor"] || r.supervisor || "").trim() || null,
           coordenador: String(r["Coordenador"] || r.coordenador || "").trim() || null,
@@ -1081,13 +1086,14 @@ const VistoriaCampo = () => {
           uploaded_by: user.id,
         };
 
-        const found = (tt && byTT.get(tt)) || (tr && byTR.get(tr));
+        const found = (re && byRE.get(re)) || (tt && byTT.get(tt)) || (tr && byTR.get(tr));
         if (found) {
           // Não altera se todos os campos relevantes forem iguais
           const isSame =
             (found.nome_tecnico || "") === payload.nome_tecnico &&
             (found.tt || "") === (payload.tt || "") &&
             (found.tr || "") === (payload.tr || "") &&
+            (found.re || "") === (payload.re || "") &&
             (found.nome_empresa || "") === (payload.nome_empresa || "") &&
             (found.supervisor || "") === (payload.supervisor || "") &&
             (found.coordenador || "") === (payload.coordenador || "") &&
@@ -1117,8 +1123,8 @@ const VistoriaCampo = () => {
 
   const downloadTemplateColaboradores = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ["TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
-      ["TT123456", "RE12345", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
+      ["RE", "TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
+      ["RE12345", "TT123456", "TR98765", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
@@ -1185,6 +1191,7 @@ const VistoriaCampo = () => {
           nome_tecnico: editColaboradorForm.nome_tecnico,
           tt: editColaboradorForm.tt || null,
           tr: editColaboradorForm.tr || null,
+          re: editColaboradorForm.re || null,
           nome_empresa: editColaboradorForm.nome_empresa || null,
           supervisor: editColaboradorForm.supervisor || null,
           coordenador: editColaboradorForm.coordenador || null,
@@ -1333,6 +1340,7 @@ const VistoriaCampo = () => {
     const q = filterColaboradores.toLowerCase();
     return (
       c.nome_tecnico?.toLowerCase().includes(q) ||
+      (c.re || "").toLowerCase().includes(q) ||
       (c.tt || "").toLowerCase().includes(q) ||
       (c.tr || "").toLowerCase().includes(q) ||
       (c.supervisor || "").toLowerCase().includes(q) ||
@@ -1814,7 +1822,7 @@ const VistoriaCampo = () => {
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <Input
-                          placeholder="Filtrar por nome, TT, TR, supervisor..."
+                          placeholder="Filtrar por nome, RE, TT, TR, supervisor..."
                           value={filterColaboradores}
                           onChange={(e) => setFilterColaboradores(e.target.value)}
                           className="w-[280px] h-9 text-sm"
@@ -1830,6 +1838,7 @@ const VistoriaCampo = () => {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">RE</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">TR</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
@@ -1844,7 +1853,7 @@ const VistoriaCampo = () => {
                         <TableBody>
                           {filteredColaboradores.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                                 {loadingColaboradores ? "Carregando..." : "Nenhum colaborador cadastrado."}
                               </TableCell>
                             </TableRow>
@@ -1853,6 +1862,7 @@ const VistoriaCampo = () => {
                               <TableRow key={c.id} className="hover:bg-muted/30">
                                 {editingColaborador?.id === c.id ? (
                                   <>
+                                    <TableCell><Input value={editColaboradorForm?.re || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, re: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.tt || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tt: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.tr || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tr: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.nome_tecnico || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_tecnico: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
@@ -1870,6 +1880,7 @@ const VistoriaCampo = () => {
                                   </>
                                 ) : (
                                   <>
+                                    <TableCell className="text-xs font-mono font-bold text-primary">{c.re || "-"}</TableCell>
                                     <TableCell className="text-xs font-mono">{c.tt || "-"}</TableCell>
                                     <TableCell className="text-xs font-mono">{c.tr || "-"}</TableCell>
                                     <TableCell className="text-xs font-medium">{c.nome_tecnico}</TableCell>
