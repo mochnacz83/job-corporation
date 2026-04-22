@@ -71,6 +71,13 @@ interface ColetaRecord {
   circuito_compartilhado: string | null;
   opcoes_adicionais: string | null;
   last_exported_at: string | null;
+  edit_requested?: boolean;
+  edit_request_reason?: string | null;
+  edit_requested_at?: string | null;
+  edit_unlocked?: boolean;
+  edit_unlocked_at?: string | null;
+  edit_unlocked_by?: string | null;
+  post_edit_locked?: boolean;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
 
