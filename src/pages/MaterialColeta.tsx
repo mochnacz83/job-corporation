@@ -2472,6 +2472,48 @@ const MaterialColeta = () => {
                                  >
                                    <Pencil className="w-3.5 h-3.5" />
                                  </Button>
+                                  {/* Solicitar edição (dono, sem libera\u00e7\u00e3o ativa, n\u00e3o travado) */}
+                                  {!isAdmin && c.user_id === user?.id && !c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className={`h-7 w-7 ${c.edit_requested ? "text-warning" : ""}`}
+                                      onClick={() => { setRequestEditColeta(c); setRequestEditReason(c.edit_request_reason || ""); }}
+                                      title={c.edit_requested ? "Solicita\u00e7\u00e3o de edi\u00e7\u00e3o pendente" : "Solicitar edi\u00e7\u00e3o ao Administrador"}
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Admin: liberar edi\u00e7\u00e3o quando solicitada */}
+                                  {isAdmin && c.edit_requested && !c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-success"
+                                      onClick={() => handleAdminUnlockEdit(c)}
+                                      title={`Liberar edi\u00e7\u00e3o (motivo: ${c.edit_request_reason || "-"})`}
+                                    >
+                                      <Unlock className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Dono com edi\u00e7\u00e3o liberada: bot\u00e3o de re-edi\u00e7\u00e3o de materiais */}
+                                  {c.user_id === user?.id && c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-primary"
+                                      onClick={() => handleOpenPostUnlockEdit(c)}
+                                      title="Edi\u00e7\u00e3o liberada \u2014 alterar materiais/seriais"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Indicador de travado */}
+                                  {c.post_edit_locked && (
+                                    <span title="Registro travado ap\u00f3s reedi\u00e7\u00e3o" className="inline-flex items-center text-muted-foreground">
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </span>
+                                  )}
                                  {c.pdf_url && (
                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
                                      <FileText className="w-3.5 h-3.5" />
