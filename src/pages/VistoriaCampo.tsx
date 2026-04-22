@@ -1340,6 +1340,7 @@ const VistoriaCampo = () => {
     const q = filterColaboradores.toLowerCase();
     return (
       c.nome_tecnico?.toLowerCase().includes(q) ||
+      (c.re || "").toLowerCase().includes(q) ||
       (c.tt || "").toLowerCase().includes(q) ||
       (c.tr || "").toLowerCase().includes(q) ||
       (c.supervisor || "").toLowerCase().includes(q) ||
