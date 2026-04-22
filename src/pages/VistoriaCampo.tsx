@@ -1837,6 +1837,7 @@ const VistoriaCampo = () => {
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-primary/5">
+                            <TableHead className="font-bold text-foreground text-xs">RE</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">TT</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">TR</TableHead>
                             <TableHead className="font-bold text-foreground text-xs">Nome</TableHead>
@@ -1851,7 +1852,7 @@ const VistoriaCampo = () => {
                         <TableBody>
                           {filteredColaboradores.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                                 {loadingColaboradores ? "Carregando..." : "Nenhum colaborador cadastrado."}
                               </TableCell>
                             </TableRow>
@@ -1860,6 +1861,7 @@ const VistoriaCampo = () => {
                               <TableRow key={c.id} className="hover:bg-muted/30">
                                 {editingColaborador?.id === c.id ? (
                                   <>
+                                    <TableCell><Input value={editColaboradorForm?.re || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, re: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.tt || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tt: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.tr || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, tr: e.target.value.toUpperCase() } : f)} className="h-7 text-xs" /></TableCell>
                                     <TableCell><Input value={editColaboradorForm?.nome_tecnico || ""} onChange={(e) => setEditColaboradorForm(f => f ? { ...f, nome_tecnico: e.target.value } : f)} className="h-7 text-xs" /></TableCell>
@@ -1877,6 +1879,7 @@ const VistoriaCampo = () => {
                                   </>
                                 ) : (
                                   <>
+                                    <TableCell className="text-xs font-mono font-bold text-primary">{c.re || "-"}</TableCell>
                                     <TableCell className="text-xs font-mono">{c.tt || "-"}</TableCell>
                                     <TableCell className="text-xs font-mono">{c.tr || "-"}</TableCell>
                                     <TableCell className="text-xs font-medium">{c.nome_tecnico}</TableCell>
