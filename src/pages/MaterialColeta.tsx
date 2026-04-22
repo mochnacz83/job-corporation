@@ -1106,7 +1106,7 @@ const MaterialColeta = () => {
         const to = from + PAGE_SIZE - 1;
         const { data, error } = await (supabase
           .from("material_coletas")
-          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, edit_requested, edit_request_reason, edit_requested_at, edit_unlocked, edit_unlocked_at, edit_unlocked_by, post_edit_locked, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
           .order("created_at", { ascending: false })
           .range(from, to) as any);
         if (error) throw error;
