@@ -1123,8 +1123,8 @@ const VistoriaCampo = () => {
 
   const downloadTemplateColaboradores = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ["TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
-      ["TT123456", "RE12345", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
+      ["RE", "TT", "TR", "Nome Técnico", "Empresa", "Supervisor", "Coordenador", "Telefone", "Cidade"],
+      ["RE12345", "TT123456", "TR98765", "JOÃO DA SILVA", "ABILITY", "MARIA SOUZA", "PEDRO LIMA", "(48) 99999-9999", "FLORIANÓPOLIS"],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
