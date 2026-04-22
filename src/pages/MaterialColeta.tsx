@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle, Truck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, FileSpreadsheet, Search, Download, ImageIcon, FileText, ScanBarcode, Pencil, Eye, RefreshCw, Camera, CheckCircle2, AlertTriangle, AlertCircle, Truck, Lock, Unlock, KeyRound } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -71,6 +71,13 @@ interface ColetaRecord {
   circuito_compartilhado: string | null;
   opcoes_adicionais: string | null;
   last_exported_at: string | null;
+  edit_requested?: boolean;
+  edit_request_reason?: string | null;
+  edit_requested_at?: string | null;
+  edit_unlocked?: boolean;
+  edit_unlocked_at?: string | null;
+  edit_unlocked_by?: string | null;
+  post_edit_locked?: boolean;
   material_coleta_items: { codigo_material: string; nome_material: string; quantidade: number | ""; unidade: string; serial: string | null }[];
 }
 
@@ -209,6 +216,11 @@ const MaterialColeta = () => {
   const [editFotoFile, setEditFotoFile] = useState<File | null>(null);
   const [editFotoPreview, setEditFotoPreview] = useState<string | null>(null);
   const editGalleryInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit-request workflow
+  const [requestEditColeta, setRequestEditColeta] = useState<ColetaRecord | null>(null);
+  const [requestEditReason, setRequestEditReason] = useState("");
+  const [editMateriais, setEditMateriais] = useState<MaterialItem[]>([]);
 
   const openScanner = (onScan: (code: string) => void) => {
     setScannerCallback(() => onScan);
@@ -619,6 +631,60 @@ const MaterialColeta = () => {
     setMateriais((prev) => prev.filter((m) => m.id !== id));
   };
 
+  // Validate seriais uniqueness: in-form duplicates AND global DB duplicates.
+  // excludeColetaId allows the same record's existing items (when re-editing) to be ignored.
+  const validateSeriaisUnique = async (
+    items: MaterialItem[],
+    excludeColetaId: string | null
+  ): Promise<{ ok: boolean; message?: string }> => {
+    const normalize = (s: string) => s.toUpperCase().trim();
+    const isIgnorable = (s: string) => {
+      const n = normalize(s);
+      return n === "" || n === "N/A" || n === "-";
+    };
+
+    const allSeriais: string[] = [];
+    for (const m of items) {
+      if (m.seriais.length > 0) {
+        m.seriais.forEach((s) => { if (!isIgnorable(s)) allSeriais.push(normalize(s)); });
+      } else if (m.serial && !isIgnorable(m.serial)) {
+        allSeriais.push(normalize(m.serial));
+      }
+    }
+    if (allSeriais.length === 0) return { ok: true };
+
+    // In-form duplicates
+    const seen = new Set<string>();
+    for (const s of allSeriais) {
+      if (seen.has(s)) {
+        return { ok: false, message: `Serial duplicado neste formulário: ${s}` };
+      }
+      seen.add(s);
+    }
+
+    // DB check
+    try {
+      const { data, error } = await supabase
+        .from("material_coleta_items")
+        .select("serial, coleta_id")
+        .in("serial", allSeriais);
+      if (error) throw error;
+      const conflict = (data || []).find((row: any) => {
+        if (!row.serial) return false;
+        const norm = normalize(row.serial);
+        if (!allSeriais.includes(norm)) return false;
+        if (excludeColetaId && row.coleta_id === excludeColetaId) return false;
+        return true;
+      });
+      if (conflict) {
+        return { ok: false, message: `Serial "${(conflict as any).serial}" já cadastrado em outra coleta.` };
+      }
+    } catch (err: any) {
+      return { ok: false, message: "Erro ao validar seriais: " + err.message };
+    }
+    return { ok: true };
+  };
+
   // Generate PDF for Reversa - fit in 1 A4 page
   const generatePDF = (coletaData: {
     matriculaTt: string;
@@ -937,6 +1003,13 @@ const MaterialColeta = () => {
       }
     }
 
+    // Validate seriais uniqueness — within form and against database
+    const isSemMaterialEarly = tipoAplicacao === "SEM MATERIAL";
+    if (!isSemMaterialEarly) {
+      const dupCheck = await validateSeriaisUnique(materiais, null);
+      if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
+    }
+
     if (isReversa) {
       const colabSig = getCanvasDataUrl(sigColabCanvasRef.current);
       if (!colabSig || colabSig === "data:,") {
@@ -1099,7 +1172,7 @@ const MaterialColeta = () => {
         const to = from + PAGE_SIZE - 1;
         const { data, error } = await (supabase
           .from("material_coletas")
-          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
+          .select("id, user_id, matricula_tt, nome_tecnico, cidade, sigla_cidade, uf, atividade, tipo_aplicacao, circuito, ba, data_execucao, created_at, pdf_url, foto_url, assinatura_colaborador, assinatura_almoxarifado, almox_edit_done, last_exported_at, local_retirada, classificacao_cenario, circuito_compartilhado, opcoes_adicionais, edit_requested, edit_request_reason, edit_requested_at, edit_unlocked, edit_unlocked_at, edit_unlocked_by, post_edit_locked, material_coleta_items(codigo_material, nome_material, quantidade, unidade, serial)")
           .order("created_at", { ascending: false })
           .range(from, to) as any);
         if (error) throw error;
@@ -1387,6 +1460,162 @@ const MaterialColeta = () => {
       setEditingColeta(null);
     } catch (err: any) {
       toast.error("Erro ao atualizar: " + err.message);
+    }
+  };
+
+  // ===== Edit-request workflow handlers =====
+  const handleSubmitEditRequest = async () => {
+    if (!requestEditColeta) return;
+    const reason = requestEditReason.trim();
+    if (reason.length < 5) {
+      toast.error("Descreva o motivo da solicita\u00e7\u00e3o (m\u00ednimo 5 caracteres).");
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          edit_requested: true,
+          edit_request_reason: reason,
+          edit_requested_at: new Date().toISOString(),
+        } as any)
+        .eq("id", requestEditColeta.id);
+      if (error) throw error;
+      toast.success("Solicita\u00e7\u00e3o enviada ao Administrador.");
+      const patch = { edit_requested: true, edit_request_reason: reason } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
+      setColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
+      setRequestEditColeta(null);
+      setRequestEditReason("");
+    } catch (err: any) {
+      toast.error("Erro ao enviar solicita\u00e7\u00e3o: " + err.message);
+    }
+  };
+
+  const handleAdminUnlockEdit = async (c: ColetaRecord) => {
+    if (!user) return;
+    if (!confirm(`Liberar edi\u00e7\u00e3o para ${c.nome_tecnico}?\n\nMotivo: ${c.edit_request_reason || "-"}`)) return;
+    try {
+      const { error } = await supabase
+        .from("material_coletas")
+        .update({
+          edit_unlocked: true,
+          edit_unlocked_at: new Date().toISOString(),
+          edit_unlocked_by: user.id,
+          edit_requested: false,
+        } as any)
+        .eq("id", c.id);
+      if (error) throw error;
+      toast.success("Edi\u00e7\u00e3o liberada para o usu\u00e1rio.");
+      const patch = { edit_unlocked: true, edit_requested: false } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+      setColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
+    } catch (err: any) {
+      toast.error("Erro ao liberar: " + err.message);
+    }
+  };
+
+  const handleOpenPostUnlockEdit = (c: ColetaRecord) => {
+    // Build editable materials list from existing items, grouping by codigo (preserve seriais arrays)
+    const items: MaterialItem[] = c.material_coleta_items.map((it) => ({
+      id: crypto.randomUUID(),
+      codigo_material: it.codigo_material,
+      nome_material: it.nome_material,
+      quantidade: typeof it.quantidade === "number" ? it.quantidade : Number(it.quantidade) || 1,
+      unidade: it.unidade || "Un",
+      serial: it.serial || "",
+      seriais: [],
+      askSeriais: false,
+    }));
+    setEditMateriais(items.length > 0 ? items : [newMaterial()]);
+    setEditingColeta(c);
+    setEditColetaForm({
+      ba: c.ba || "",
+      circuito: c.circuito || "",
+      cidade: c.cidade || "",
+      sigla_cidade: c.sigla_cidade || "",
+      uf: c.uf || "",
+      data_execucao: c.data_execucao || "",
+    });
+  };
+
+  const updateEditMaterial = (id: string, field: keyof MaterialItem, value: any) => {
+    setEditMateriais(prev => prev.map(m => m.id === id ? { ...m, [field]: value } : m));
+  };
+
+  const handleSavePostUnlockEdit = async () => {
+    if (!editingColeta) return;
+    if (!editingColeta.edit_unlocked || editingColeta.post_edit_locked) {
+      toast.error("Esta coleta n\u00e3o est\u00e1 liberada para edi\u00e7\u00e3o.");
+      return;
+    }
+    // Validate materials
+    for (const m of editMateriais) {
+      if (!m.codigo_material || !m.nome_material) {
+        toast.error("Preencha c\u00f3digo e nome de todos os materiais"); return;
+      }
+      if (m.quantidade === "" || Number(m.quantidade) <= 0) {
+        toast.error(`Quantidade inv\u00e1lida em ${m.codigo_material}`); return;
+      }
+    }
+    // Serial uniqueness check (excluding this coleta's own items)
+    const dup = await validateSeriaisUnique(editMateriais, editingColeta.id);
+    if (!dup.ok) { toast.error(dup.message!); return; }
+
+    try {
+      // Replace items: delete then insert
+      const { error: delErr } = await supabase.from("material_coleta_items").delete().eq("coleta_id", editingColeta.id);
+      if (delErr) throw delErr;
+
+      const newItems = editMateriais.map(m => ({
+        coleta_id: editingColeta.id,
+        codigo_material: m.codigo_material,
+        nome_material: m.nome_material,
+        quantidade: m.quantidade,
+        unidade: m.unidade,
+        serial: m.serial || null,
+      }));
+      if (newItems.length > 0) {
+        const { error: insErr } = await supabase.from("material_coleta_items").insert(newItems as any);
+        if (insErr) throw insErr;
+      }
+
+      // Lock the record
+      const { error: lockErr } = await supabase
+        .from("material_coletas")
+        .update({
+          post_edit_locked: true,
+          edit_unlocked: false,
+          ba: editColetaForm.ba.toUpperCase() || null,
+          circuito: editColetaForm.circuito.toUpperCase() || null,
+          data_execucao: editColetaForm.data_execucao || null,
+        } as any)
+        .eq("id", editingColeta.id);
+      if (lockErr) throw lockErr;
+
+      toast.success("Altera\u00e7\u00f5es salvas. Registro travado.");
+      // Refresh local state
+      const refreshedItems = newItems.map(it => ({
+        codigo_material: it.codigo_material,
+        nome_material: it.nome_material,
+        quantidade: it.quantidade,
+        unidade: it.unidade,
+        serial: it.serial,
+      }));
+      const patch = {
+        post_edit_locked: true,
+        edit_unlocked: false,
+        ba: editColetaForm.ba.toUpperCase() || null,
+        circuito: editColetaForm.circuito.toUpperCase() || null,
+        data_execucao: editColetaForm.data_execucao || null,
+        material_coleta_items: refreshedItems,
+      } as Partial<ColetaRecord>;
+      setAllColetas(prev => prev.map(x => x.id === editingColeta.id ? { ...x, ...patch } as ColetaRecord : x));
+      setColetas(prev => prev.map(x => x.id === editingColeta.id ? { ...x, ...patch } as ColetaRecord : x));
+      setEditingColeta(null);
+      setEditMateriais([]);
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + err.message);
     }
   };
 
@@ -2399,6 +2628,48 @@ const MaterialColeta = () => {
                                  >
                                    <Pencil className="w-3.5 h-3.5" />
                                  </Button>
+                                  {/* Solicitar edição (dono, sem libera\u00e7\u00e3o ativa, n\u00e3o travado) */}
+                                  {!isAdmin && c.user_id === user?.id && !c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className={`h-7 w-7 ${c.edit_requested ? "text-warning" : ""}`}
+                                      onClick={() => { setRequestEditColeta(c); setRequestEditReason(c.edit_request_reason || ""); }}
+                                      title={c.edit_requested ? "Solicita\u00e7\u00e3o de edi\u00e7\u00e3o pendente" : "Solicitar edi\u00e7\u00e3o ao Administrador"}
+                                    >
+                                      <KeyRound className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Admin: liberar edi\u00e7\u00e3o quando solicitada */}
+                                  {isAdmin && c.edit_requested && !c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-success"
+                                      onClick={() => handleAdminUnlockEdit(c)}
+                                      title={`Liberar edi\u00e7\u00e3o (motivo: ${c.edit_request_reason || "-"})`}
+                                    >
+                                      <Unlock className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Dono com edi\u00e7\u00e3o liberada: bot\u00e3o de re-edi\u00e7\u00e3o de materiais */}
+                                  {c.user_id === user?.id && c.edit_unlocked && !c.post_edit_locked && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7 text-primary"
+                                      onClick={() => handleOpenPostUnlockEdit(c)}
+                                      title="Edi\u00e7\u00e3o liberada \u2014 alterar materiais/seriais"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                  )}
+                                  {/* Indicador de travado */}
+                                  {c.post_edit_locked && (
+                                    <span title="Registro travado ap\u00f3s reedi\u00e7\u00e3o" className="inline-flex items-center text-muted-foreground">
+                                      <Lock className="w-3.5 h-3.5" />
+                                    </span>
+                                  )}
                                  {c.pdf_url && (
                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => window.open(c.pdf_url!, "_blank")} title="Doc Logística (PDF)">
                                      <FileText className="w-3.5 h-3.5" />
@@ -2688,7 +2959,10 @@ const MaterialColeta = () => {
       </Dialog >
 
       {/* Edit Coleta Dialog */}
-      <Dialog open={!!editingColeta} onOpenChange={() => setEditingColeta(null)}>
+      <Dialog
+        open={!!editingColeta && !(editingColeta.edit_unlocked && !editingColeta.post_edit_locked && editMateriais.length > 0)}
+        onOpenChange={() => { setEditingColeta(null); setEditMateriais([]); }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Informações Complementares</DialogTitle>
@@ -2798,6 +3072,120 @@ const MaterialColeta = () => {
           <div id="barcode-scanner-container" className="w-full min-h-[300px] rounded-md overflow-hidden" />
           <DialogFooter>
             <Button variant="outline" onClick={closeScanner}>Cancelar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Solicitar edi\u00e7\u00e3o (usu\u00e1rio dono) */}
+      <Dialog open={!!requestEditColeta} onOpenChange={(o) => { if (!o) { setRequestEditColeta(null); setRequestEditReason(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitar edi\u00e7\u00e3o ao Administrador</DialogTitle>
+            <DialogDescription>
+              Descreva o motivo da solicita\u00e7\u00e3o. Ap\u00f3s a libera\u00e7\u00e3o pelo Administrador voc\u00ea poder\u00e1 alterar seriais, quantidades e materiais. Ap\u00f3s salvar, o registro ser\u00e1 travado.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {requestEditColeta?.edit_requested && (
+              <p className="text-xs text-warning">J\u00e1 existe uma solicita\u00e7\u00e3o pendente. Voc\u00ea pode atualizar o motivo abaixo.</p>
+            )}
+            <Label className="text-sm">Motivo</Label>
+            <textarea
+              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={requestEditReason}
+              onChange={(e) => setRequestEditReason(e.target.value)}
+              placeholder="Ex.: Serial digitado incorretamente, quantidade errada, faltou um material..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRequestEditColeta(null); setRequestEditReason(""); }}>Cancelar</Button>
+            <Button onClick={handleSubmitEditRequest}>Enviar Solicita\u00e7\u00e3o</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edi\u00e7\u00e3o p\u00f3s-libera\u00e7\u00e3o de materiais/seriais */}
+      <Dialog
+        open={!!editingColeta && !!editingColeta.edit_unlocked && !editingColeta.post_edit_locked && editMateriais.length > 0}
+        onOpenChange={(o) => { if (!o) { setEditingColeta(null); setEditMateriais([]); } }}
+      >
+        <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Edi\u00e7\u00e3o liberada \u2014 Materiais e Seriais</DialogTitle>
+            <DialogDescription>
+              Atualize seriais, quantidades, adicione ou remova materiais. <strong>Ap\u00f3s salvar, o registro ser\u00e1 travado e n\u00e3o poder\u00e1 mais ser editado.</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">BA</Label>
+                <Input value={editColetaForm.ba} onChange={(e) => setEditColetaForm(p => ({ ...p, ba: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Circuito</Label>
+                <Input value={editColetaForm.circuito} onChange={(e) => setEditColetaForm(p => ({ ...p, circuito: e.target.value.toUpperCase() }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Data Execu\u00e7\u00e3o</Label>
+                <Input type="date" value={editColetaForm.data_execucao} onChange={(e) => setEditColetaForm(p => ({ ...p, data_execucao: e.target.value }))} />
+              </div>
+            </div>
+            <div className="border rounded-md p-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Materiais</Label>
+                <Button size="sm" variant="outline" onClick={() => setEditMateriais(prev => [...prev, newMaterial()])}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+                </Button>
+              </div>
+              {editMateriais.map((mat, idx) => (
+                <div key={mat.id} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
+                  <div className="col-span-3 space-y-1">
+                    <Label className="text-xs">C\u00f3digo</Label>
+                    <Input
+                      value={mat.codigo_material}
+                      onChange={(e) => {
+                        const code = e.target.value.toUpperCase();
+                        const found = materiaisCadastro.find(mc => mc.codigo.toUpperCase() === code);
+                        updateEditMaterial(mat.id, "codigo_material", code);
+                        if (found) updateEditMaterial(mat.id, "nome_material", found.nome_material);
+                      }}
+                      className="uppercase"
+                    />
+                  </div>
+                  <div className="col-span-4 space-y-1">
+                    <Label className="text-xs">Nome</Label>
+                    <Input value={mat.nome_material} onChange={(e) => updateEditMaterial(mat.id, "nome_material", e.target.value.toUpperCase())} className="uppercase" />
+                  </div>
+                  <div className="col-span-1 space-y-1">
+                    <Label className="text-xs">Qtd</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={mat.quantidade}
+                      onChange={(e) => updateEditMaterial(mat.id, "quantidade", e.target.value === "" ? "" : Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="col-span-1 space-y-1">
+                    <Label className="text-xs">Un</Label>
+                    <Input value={mat.unidade} onChange={(e) => updateEditMaterial(mat.id, "unidade", e.target.value)} />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Serial</Label>
+                    <Input value={mat.serial} onChange={(e) => updateEditMaterial(mat.id, "serial", e.target.value.toUpperCase())} className="uppercase" />
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setEditMateriais(prev => prev.length > 1 ? prev.filter(m => m.id !== mat.id) : prev)} title="Remover">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditingColeta(null); setEditMateriais([]); }}>Cancelar</Button>
+            <Button onClick={handleSavePostUnlockEdit}>Salvar e Travar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
