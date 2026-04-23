@@ -689,6 +689,66 @@ const MaterialColeta = () => {
     return { ok: true };
   };
 
+  // Real-time check for a single serial against in-form duplicates and DB.
+  // Debounced ~400ms per key. excludeColetaId allows re-edit context.
+  const checkSerialLive = useCallback((
+    key: string,
+    serialRaw: string,
+    excludeColetaId: string | null = null,
+  ) => {
+    const norm = (serialRaw || "").toUpperCase().trim();
+    // clear pending timer for this key
+    if (serialCheckTimers.current[key]) {
+      window.clearTimeout(serialCheckTimers.current[key]);
+    }
+    if (!norm || norm === "N/A" || norm === "-") {
+      setSerialErrors((prev) => {
+        if (!prev[key]) return prev;
+        const c = { ...prev }; delete c[key]; return c;
+      });
+      return;
+    }
+    serialCheckTimers.current[key] = window.setTimeout(async () => {
+      // 1) in-form duplicate check
+      const inFormSeriais: string[] = [];
+      materiais.forEach((m) => {
+        if (m.seriais.length > 0) {
+          m.seriais.forEach((s, i) => {
+            const k = `${m.id}:${i}`;
+            const v = (s || "").toUpperCase().trim();
+            if (v && v !== "N/A" && v !== "-" && k !== key) inFormSeriais.push(v);
+          });
+        } else if (m.serial) {
+          const k = `${m.id}:main`;
+          const v = m.serial.toUpperCase().trim();
+          if (v && v !== "N/A" && v !== "-" && k !== key) inFormSeriais.push(v);
+        }
+      });
+      if (inFormSeriais.includes(norm)) {
+        setSerialErrors((prev) => ({ ...prev, [key]: "Serial duplicado neste formulário" }));
+        return;
+      }
+      // 2) DB check
+      try {
+        const { data, error } = await supabase
+          .from("material_coleta_items")
+          .select("serial, coleta_id")
+          .eq("serial", norm)
+          .limit(5);
+        if (error) throw error;
+        const conflict = (data || []).find((r: any) => !excludeColetaId || r.coleta_id !== excludeColetaId);
+        setSerialErrors((prev) => {
+          const c = { ...prev };
+          if (conflict) c[key] = "Serial já cadastrado em outra coleta";
+          else delete c[key];
+          return c;
+        });
+      } catch {
+        // ignore network errors silently for live check
+      }
+    }, 400);
+  }, [materiais]);
+
   // Generate PDF for Reversa - fit in 1 A4 page
   const generatePDF = (coletaData: {
     matriculaTt: string;
