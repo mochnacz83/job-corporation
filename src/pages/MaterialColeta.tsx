@@ -161,6 +161,10 @@ const MaterialColeta = () => {
   const [materiais, setMateriais] = useState<MaterialItem[]>([newMaterial()]);
   const [submitting, setSubmitting] = useState(false);
 
+  // Real-time serial conflict tracking — key: `${materialId}:${index|'main'}` => message
+  const [serialErrors, setSerialErrors] = useState<Record<string, string>>({});
+  const serialCheckTimers = useRef<Record<string, number>>({});
+
   // Reversa state
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
