@@ -2211,16 +2211,21 @@ const MaterialColeta = () => {
                             <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                               {mat.seriais.map((s, i) => (
-                                <div key={i} className="flex gap-1">
-                                  <Input
-                                    value={s}
-                                    onChange={(e) => updateSerial(mat.id, i, e.target.value)}
-                                    placeholder={`SERIAL ${i + 1} *`}
-                                    className="flex-1 uppercase"
-                                  />
-                                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
-                                    <ScanBarcode className="w-4 h-4" />
-                                  </Button>
+                                <div key={i} className="space-y-1">
+                                  <div className="flex gap-1">
+                                    <Input
+                                      value={s}
+                                      onChange={(e) => { updateSerial(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:${i}`, e.target.value); }}
+                                      placeholder={`SERIAL ${i + 1} *`}
+                                      className={`flex-1 uppercase ${serialErrors[`${mat.id}:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                    />
+                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerial(mat.id, i, code); checkSerialLive(`${mat.id}:${i}`, code); })}>
+                                      <ScanBarcode className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                  {serialErrors[`${mat.id}:${i}`] && (
+                                    <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:${i}`]}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>
