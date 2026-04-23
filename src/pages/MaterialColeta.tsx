@@ -1070,6 +1070,12 @@ const MaterialColeta = () => {
     // Validate seriais uniqueness — within form and against database
     const isSemMaterialEarly = tipoAplicacao === "SEM MATERIAL";
     if (!isSemMaterialEarly) {
+      // Block save if there are unresolved live serial errors
+      const liveErrors = Object.values(serialErrors).filter(Boolean);
+      if (liveErrors.length > 0) {
+        toast.error(`Existem seriais com erro: ${liveErrors[0]}`);
+        return;
+      }
       const dupCheck = await validateSeriaisUnique(materiais, null);
       if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
     }
