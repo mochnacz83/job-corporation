@@ -979,7 +979,19 @@ const MaterialColeta = () => {
     const downloadUrl = URL.createObjectURL(pdfBlob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = `Material_${coletaData.nomeTecnico.replace(/\s+/g, "_")}_${coletaData.dataExecucao}.pdf`;
+    const sanitizeForFilename = (v: string) =>
+      (v || "")
+        .toString()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toUpperCase() || "SEM_INFO";
+    const partCircuito = sanitizeForFilename(coletaData.circuito);
+    const partSigla = sanitizeForFilename(coletaData.siglaCidade);
+    const partAtividade = sanitizeForFilename(coletaData.atividade);
+    const partTecnico = sanitizeForFilename(coletaData.nomeTecnico);
+    link.download = `${partCircuito}_${partSigla}_${partAtividade}_${partTecnico}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
