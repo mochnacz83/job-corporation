@@ -1538,7 +1538,7 @@ const MaterialColeta = () => {
     if (!requestEditColeta) return;
     const reason = requestEditReason.trim();
     if (reason.length < 5) {
-      toast.error("Descreva o motivo da solicita\u00e7\u00e3o (m\u00ednimo 5 caracteres).");
+      toast.error("Descreva o motivo da solicitação (mínimo 5 caracteres).");
       return;
     }
     try {
@@ -1551,20 +1551,20 @@ const MaterialColeta = () => {
         } as any)
         .eq("id", requestEditColeta.id);
       if (error) throw error;
-      toast.success("Solicita\u00e7\u00e3o enviada ao Administrador.");
+      toast.success("Solicitação enviada ao Administrador.");
       const patch = { edit_requested: true, edit_request_reason: reason } as Partial<ColetaRecord>;
       setAllColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
       setColetas(prev => prev.map(x => x.id === requestEditColeta.id ? { ...x, ...patch } : x));
       setRequestEditColeta(null);
       setRequestEditReason("");
     } catch (err: any) {
-      toast.error("Erro ao enviar solicita\u00e7\u00e3o: " + err.message);
+      toast.error("Erro ao enviar solicitação: " + err.message);
     }
   };
 
   const handleAdminUnlockEdit = async (c: ColetaRecord) => {
     if (!user) return;
-    if (!confirm(`Liberar edi\u00e7\u00e3o para ${c.nome_tecnico}?\n\nMotivo: ${c.edit_request_reason || "-"}`)) return;
+    if (!confirm(`Liberar edição para ${c.nome_tecnico}?\n\nMotivo: ${c.edit_request_reason || "-"}`)) return;
     try {
       const { error } = await supabase
         .from("material_coletas")
@@ -1576,7 +1576,7 @@ const MaterialColeta = () => {
         } as any)
         .eq("id", c.id);
       if (error) throw error;
-      toast.success("Edi\u00e7\u00e3o liberada para o usu\u00e1rio.");
+      toast.success("Edição liberada para o usuário.");
       const patch = { edit_unlocked: true, edit_requested: false } as Partial<ColetaRecord>;
       setAllColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
       setColetas(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x));
@@ -1616,16 +1616,16 @@ const MaterialColeta = () => {
   const handleSavePostUnlockEdit = async () => {
     if (!editingColeta) return;
     if (!editingColeta.edit_unlocked || editingColeta.post_edit_locked) {
-      toast.error("Esta coleta n\u00e3o est\u00e1 liberada para edi\u00e7\u00e3o.");
+      toast.error("Esta coleta não está liberada para edição.");
       return;
     }
     // Validate materials
     for (const m of editMateriais) {
       if (!m.codigo_material || !m.nome_material) {
-        toast.error("Preencha c\u00f3digo e nome de todos os materiais"); return;
+        toast.error("Preencha código e nome de todos os materiais"); return;
       }
       if (m.quantidade === "" || Number(m.quantidade) <= 0) {
-        toast.error(`Quantidade inv\u00e1lida em ${m.codigo_material}`); return;
+        toast.error(`Quantidade inválida em ${m.codigo_material}`); return;
       }
     }
     // Serial uniqueness check (excluding this coleta's own items)
@@ -1663,7 +1663,7 @@ const MaterialColeta = () => {
         .eq("id", editingColeta.id);
       if (lockErr) throw lockErr;
 
-      toast.success("Altera\u00e7\u00f5es salvas. Registro travado.");
+      toast.success("Alterações salvas. Registro travado.");
       // Refresh local state
       const refreshedItems = newItems.map(it => ({
         codigo_material: it.codigo_material,
@@ -2710,45 +2710,45 @@ const MaterialColeta = () => {
                                  >
                                    <Pencil className="w-3.5 h-3.5" />
                                  </Button>
-                                  {/* Solicitar edição (dono, sem libera\u00e7\u00e3o ativa, n\u00e3o travado) */}
+                                  {/* Solicitar edição (dono, sem liberação ativa, não travado) */}
                                   {!isAdmin && c.user_id === user?.id && !c.edit_unlocked && !c.post_edit_locked && (
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className={`h-7 w-7 ${c.edit_requested ? "text-warning" : ""}`}
                                       onClick={() => { setRequestEditColeta(c); setRequestEditReason(c.edit_request_reason || ""); }}
-                                      title={c.edit_requested ? "Solicita\u00e7\u00e3o de edi\u00e7\u00e3o pendente" : "Solicitar edi\u00e7\u00e3o ao Administrador"}
+                                      title={c.edit_requested ? "Solicitação de edição pendente" : "Solicitar edição ao Administrador"}
                                     >
                                       <KeyRound className="w-3.5 h-3.5" />
                                     </Button>
                                   )}
-                                  {/* Admin: liberar edi\u00e7\u00e3o quando solicitada */}
+                                  {/* Admin: liberar edição quando solicitada */}
                                   {isAdmin && c.edit_requested && !c.edit_unlocked && !c.post_edit_locked && (
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="h-7 w-7 text-success"
                                       onClick={() => handleAdminUnlockEdit(c)}
-                                      title={`Liberar edi\u00e7\u00e3o (motivo: ${c.edit_request_reason || "-"})`}
+                                      title={`Liberar edição (motivo: ${c.edit_request_reason || "-"})`}
                                     >
                                       <Unlock className="w-3.5 h-3.5" />
                                     </Button>
                                   )}
-                                  {/* Dono com edi\u00e7\u00e3o liberada: bot\u00e3o de re-edi\u00e7\u00e3o de materiais */}
+                                  {/* Dono com edição liberada: botão de re-edição de materiais */}
                                   {c.user_id === user?.id && c.edit_unlocked && !c.post_edit_locked && (
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="h-7 w-7 text-primary"
                                       onClick={() => handleOpenPostUnlockEdit(c)}
-                                      title="Edi\u00e7\u00e3o liberada \u2014 alterar materiais/seriais"
+                                      title="Edição liberada \u2014 alterar materiais/seriais"
                                     >
                                       <Pencil className="w-3.5 h-3.5" />
                                     </Button>
                                   )}
                                   {/* Indicador de travado */}
                                   {c.post_edit_locked && (
-                                    <span title="Registro travado ap\u00f3s reedi\u00e7\u00e3o" className="inline-flex items-center text-muted-foreground">
+                                    <span title="Registro travado após reedição" className="inline-flex items-center text-muted-foreground">
                                       <Lock className="w-3.5 h-3.5" />
                                     </span>
                                   )}
@@ -3158,18 +3158,18 @@ const MaterialColeta = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Solicitar edi\u00e7\u00e3o (usu\u00e1rio dono) */}
+      {/* Solicitar edição (usuário dono) */}
       <Dialog open={!!requestEditColeta} onOpenChange={(o) => { if (!o) { setRequestEditColeta(null); setRequestEditReason(""); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Solicitar edi\u00e7\u00e3o ao Administrador</DialogTitle>
+            <DialogTitle>Solicitar edição ao Administrador</DialogTitle>
             <DialogDescription>
-              Descreva o motivo da solicita\u00e7\u00e3o. Ap\u00f3s a libera\u00e7\u00e3o pelo Administrador voc\u00ea poder\u00e1 alterar seriais, quantidades e materiais. Ap\u00f3s salvar, o registro ser\u00e1 travado.
+              Descreva o motivo da solicitação. Após a liberação pelo Administrador você poderá alterar seriais, quantidades e materiais. Após salvar, o registro será travado.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             {requestEditColeta?.edit_requested && (
-              <p className="text-xs text-warning">J\u00e1 existe uma solicita\u00e7\u00e3o pendente. Voc\u00ea pode atualizar o motivo abaixo.</p>
+              <p className="text-xs text-warning">Já existe uma solicitação pendente. Você pode atualizar o motivo abaixo.</p>
             )}
             <Label className="text-sm">Motivo</Label>
             <textarea
@@ -3181,21 +3181,21 @@ const MaterialColeta = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setRequestEditColeta(null); setRequestEditReason(""); }}>Cancelar</Button>
-            <Button onClick={handleSubmitEditRequest}>Enviar Solicita\u00e7\u00e3o</Button>
+            <Button onClick={handleSubmitEditRequest}>Enviar Solicitação</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edi\u00e7\u00e3o p\u00f3s-libera\u00e7\u00e3o de materiais/seriais */}
+      {/* Edição pós-liberação de materiais/seriais */}
       <Dialog
         open={!!editingColeta && !!editingColeta.edit_unlocked && !editingColeta.post_edit_locked && editMateriais.length > 0}
         onOpenChange={(o) => { if (!o) { setEditingColeta(null); setEditMateriais([]); } }}
       >
         <DialogContent className="w-[96vw] max-w-3xl max-h-[92vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Edi\u00e7\u00e3o liberada \u2014 Materiais e Seriais</DialogTitle>
+            <DialogTitle>Edição liberada \u2014 Materiais e Seriais</DialogTitle>
             <DialogDescription>
-              Atualize seriais, quantidades, adicione ou remova materiais. <strong>Ap\u00f3s salvar, o registro ser\u00e1 travado e n\u00e3o poder\u00e1 mais ser editado.</strong>
+              Atualize seriais, quantidades, adicione ou remova materiais. <strong>Após salvar, o registro será travado e não poderá mais ser editado.</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -3209,7 +3209,7 @@ const MaterialColeta = () => {
                 <Input value={editColetaForm.circuito} onChange={(e) => setEditColetaForm(p => ({ ...p, circuito: e.target.value.toUpperCase() }))} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Data Execu\u00e7\u00e3o</Label>
+                <Label className="text-xs">Data Execução</Label>
                 <Input type="date" value={editColetaForm.data_execucao} onChange={(e) => setEditColetaForm(p => ({ ...p, data_execucao: e.target.value }))} />
               </div>
             </div>
@@ -3223,7 +3223,7 @@ const MaterialColeta = () => {
               {editMateriais.map((mat, idx) => (
                 <div key={mat.id} className="grid grid-cols-12 gap-2 items-end border-b pb-2">
                   <div className="col-span-3 space-y-1">
-                    <Label className="text-xs">C\u00f3digo</Label>
+                    <Label className="text-xs">Código</Label>
                     <Input
                       value={mat.codigo_material}
                       onChange={(e) => {
