@@ -2175,14 +2175,21 @@ const MaterialColeta = () => {
                               <div className="flex gap-1">
                                 <Input
                                   value={mat.serial}
-                                  onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
+                                  onChange={(e) => {
+                                    const v = toUpper(e.target.value);
+                                    updateMaterial(mat.id, "serial", v);
+                                    checkSerialLive(`${mat.id}:main`, v);
+                                  }}
                                   placeholder="SERIAL"
-                                  className="flex-1 uppercase"
+                                  className={`flex-1 uppercase ${serialErrors[`${mat.id}:main`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                 />
-                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
+                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial", code); checkSerialLive(`${mat.id}:main`, code); })}>
                                   <ScanBarcode className="w-4 h-4" />
                                 </Button>
                               </div>
+                              {serialErrors[`${mat.id}:main`] && (
+                                <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:main`]}</p>
+                              )}
                             </div>
                           )}
                         </div>
