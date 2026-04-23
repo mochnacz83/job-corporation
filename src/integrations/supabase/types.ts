@@ -1141,6 +1141,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      material_coleta_has_items: {
+        Args: { _coleta_id: string }
+        Returns: boolean
+      }
       process_bi_etl: { Args: never; Returns: undefined }
     }
     Enums: {

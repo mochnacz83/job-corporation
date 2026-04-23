@@ -161,6 +161,10 @@ const MaterialColeta = () => {
   const [materiais, setMateriais] = useState<MaterialItem[]>([newMaterial()]);
   const [submitting, setSubmitting] = useState(false);
 
+  // Real-time serial conflict tracking — key: `${materialId}:${index|'main'}` => message
+  const [serialErrors, setSerialErrors] = useState<Record<string, string>>({});
+  const serialCheckTimers = useRef<Record<string, number>>({});
+
   // Reversa state
   const [fotoFile, setFotoFile] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
@@ -685,6 +689,66 @@ const MaterialColeta = () => {
     return { ok: true };
   };
 
+  // Real-time check for a single serial against in-form duplicates and DB.
+  // Debounced ~400ms per key. excludeColetaId allows re-edit context.
+  const checkSerialLive = useCallback((
+    key: string,
+    serialRaw: string,
+    excludeColetaId: string | null = null,
+  ) => {
+    const norm = (serialRaw || "").toUpperCase().trim();
+    // clear pending timer for this key
+    if (serialCheckTimers.current[key]) {
+      window.clearTimeout(serialCheckTimers.current[key]);
+    }
+    if (!norm || norm === "N/A" || norm === "-") {
+      setSerialErrors((prev) => {
+        if (!prev[key]) return prev;
+        const c = { ...prev }; delete c[key]; return c;
+      });
+      return;
+    }
+    serialCheckTimers.current[key] = window.setTimeout(async () => {
+      // 1) in-form duplicate check
+      const inFormSeriais: string[] = [];
+      materiais.forEach((m) => {
+        if (m.seriais.length > 0) {
+          m.seriais.forEach((s, i) => {
+            const k = `${m.id}:${i}`;
+            const v = (s || "").toUpperCase().trim();
+            if (v && v !== "N/A" && v !== "-" && k !== key) inFormSeriais.push(v);
+          });
+        } else if (m.serial) {
+          const k = `${m.id}:main`;
+          const v = m.serial.toUpperCase().trim();
+          if (v && v !== "N/A" && v !== "-" && k !== key) inFormSeriais.push(v);
+        }
+      });
+      if (inFormSeriais.includes(norm)) {
+        setSerialErrors((prev) => ({ ...prev, [key]: "Serial duplicado neste formulário" }));
+        return;
+      }
+      // 2) DB check
+      try {
+        const { data, error } = await supabase
+          .from("material_coleta_items")
+          .select("serial, coleta_id")
+          .eq("serial", norm)
+          .limit(5);
+        if (error) throw error;
+        const conflict = (data || []).find((r: any) => !excludeColetaId || r.coleta_id !== excludeColetaId);
+        setSerialErrors((prev) => {
+          const c = { ...prev };
+          if (conflict) c[key] = "Serial já cadastrado em outra coleta";
+          else delete c[key];
+          return c;
+        });
+      } catch {
+        // ignore network errors silently for live check
+      }
+    }, 400);
+  }, [materiais]);
+
   // Generate PDF for Reversa - fit in 1 A4 page
   const generatePDF = (coletaData: {
     matriculaTt: string;
@@ -1006,6 +1070,12 @@ const MaterialColeta = () => {
     // Validate seriais uniqueness — within form and against database
     const isSemMaterialEarly = tipoAplicacao === "SEM MATERIAL";
     if (!isSemMaterialEarly) {
+      // Block save if there are unresolved live serial errors
+      const liveErrors = Object.values(serialErrors).filter(Boolean);
+      if (liveErrors.length > 0) {
+        toast.error(`Existem seriais com erro: ${liveErrors[0]}`);
+        return;
+      }
       const dupCheck = await validateSeriaisUnique(materiais, null);
       if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
     }
@@ -2111,14 +2181,21 @@ const MaterialColeta = () => {
                               <div className="flex gap-1">
                                 <Input
                                   value={mat.serial}
-                                  onChange={(e) => updateMaterial(mat.id, "serial", toUpper(e.target.value))}
+                                  onChange={(e) => {
+                                    const v = toUpper(e.target.value);
+                                    updateMaterial(mat.id, "serial", v);
+                                    checkSerialLive(`${mat.id}:main`, v);
+                                  }}
                                   placeholder="SERIAL"
-                                  className="flex-1 uppercase"
+                                  className={`flex-1 uppercase ${serialErrors[`${mat.id}:main`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                 />
-                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => updateMaterial(mat.id, "serial", code))}>
+                                <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial", code); checkSerialLive(`${mat.id}:main`, code); })}>
                                   <ScanBarcode className="w-4 h-4" />
                                 </Button>
                               </div>
+                              {serialErrors[`${mat.id}:main`] && (
+                                <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:main`]}</p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -2140,16 +2217,21 @@ const MaterialColeta = () => {
                             <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                               {mat.seriais.map((s, i) => (
-                                <div key={i} className="flex gap-1">
-                                  <Input
-                                    value={s}
-                                    onChange={(e) => updateSerial(mat.id, i, e.target.value)}
-                                    placeholder={`SERIAL ${i + 1} *`}
-                                    className="flex-1 uppercase"
-                                  />
-                                  <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => updateSerial(mat.id, i, code))}>
-                                    <ScanBarcode className="w-4 h-4" />
-                                  </Button>
+                                <div key={i} className="space-y-1">
+                                  <div className="flex gap-1">
+                                    <Input
+                                      value={s}
+                                      onChange={(e) => { updateSerial(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:${i}`, e.target.value); }}
+                                      placeholder={`SERIAL ${i + 1} *`}
+                                      className={`flex-1 uppercase ${serialErrors[`${mat.id}:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                    />
+                                    <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerial(mat.id, i, code); checkSerialLive(`${mat.id}:${i}`, code); })}>
+                                      <ScanBarcode className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                  {serialErrors[`${mat.id}:${i}`] && (
+                                    <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:${i}`]}</p>
+                                  )}
                                 </div>
                               ))}
                             </div>
