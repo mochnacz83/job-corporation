@@ -553,7 +553,14 @@ const AtividadesEncerramento = () => {
               <CardHeader>
                 <CardTitle className="text-sm">URL assinada do CSV (FATO)</CardTitle>
                 <CardDescription className="text-xs">
-                  Cole a URL assinada do Google Cloud Storage. O sistema baixa este arquivo a cada hora.
+                  Cole a URL <strong>assinada</strong> (signed URL) do Google Cloud Storage no formato{" "}
+                  <code>https://storage.googleapis.com/...?X-Goog-Signature=...</code>. O sistema importa
+                  somente registros com <code>cd_uf = SC</code> e cruza por TT/TR com a base Presença.
+                  <br />
+                  <span className="text-destructive">
+                    URLs do tipo <code>storage.cloud.google.com/...?authuser=0</code> NÃO funcionam
+                    (exigem login interativo do Google).
+                  </span>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">

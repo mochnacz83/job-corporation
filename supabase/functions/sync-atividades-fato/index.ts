@@ -200,6 +200,24 @@ Deno.serve(async (req) => {
       text = new TextDecoder("windows-1252").decode(buf);
     }
 
+    // Detect HTML/login page (URL inválida ou exige autenticação interativa)
+    const sniff = text.slice(0, 2048).toLowerCase();
+    const ctype = (resp.headers.get("content-type") || "").toLowerCase();
+    if (
+      ctype.includes("text/html") ||
+      sniff.includes("<!doctype html") ||
+      sniff.includes("<html") ||
+      sniff.includes("accounts.google.com") ||
+      sniff.includes("signin")
+    ) {
+      throw new Error(
+        "URL retornou página HTML (provavelmente tela de login do Google), não um CSV. " +
+        "A URL configurada (storage.cloud.google.com) exige login interativo. " +
+        "Use uma URL ASSINADA do GCS (gsutil signurl -d 7d ...) OU torne o objeto público em " +
+        "https://storage.googleapis.com/<bucket>/<arquivo>.",
+      );
+    }
+
     const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
     if (lines.length < 2) {
       await finalize("success", 0);
@@ -259,13 +277,30 @@ Deno.serve(async (req) => {
       "dt referencia",
       "data_referencia",
     ]);
+    const idxUF = findCol(headers, [
+      "cd_uf",
+      "uf",
+      "cd uf",
+      "estado_uf",
+      "sg_uf",
+    ]);
 
     const rows: Array<Record<string, unknown>> = [];
+    let skippedUF = 0;
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i], delim);
       if (cols.length === 1 && !cols[0]) continue;
       const rawObj: Record<string, string> = {};
       headers.forEach((h, j) => (rawObj[h] = cols[j] ?? ""));
+
+      // Filtrar somente UF = SC
+      if (idxUF >= 0) {
+        const ufRaw = (cols[idxUF] || "").toString().trim().toUpperCase();
+        if (ufRaw && ufRaw !== "SC") {
+          skippedUF++;
+          continue;
+        }
+      }
 
       const estadoRaw = idxEstado >= 0 ? cols[idxEstado] : "";
       const dtTermino = idxDataTermino >= 0 ? parseDate(cols[idxDataTermino]) : null;
