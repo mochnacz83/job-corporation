@@ -92,6 +92,75 @@ export type Database = {
         }
         Relationships: []
       }
+      atividades_fato: {
+        Row: {
+          data_atividade: string | null
+          data_termino: string | null
+          ds_estado: string | null
+          ds_macro_atividade: string | null
+          id: string
+          imported_at: string
+          matricula_tr: string | null
+          matricula_tt: string | null
+          nome_tecnico: string | null
+          raw: Json | null
+        }
+        Insert: {
+          data_atividade?: string | null
+          data_termino?: string | null
+          ds_estado?: string | null
+          ds_macro_atividade?: string | null
+          id?: string
+          imported_at?: string
+          matricula_tr?: string | null
+          matricula_tt?: string | null
+          nome_tecnico?: string | null
+          raw?: Json | null
+        }
+        Update: {
+          data_atividade?: string | null
+          data_termino?: string | null
+          ds_estado?: string | null
+          ds_macro_atividade?: string | null
+          id?: string
+          imported_at?: string
+          matricula_tr?: string | null
+          matricula_tt?: string | null
+          nome_tecnico?: string | null
+          raw?: Json | null
+        }
+        Relationships: []
+      }
+      atividades_sync_log: {
+        Row: {
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          rows_imported: number | null
+          started_at: string
+          status: string
+          triggered_by: string | null
+        }
+        Insert: {
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          rows_imported?: number | null
+          started_at?: string
+          status?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          rows_imported?: number | null
+          started_at?: string
+          status?: string
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       fato_reparos: {
         Row: {
           causa_ofensora_n1: string | null
@@ -926,6 +995,51 @@ export type Database = {
           repetida_repetiu?: number | null
           tt?: string
           updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      tecnicos_presenca: {
+        Row: {
+          coordenador: string | null
+          funcionario: string | null
+          id: string
+          operadora: string | null
+          setor_atual: string | null
+          setor_origem: string | null
+          status: string | null
+          supervisor: string | null
+          tr: string | null
+          tt: string | null
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          coordenador?: string | null
+          funcionario?: string | null
+          id?: string
+          operadora?: string | null
+          setor_atual?: string | null
+          setor_origem?: string | null
+          status?: string | null
+          supervisor?: string | null
+          tr?: string | null
+          tt?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          coordenador?: string | null
+          funcionario?: string | null
+          id?: string
+          operadora?: string | null
+          setor_atual?: string | null
+          setor_origem?: string | null
+          status?: string | null
+          supervisor?: string | null
+          tr?: string | null
+          tt?: string | null
+          uploaded_at?: string
           uploaded_by?: string | null
         }
         Relationships: []
