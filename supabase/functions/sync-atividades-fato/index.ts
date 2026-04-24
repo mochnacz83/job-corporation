@@ -255,7 +255,16 @@ Deno.serve(async (req) => {
       "tr",
       "cd_matricula_tr",
     ]);
+    // Coluna única que pode ser TT OU TR (será resolvida no cruzamento com Presença)
+    const idxMatricula = findCol(headers, [
+      "cd_matricula_tecnico",
+      "matricula_tecnico",
+      "matricula tecnico",
+      "cd matricula tecnico",
+    ]);
     const idxNome = findCol(headers, [
+      "ds_tecnico",
+      "ds tecnico",
       "nome_tecnico",
       "nome tecnico",
       "tecnico",
@@ -315,10 +324,20 @@ Deno.serve(async (req) => {
         ds_estado: normalizeEstado(estadoRaw),
         ds_macro_atividade:
           idxMacro >= 0 ? (cols[idxMacro] || "").trim() : null,
-        matricula_tt:
-          idxTT >= 0 ? (cols[idxTT] || "").trim().toUpperCase() : null,
-        matricula_tr:
-          idxTR >= 0 ? (cols[idxTR] || "").trim().toUpperCase() : null,
+        // Se houver coluna única cd_matricula_tecnico, gravar em ambas (TT e TR)
+        // para o cruzamento bater por qualquer um dos lados na dimensão Presença.
+        matricula_tt: (() => {
+          const direct = idxTT >= 0 ? (cols[idxTT] || "").trim().toUpperCase() : "";
+          if (direct) return direct;
+          const generic = idxMatricula >= 0 ? (cols[idxMatricula] || "").trim().toUpperCase() : "";
+          return generic || null;
+        })(),
+        matricula_tr: (() => {
+          const direct = idxTR >= 0 ? (cols[idxTR] || "").trim().toUpperCase() : "";
+          if (direct) return direct;
+          const generic = idxMatricula >= 0 ? (cols[idxMatricula] || "").trim().toUpperCase() : "";
+          return generic || null;
+        })(),
         nome_tecnico: idxNome >= 0 ? (cols[idxNome] || "").trim() : null,
         data_atividade: dataAtividade,
         data_termino: dtTermino,
