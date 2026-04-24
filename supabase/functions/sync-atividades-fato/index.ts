@@ -175,7 +175,16 @@ Deno.serve(async (req) => {
     const resp = await fetch(url);
     if (!resp.ok) {
       const txt = await resp.text();
-      throw new Error(`Falha ao baixar CSV (${resp.status}): ${txt.slice(0, 200)}`);
+      let hint = "";
+      if (resp.status === 403 || resp.status === 401) {
+        hint =
+          " | A URL configurada exige autenticação do navegador (login Google). " +
+          "Use uma URL ASSINADA do GCS (signed URL via 'gsutil signurl') OU torne o objeto público " +
+          "(allUsers = Storage Object Viewer) e use https://storage.googleapis.com/<bucket>/<arquivo>.";
+      }
+      throw new Error(
+        `Falha ao baixar CSV (${resp.status}): ${txt.slice(0, 200)}${hint}`,
+      );
     }
 
     // Try latin1 decoding first (common BR), fallback utf-8
