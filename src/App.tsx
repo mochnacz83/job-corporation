@@ -31,6 +31,7 @@ const MaterialColeta = lazy(() => import("./pages/MaterialColeta"));
 const VistoriaCampo = lazy(() => import("./pages/VistoriaCampo"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const AdminIdeas = lazy(() => import("./pages/AdminIdeas"));
+const AtividadesEncerramento = lazy(() => import("./pages/AtividadesEncerramento"));
 
 // Generic persistent page wrapper: mounts once, then hides/shows via CSS
 const PersistentPage = ({ path, children }: { path: string; children: ReactNode }) => {
@@ -64,6 +65,7 @@ const persistentPages = [
   { path: "/material-coleta", element: <MaterialColeta /> },
   { path: "/vistoria-campo", element: <VistoriaCampo /> },
   { path: "/inventario", element: <Inventory /> },
+  { path: "/atividades-encerramento", element: <AtividadesEncerramento /> },
 ];
 
 const Login = lazy(() => import("./pages/Login"));
