@@ -146,63 +146,90 @@ Deno.serve(async (req) => {
   };
 
   try {
-    // Read URL from app_settings
-    const { data: settingRow, error: settingErr } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "atividades_csv_url")
-      .maybeSingle();
+    let text: string = "";
+    let fallbackToUrl = false;
+    let respCt = "";
 
-    if (settingErr) throw settingErr;
-
-    const url =
-      typeof settingRow?.value === "string"
-        ? settingRow.value
-        : (settingRow?.value as { url?: string })?.url;
-
-    if (!url) {
-      await finalize("error", 0, "URL do CSV não configurada em app_settings.");
-      return new Response(
-        JSON.stringify({ ok: false, error: "URL do CSV não configurada" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Download CSV
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      const txt = await resp.text();
-      let hint = "";
-      if (resp.status === 403 || resp.status === 401) {
-        hint =
-          " | A URL configurada exige autenticação do navegador (login Google). " +
-          "Use uma URL ASSINADA do GCS (signed URL via 'gsutil signurl') OU torne o objeto público " +
-          "(allUsers = Storage Object Viewer) e use https://storage.googleapis.com/<bucket>/<arquivo>.";
+    // Check if the request has a plain text or csv body
+    const reqCt = (req.headers.get("content-type") || "").toLowerCase();
+    if (req.method === "POST" && (reqCt.includes("text/csv") || reqCt.includes("text/plain"))) {
+      const buf = new Uint8Array(await req.arrayBuffer());
+      if (buf.length > 0) {
+        try {
+          text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+          if (text.includes("Ã") && !text.includes("ç") && !text.includes("ã")) {
+            text = new TextDecoder("windows-1252").decode(buf);
+          }
+        } catch {
+          text = new TextDecoder("windows-1252").decode(buf);
+        }
+        console.log(`[sync-atividades-fato] Recebido arquivo CSV diretamente via POST (${buf.length} bytes)`);
+      } else {
+        fallbackToUrl = true;
       }
-      throw new Error(
-        `Falha ao baixar CSV (${resp.status}): ${txt.slice(0, 200)}${hint}`,
-      );
+    } else {
+      fallbackToUrl = true;
     }
 
-    // Try latin1 decoding first (common BR), fallback utf-8
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    let text: string;
-    try {
-      text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-      // detect mojibake
-      if (text.includes("Ã") && !text.includes("ç") && !text.includes("ã")) {
+    if (fallbackToUrl) {
+      // Read URL from app_settings
+      const { data: settingRow, error: settingErr } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "atividades_csv_url")
+        .maybeSingle();
+
+      if (settingErr) throw settingErr;
+
+      const url =
+        typeof settingRow?.value === "string"
+          ? settingRow.value
+          : (settingRow?.value as { url?: string })?.url;
+
+      if (!url) {
+        await finalize("error", 0, "URL do CSV não configurada em app_settings nem arquivo enviado no POST.");
+        return new Response(
+          JSON.stringify({ ok: false, error: "Nenhum arquivo enviado e URL do CSV não configurada" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      // Download CSV
+      const resp = await fetch(url);
+      respCt = resp.headers.get("content-type") || "";
+      if (!resp.ok) {
+        const txt = await resp.text();
+        let hint = "";
+        if (resp.status === 403 || resp.status === 401) {
+          hint =
+            " | A URL configurada exige autenticação do navegador (login Google). " +
+            "Use uma URL ASSINADA do GCS (signed URL via 'gsutil signurl') OU torne o objeto público " +
+            "(allUsers = Storage Object Viewer) e use https://storage.googleapis.com/<bucket>/<arquivo>.";
+        }
+        throw new Error(
+          `Falha ao baixar CSV (${resp.status}): ${txt.slice(0, 200)}${hint}`,
+        );
+      }
+
+      // Try latin1 decoding first (common BR), fallback utf-8
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      try {
+        text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+        // detect mojibake
+        if (text.includes("Ã") && !text.includes("ç") && !text.includes("ã")) {
+          text = new TextDecoder("windows-1252").decode(buf);
+        }
+      } catch {
         text = new TextDecoder("windows-1252").decode(buf);
       }
-    } catch {
-      text = new TextDecoder("windows-1252").decode(buf);
     }
 
     // Detect HTML/login page (URL inválida ou exige autenticação interativa)
     const sniff = text.slice(0, 2048).toLowerCase();
-    const ctype = (resp.headers.get("content-type") || "").toLowerCase();
+    const ctype = respCt.toLowerCase();
     if (
       ctype.includes("text/html") ||
       sniff.includes("<!doctype html") ||

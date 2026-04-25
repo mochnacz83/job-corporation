@@ -63,6 +63,8 @@ const AtividadesEncerramento = () => {
   const [csvUrl, setCsvUrl] = useState("");
   const [savingUrl, setSavingUrl] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fatoFileRef = useRef<HTMLInputElement>(null);
+  const [uploadingFato, setUploadingFato] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -386,6 +388,41 @@ const AtividadesEncerramento = () => {
     }
   };
 
+  const handleUploadFato = async (file: File) => {
+    setUploadingFato(true);
+    try {
+      const text = await file.text();
+      const { data, error } = await supabase.functions.invoke("sync-atividades-fato", {
+        body: text,
+        headers: { "Content-Type": "text/csv" },
+      });
+      if (error) throw error;
+      const result = data as { ok?: boolean; rows?: number; error?: string };
+      if (result?.ok) {
+        toast({
+          title: "Sincronização concluída",
+          description: `${result.rows ?? 0} registros Fato importados localmente.`,
+        });
+        await loadData();
+      } else {
+        toast({
+          title: "Falha na sincronização",
+          description: result?.error || "Erro desconhecido",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Erro no upload",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      if (fatoFileRef.current) fatoFileRef.current.value = "";
+      setUploadingFato(false);
+    }
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -599,6 +636,31 @@ const AtividadesEncerramento = () => {
                   <Upload className="w-3 h-3 inline mr-1" />
                   Colunas esperadas: TR, TT, FUNCIONARIO, OPERADORA, SUPERVISOR, COORDENADOR, SETOR ORIGEM, SETOR ATUAL, STATUS.
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Upload Manual CSV (FATO)</CardTitle>
+                <CardDescription className="text-xs">
+                  Faça o upload do arquivo CSV diretamente de sua máquina caso não queira usar a automação local.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex gap-2 items-center">
+                  <Input
+                    ref={fatoFileRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleUploadFato(f);
+                    }}
+                    className="text-xs max-w-sm"
+                    disabled={uploadingFato}
+                  />
+                  {uploadingFato && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
