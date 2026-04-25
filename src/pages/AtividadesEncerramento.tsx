@@ -95,15 +95,7 @@ const AtividadesEncerramento = () => {
   };
 
   const loadSettings = async () => {
-    const { data } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", "atividades_csv_url")
-      .maybeSingle();
-    if (data?.value) {
-      const v = typeof data.value === "string" ? data.value : (data.value as { url?: string })?.url ?? "";
-      setCsvUrl(v);
-    }
+    // This function is kept for signature compatibility but no longer fetches FATO CSV URL.
   };
 
   useEffect(() => {
@@ -239,35 +231,7 @@ const AtividadesEncerramento = () => {
   }, [aggregated]);
 
   const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sync-atividades-fato", {
-        body: { trigger: "manual" },
-      });
-      if (error) throw error;
-      const result = data as { ok?: boolean; rows?: number; error?: string };
-      if (result?.ok) {
-        toast({
-          title: "Sincronização concluída",
-          description: `${result.rows ?? 0} registros importados.`,
-        });
-        await loadData();
-      } else {
-        toast({
-          title: "Falha na sincronização",
-          description: result?.error || "Erro desconhecido",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      toast({
-        title: "Erro",
-        description: e instanceof Error ? e.message : String(e),
-        variant: "destructive",
-      });
-    } finally {
-      setSyncing(false);
-    }
+    // Deprecated via web
   };
 
   const handleSaveUrl = async () => {
@@ -447,12 +411,6 @@ const AtividadesEncerramento = () => {
           <Button onClick={loadData} size="sm" variant="outline" disabled={loading}>
             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
           </Button>
-          {isAdmin && (
-            <Button onClick={handleSync} size="sm" disabled={syncing}>
-              {syncing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCw className="w-3 h-3 mr-1" />}
-              Sincronizar agora
-            </Button>
-          )}
         </div>
       </div>
 
@@ -588,29 +546,26 @@ const AtividadesEncerramento = () => {
           <TabsContent value="config" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">URL assinada do CSV (FATO)</CardTitle>
+                <CardTitle className="text-sm">Upload Manual CSV (FATO)</CardTitle>
                 <CardDescription className="text-xs">
-                  Cole a URL <strong>assinada</strong> (signed URL) do Google Cloud Storage no formato{" "}
-                  <code>https://storage.googleapis.com/...?X-Goog-Signature=...</code>. O sistema importa
-                  somente registros com <code>cd_uf = SC</code> e cruza por TT/TR com a base Presença.
-                  <br />
-                  <span className="text-destructive">
-                    URLs do tipo <code>storage.cloud.google.com/...?authuser=0</code> NÃO funcionam
-                    (exigem login interativo do Google).
-                  </span>
+                  Faça o upload do arquivo CSV diretamente de sua máquina caso não queira usar a automação local. A URL configurada foi descontinuada a favor do envio direto FATO.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Input
-                  value={csvUrl}
-                  onChange={(e) => setCsvUrl(e.target.value)}
-                  placeholder="https://storage.googleapis.com/.../arquivo.csv?X-Goog-Signature=..."
-                  className="text-xs font-mono"
-                />
-                <Button onClick={handleSaveUrl} size="sm" disabled={savingUrl}>
-                  {savingUrl ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
-                  Salvar URL
-                </Button>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    ref={fatoFileRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleUploadFato(f);
+                    }}
+                    className="text-xs max-w-sm"
+                    disabled={uploadingFato}
+                  />
+                  {uploadingFato && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                </div>
               </CardContent>
             </Card>
 
@@ -639,30 +594,6 @@ const AtividadesEncerramento = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Upload Manual CSV (FATO)</CardTitle>
-                <CardDescription className="text-xs">
-                  Faça o upload do arquivo CSV diretamente de sua máquina caso não queira usar a automação local.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex gap-2 items-center">
-                  <Input
-                    ref={fatoFileRef}
-                    type="file"
-                    accept=".csv"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleUploadFato(f);
-                    }}
-                    className="text-xs max-w-sm"
-                    disabled={uploadingFato}
-                  />
-                  {uploadingFato && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         )}
       </Tabs>

@@ -147,102 +147,27 @@ Deno.serve(async (req) => {
 
   try {
     let text: string = "";
-    let fallbackToUrl = false;
-    let respCt = "";
 
     // Check if the request has a plain text or csv body
     const reqCt = (req.headers.get("content-type") || "").toLowerCase();
-    if (req.method === "POST" && (reqCt.includes("text/csv") || reqCt.includes("text/plain"))) {
+    
+    // Accept application/octet-stream also as curl sometimes sends that or text/csv
+    if (req.method === "POST" && (reqCt.includes("text/csv") || reqCt.includes("text/plain") || reqCt.includes("application/octet-stream") || reqCt.includes("application/x-www-form-urlencoded"))) {
       const buf = new Uint8Array(await req.arrayBuffer());
-      if (buf.length > 0) {
-        try {
-          text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-          if (text.includes("Ã") && !text.includes("ç") && !text.includes("ã")) {
-            text = new TextDecoder("windows-1252").decode(buf);
-          }
-        } catch {
-          text = new TextDecoder("windows-1252").decode(buf);
-        }
-        console.log(`[sync-atividades-fato] Recebido arquivo CSV diretamente via POST (${buf.length} bytes)`);
-      } else {
-        fallbackToUrl = true;
+      if (buf.length === 0) {
+        throw new Error("Arquivo CSV enviado está vazio!");
       }
-    } else {
-      fallbackToUrl = true;
-    }
-
-    if (fallbackToUrl) {
-      // Read URL from app_settings
-      const { data: settingRow, error: settingErr } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", "atividades_csv_url")
-        .maybeSingle();
-
-      if (settingErr) throw settingErr;
-
-      const url =
-        typeof settingRow?.value === "string"
-          ? settingRow.value
-          : (settingRow?.value as { url?: string })?.url;
-
-      if (!url) {
-        await finalize("error", 0, "URL do CSV não configurada em app_settings nem arquivo enviado no POST.");
-        return new Response(
-          JSON.stringify({ ok: false, error: "Nenhum arquivo enviado e URL do CSV não configurada" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      // Download CSV
-      const resp = await fetch(url);
-      respCt = resp.headers.get("content-type") || "";
-      if (!resp.ok) {
-        const txt = await resp.text();
-        let hint = "";
-        if (resp.status === 403 || resp.status === 401) {
-          hint =
-            " | A URL configurada exige autenticação do navegador (login Google). " +
-            "Use uma URL ASSINADA do GCS (signed URL via 'gsutil signurl') OU torne o objeto público " +
-            "(allUsers = Storage Object Viewer) e use https://storage.googleapis.com/<bucket>/<arquivo>.";
-        }
-        throw new Error(
-          `Falha ao baixar CSV (${resp.status}): ${txt.slice(0, 200)}${hint}`,
-        );
-      }
-
-      // Try latin1 decoding first (common BR), fallback utf-8
-      const buf = new Uint8Array(await resp.arrayBuffer());
       try {
         text = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-        // detect mojibake
         if (text.includes("Ã") && !text.includes("ç") && !text.includes("ã")) {
           text = new TextDecoder("windows-1252").decode(buf);
         }
       } catch {
         text = new TextDecoder("windows-1252").decode(buf);
       }
-    }
-
-    // Detect HTML/login page (URL inválida ou exige autenticação interativa)
-    const sniff = text.slice(0, 2048).toLowerCase();
-    const ctype = respCt.toLowerCase();
-    if (
-      ctype.includes("text/html") ||
-      sniff.includes("<!doctype html") ||
-      sniff.includes("<html") ||
-      sniff.includes("accounts.google.com") ||
-      sniff.includes("signin")
-    ) {
-      throw new Error(
-        "URL retornou página HTML (provavelmente tela de login do Google), não um CSV. " +
-        "A URL configurada (storage.cloud.google.com) exige login interativo. " +
-        "Use uma URL ASSINADA do GCS (gsutil signurl -d 7d ...) OU torne o objeto público em " +
-        "https://storage.googleapis.com/<bucket>/<arquivo>.",
-      );
+      console.log(`[sync-atividades-fato] Recebido arquivo diretamente via POST (${buf.length} bytes)`);
+    } else {
+      throw new Error(`Requisição POST deve conter o corpo do arquivo CSV e o Header Content-Type adequado. Tipo recebido: ${reqCt}`);
     }
 
     const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
