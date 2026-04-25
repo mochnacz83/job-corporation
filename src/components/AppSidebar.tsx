@@ -183,11 +183,9 @@ const AppSidebar = () => {
                         <NavLink
                           to={item.path}
                           end
-                          className="hover:bg-sidebar-accent/20"
-                          activeClassName="bg-sidebar-primary/20 text-sidebar-primary font-medium"
                           title={item.description || item.label}
                         >
-                          <item.icon className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <item.icon className="w-4 h-4 flex-shrink-0" />
                           {!collapsed && <span className="truncate text-[11px] leading-tight">{item.label}</span>}
                         </NavLink>
                       )}
@@ -229,10 +227,8 @@ const AppSidebar = () => {
               <NavLink
                 to="/dashboard"
                 end
-                className="hover:bg-sidebar-accent/20"
-                activeClassName="bg-sidebar-primary/20 text-sidebar-primary font-medium"
               >
-                <Home className="w-4 h-4 mr-2" />
+                <Home className="w-4 h-4" />
                 {!collapsed && <span>Início</span>}
               </NavLink>
             </SidebarMenuButton>
