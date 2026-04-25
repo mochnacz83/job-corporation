@@ -294,6 +294,50 @@ Deno.serve(async (req) => {
       "sg_uf",
     ]);
 
+    // Resumo de detecção de colunas (auditoria pré-importação)
+    const columnsExpected: Record<string, number> = {
+      ds_estado: idxEstado,
+      ds_macro_atividade: idxMacro,
+      cd_matricula_tt: idxTT,
+      cd_matricula_tr: idxTR,
+      cd_matricula_tecnico: idxMatricula,
+      ds_tecnico: idxNome,
+      dt_termino: idxDataTermino,
+      dt_atividade: idxDataAtividade,
+      cd_uf: idxUF,
+    };
+    const columnsFound: string[] = [];
+    const columnsMissing: string[] = [];
+    for (const [name, idx] of Object.entries(columnsExpected)) {
+      if (idx >= 0) columnsFound.push(`${name} → "${headers[idx]}"`);
+      else columnsMissing.push(name);
+    }
+    const summary =
+      `Colunas detectadas (${columnsFound.length}): ${columnsFound.join(", ") || "nenhuma"} | ` +
+      `Ausentes (${columnsMissing.length}): ${columnsMissing.join(", ") || "nenhuma"} | ` +
+      `Headers brutos: ${headers.join(" | ")}`;
+    console.log("[sync-atividades-fato] " + summary);
+
+    // Abortar se faltar identificação do técnico (TT, TR ou genérica)
+    if (idxTT < 0 && idxTR < 0 && idxMatricula < 0) {
+      throw new Error(
+        "Coluna de matrícula do técnico não encontrada (esperado: cd_matricula_tt, cd_matricula_tr ou cd_matricula_tecnico). " +
+        summary,
+      );
+    }
+    // Abortar se faltar nome do técnico
+    if (idxNome < 0) {
+      throw new Error(
+        "Coluna de nome do técnico não encontrada (esperado: ds_tecnico). " + summary,
+      );
+    }
+    // Abortar se faltar estado da atividade
+    if (idxEstado < 0) {
+      throw new Error(
+        "Coluna de estado da atividade não encontrada (esperado: ds_estado). " + summary,
+      );
+    }
+
     const rows: Array<Record<string, unknown>> = [];
     let skippedUF = 0;
     for (let i = 1; i < lines.length; i++) {
@@ -366,7 +410,14 @@ Deno.serve(async (req) => {
 
     await finalize("success", inserted);
     return new Response(
-      JSON.stringify({ ok: true, rows: inserted }),
+      JSON.stringify({
+        ok: true,
+        rows: inserted,
+        skipped_uf: skippedUF,
+        columns_found: columnsFound,
+        columns_missing: columnsMissing,
+        headers,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
