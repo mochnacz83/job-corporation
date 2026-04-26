@@ -333,6 +333,24 @@ const AtividadesEncerramento = () => {
     );
   }, [aggregated]);
 
+  // Métricas dos cartões (calculadas sobre o fato bruto do dia, ignorando cardFilter)
+  const cardMetrics = useMemo(() => {
+    const totalTecnicosPresenca = presenca.length;
+    const totalAtivos = ttsAtivos.size;
+    const totalEmAndamento = fato.filter((r) =>
+      ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado)),
+    ).length;
+    const totalAgendaDia = fato.filter((r) => norm(r.ds_estado) === "atribuído").length;
+    const totalPresencaOK = ttsPresencaOK.size;
+    return {
+      totalTecnicosPresenca,
+      totalAtivos,
+      totalEmAndamento,
+      totalAgendaDia,
+      totalPresencaOK,
+    };
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK]);
+
   const handleSync = async () => {
     // Deprecated via web
   };
