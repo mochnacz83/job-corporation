@@ -161,8 +161,16 @@ Deno.serve(async (req) => {
     const idxTR = findCol(headers, ["matricula_tr", "matricula tr", "tr", "cd_matricula_tr"]);
     const idxMatricula = findCol(headers, ["cd_matricula_tecnico", "matricula_tecnico", "matricula tecnico", "cd matricula tecnico"]);
     const idxNome = findCol(headers, ["ds_tecnico", "ds tecnico", "nome_tecnico", "nome tecnico", "tecnico", "nome_funcionario", "funcionario"]);
-    const idxDataTermino = findCol(headers, ["dt_termino", "data_termino", "data termino", "dt termino", "data_fim", "dt_fim"]);
-    const idxDataAtividade = findCol(headers, ["dt_atividade", "data_atividade", "data atividade", "dt referencia", "data_referencia"]);
+    const idxDataTermino = findCol(headers, [
+      "dt_termino", "data_termino", "data termino", "dt termino", "data_fim", "dt_fim",
+      "dh_fim_execucao_real", "dh fim execucao real",
+    ]);
+    const idxDataAtividade = findCol(headers, [
+      "dt_atividade", "data_atividade", "data atividade", "dt referencia", "data_referencia",
+      "data_naf", "data naf",
+      "dh_dataaberturaos", "dh dataaberturaos",
+      "dh_abertura_ba", "dh abertura ba",
+    ]);
     const idxUF = findCol(headers, ["cd_uf", "uf", "cd uf", "estado_uf", "sg_uf"]);
 
     if (idxTT < 0 && idxTR < 0 && idxMatricula < 0) {
