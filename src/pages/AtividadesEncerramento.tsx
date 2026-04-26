@@ -145,15 +145,6 @@ const AtividadesEncerramento = () => {
     return Array.from(s).sort();
   }, [fato]);
 
-  // filtered fato
-  const filteredFato = useMemo(() => {
-    return fato.filter((r) => {
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
-      return true;
-    });
-  }, [fato, estadoFilter, macroFilter]);
-
   // map presença by TT and TR (for join)
   const presencaByTT = useMemo(() => {
     const m = new Map<string, PresencaRow>();
@@ -170,6 +161,92 @@ const AtividadesEncerramento = () => {
     });
     return m;
   }, [presenca]);
+
+  // Listas únicas de Supervisor / Coordenador a partir da Presença
+  const supervisores = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => p.supervisor && s.add(p.supervisor.trim()));
+    return Array.from(s).filter(Boolean).sort();
+  }, [presenca]);
+
+  const coordenadores = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => p.coordenador && s.add(p.coordenador.trim()));
+    return Array.from(s).filter(Boolean).sort();
+  }, [presenca]);
+
+  // Helper para obter info de presença de um registro fato
+  const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
+    const ttKey = (r.matricula_tt || "").trim().toUpperCase();
+    const trKey = (r.matricula_tr || "").trim().toUpperCase();
+    return (
+      (ttKey && presencaByTT.get(ttKey)) ||
+      (trKey && presencaByTR.get(trKey)) ||
+      null
+    );
+  };
+
+  // Conjunto de TTs ativos na presença (status em branco/vazio)
+  const ttsAtivos = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      const stat = (p.status || "").trim();
+      if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
+    });
+    return s;
+  }, [presenca]);
+
+  // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
+  // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
+  const ttsPresencaOK = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
+      if (
+        estado.includes("conclu") &&
+        estado.includes("sucesso") &&
+        !estado.includes("sem sucesso") &&
+        MACROS_PRESENCA_OK.includes(macro) &&
+        macro !== MACRO_PRESENCA_EXCLUIR
+      ) {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        if (tt) s.add(tt);
+      }
+    });
+    return s;
+  }, [fato]);
+
+  // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
+  const filteredFato = useMemo(() => {
+    return fato.filter((r) => {
+      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
+      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+
+      const info = getPresencaInfo(r);
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
+
+      if (cardFilter === "EM_ANDAMENTO") {
+        if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
+      } else if (cardFilter === "AGENDA_DIA") {
+        if (norm(r.ds_estado) !== "atribuído") return false;
+      } else if (cardFilter === "PRESENCA_OK") {
+        const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
+        const estado = norm(r.ds_estado);
+        const isOK =
+          estado.includes("conclu") &&
+          estado.includes("sucesso") &&
+          !estado.includes("sem sucesso") &&
+          MACROS_PRESENCA_OK.includes(macro);
+        if (!isOK) return false;
+      } else if (cardFilter === "ATIVOS") {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        if (!tt || !ttsAtivos.has(tt)) return false;
+      }
+      return true;
+    });
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
