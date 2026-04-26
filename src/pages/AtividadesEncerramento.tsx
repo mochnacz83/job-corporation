@@ -544,12 +544,82 @@ const AtividadesEncerramento = () => {
 
         {/* RESUMO POR TÉCNICO */}
         <TabsContent value="resumo" className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Técnicos Ativos no dia</div><div className="text-2xl font-bold">{aggregated.length}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Concluídas com Sucesso</div><div className="text-2xl font-bold text-success">{totals.sucesso}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Concluídas sem Sucesso</div><div className="text-2xl font-bold text-destructive">{totals.insucesso}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Total de Atividades</div><div className="text-2xl font-bold">{totals.total}</div></CardContent></Card>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Técnicos: total na presença vs ativos (status em branco) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "ATIVOS" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Técnicos Ativos / Total</div>
+                <div className="text-2xl font-bold">
+                  <span className="text-primary">{cardMetrics.totalAtivos}</span>
+                  <span className="text-muted-foreground text-base"> / {cardMetrics.totalTecnicosPresenca}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">Status em branco = Ativo</div>
+              </CardContent>
+            </Card>
+
+            {/* Presença OK por macro de sucesso */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "PRESENCA_OK" ? "ALL" : "PRESENCA_OK")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "PRESENCA_OK" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Presença Confirmada</div>
+                <div className="text-2xl font-bold text-success">{cardMetrics.totalPresencaOK}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">INST/MUD/SRV/REP-FTTH OK</div>
+              </CardContent>
+            </Card>
+
+            {/* Total atividades em andamento (cartão filtro) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "EM_ANDAMENTO" ? "ALL" : "EM_ANDAMENTO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "EM_ANDAMENTO" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Total em Andamento</div>
+                <div className="text-2xl font-bold">{cardMetrics.totalEmAndamento}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Atrib./Desloc./N.Atrib./Receb./Exec.</div>
+              </CardContent>
+            </Card>
+
+            {/* Agenda do dia */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "AGENDA_DIA" ? "ALL" : "AGENDA_DIA")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "AGENDA_DIA" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Agenda do Dia</div>
+                <div className="text-2xl font-bold text-primary">{cardMetrics.totalAgendaDia}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Atribuídas para hoje</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Concluídas c/ Sucesso</div>
+                <div className="text-2xl font-bold text-success">{totals.sucesso}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
+                <div className="text-2xl font-bold text-destructive">{totals.insucesso}</div>
+              </CardContent>
+            </Card>
           </div>
+
+          {cardFilter !== "ALL" && (
+            <div className="flex items-center gap-2 text-xs">
+              <Badge variant="secondary">
+                Filtro ativo: {cardFilter === "ATIVOS" ? "Técnicos Ativos" : cardFilter === "PRESENCA_OK" ? "Presença Confirmada" : cardFilter === "EM_ANDAMENTO" ? "Em Andamento" : "Agenda do Dia"}
+              </Badge>
+              <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setCardFilter("ALL")}>
+                Limpar
+              </Button>
+            </div>
+          )}
 
           <Card>
             <CardHeader className="pb-2">
@@ -567,6 +637,20 @@ const AtividadesEncerramento = () => {
                   <SelectContent>
                     <SelectItem value="ALL">Todas as macro atividades</SelectItem>
                     {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={supervisorFilter} onValueChange={setSupervisorFilter}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Supervisor" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os supervisores</SelectItem>
+                    {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={coordenadorFilter} onValueChange={setCoordenadorFilter}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Coordenador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os coordenadores</SelectItem>
+                    {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input
