@@ -42,6 +42,29 @@ type PresencaRow = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+// Estados que contam como "Total de Atividades" (em andamento)
+const ESTADOS_EM_ANDAMENTO = [
+  "atribuído",
+  "em deslocamento",
+  "não atribuído",
+  "recebido",
+  "em execução",
+];
+
+// Macro atividades que contabilizam presença do técnico quando concluídas com sucesso
+const MACROS_PRESENCA_OK = ["INST-FTTH", "MUD-FTTH", "SRV-FTTH", "REP-FTTH"];
+const MACRO_PRESENCA_EXCLUIR = "RET-FTTH";
+
+const norm = (s: string | null | undefined) =>
+  (s || "").toString().trim().toLowerCase();
+
+type CardFilter =
+  | "ALL"
+  | "ATIVOS"
+  | "EM_ANDAMENTO"
+  | "AGENDA_DIA"
+  | "PRESENCA_OK";
+
 const AtividadesEncerramento = () => {
   const { isAdmin, profile } = useAuth();
   const { toast } = useToast();
@@ -57,6 +80,9 @@ const AtividadesEncerramento = () => {
   // filters
   const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
   const [macroFilter, setMacroFilter] = useState<string>("ALL");
+  const [supervisorFilter, setSupervisorFilter] = useState<string>("ALL");
+  const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
+  const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [search, setSearch] = useState("");
 
   // settings
@@ -119,15 +145,6 @@ const AtividadesEncerramento = () => {
     return Array.from(s).sort();
   }, [fato]);
 
-  // filtered fato
-  const filteredFato = useMemo(() => {
-    return fato.filter((r) => {
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
-      return true;
-    });
-  }, [fato, estadoFilter, macroFilter]);
-
   // map presença by TT and TR (for join)
   const presencaByTT = useMemo(() => {
     const m = new Map<string, PresencaRow>();
@@ -144,6 +161,92 @@ const AtividadesEncerramento = () => {
     });
     return m;
   }, [presenca]);
+
+  // Listas únicas de Supervisor / Coordenador a partir da Presença
+  const supervisores = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => p.supervisor && s.add(p.supervisor.trim()));
+    return Array.from(s).filter(Boolean).sort();
+  }, [presenca]);
+
+  const coordenadores = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => p.coordenador && s.add(p.coordenador.trim()));
+    return Array.from(s).filter(Boolean).sort();
+  }, [presenca]);
+
+  // Helper para obter info de presença de um registro fato
+  const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
+    const ttKey = (r.matricula_tt || "").trim().toUpperCase();
+    const trKey = (r.matricula_tr || "").trim().toUpperCase();
+    return (
+      (ttKey && presencaByTT.get(ttKey)) ||
+      (trKey && presencaByTR.get(trKey)) ||
+      null
+    );
+  };
+
+  // Conjunto de TTs ativos na presença (status em branco/vazio)
+  const ttsAtivos = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      const stat = (p.status || "").trim();
+      if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
+    });
+    return s;
+  }, [presenca]);
+
+  // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
+  // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
+  const ttsPresencaOK = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
+      if (
+        estado.includes("conclu") &&
+        estado.includes("sucesso") &&
+        !estado.includes("sem sucesso") &&
+        MACROS_PRESENCA_OK.includes(macro) &&
+        macro !== MACRO_PRESENCA_EXCLUIR
+      ) {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        if (tt) s.add(tt);
+      }
+    });
+    return s;
+  }, [fato]);
+
+  // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
+  const filteredFato = useMemo(() => {
+    return fato.filter((r) => {
+      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
+      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+
+      const info = getPresencaInfo(r);
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
+
+      if (cardFilter === "EM_ANDAMENTO") {
+        if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
+      } else if (cardFilter === "AGENDA_DIA") {
+        if (norm(r.ds_estado) !== "atribuído") return false;
+      } else if (cardFilter === "PRESENCA_OK") {
+        const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
+        const estado = norm(r.ds_estado);
+        const isOK =
+          estado.includes("conclu") &&
+          estado.includes("sucesso") &&
+          !estado.includes("sem sucesso") &&
+          MACROS_PRESENCA_OK.includes(macro);
+        if (!isOK) return false;
+      } else if (cardFilter === "ATIVOS") {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        if (!tt || !ttsAtivos.has(tt)) return false;
+      }
+      return true;
+    });
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -229,6 +332,24 @@ const AtividadesEncerramento = () => {
       { sucesso: 0, insucesso: 0, total: 0 },
     );
   }, [aggregated]);
+
+  // Métricas dos cartões (calculadas sobre o fato bruto do dia, ignorando cardFilter)
+  const cardMetrics = useMemo(() => {
+    const totalTecnicosPresenca = presenca.length;
+    const totalAtivos = ttsAtivos.size;
+    const totalEmAndamento = fato.filter((r) =>
+      ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado)),
+    ).length;
+    const totalAgendaDia = fato.filter((r) => norm(r.ds_estado) === "atribuído").length;
+    const totalPresencaOK = ttsPresencaOK.size;
+    return {
+      totalTecnicosPresenca,
+      totalAtivos,
+      totalEmAndamento,
+      totalAgendaDia,
+      totalPresencaOK,
+    };
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK]);
 
   const handleSync = async () => {
     // Deprecated via web
@@ -423,12 +544,82 @@ const AtividadesEncerramento = () => {
 
         {/* RESUMO POR TÉCNICO */}
         <TabsContent value="resumo" className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Técnicos Ativos no dia</div><div className="text-2xl font-bold">{aggregated.length}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Concluídas com Sucesso</div><div className="text-2xl font-bold text-success">{totals.sucesso}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Concluídas sem Sucesso</div><div className="text-2xl font-bold text-destructive">{totals.insucesso}</div></CardContent></Card>
-            <Card><CardContent className="p-3"><div className="text-[11px] text-muted-foreground">Total de Atividades</div><div className="text-2xl font-bold">{totals.total}</div></CardContent></Card>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* Técnicos: total na presença vs ativos (status em branco) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "ATIVOS" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Técnicos Ativos / Total</div>
+                <div className="text-2xl font-bold">
+                  <span className="text-primary">{cardMetrics.totalAtivos}</span>
+                  <span className="text-muted-foreground text-base"> / {cardMetrics.totalTecnicosPresenca}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1">Status em branco = Ativo</div>
+              </CardContent>
+            </Card>
+
+            {/* Presença OK por macro de sucesso */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "PRESENCA_OK" ? "ALL" : "PRESENCA_OK")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "PRESENCA_OK" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Presença Confirmada</div>
+                <div className="text-2xl font-bold text-success">{cardMetrics.totalPresencaOK}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">INST/MUD/SRV/REP-FTTH OK</div>
+              </CardContent>
+            </Card>
+
+            {/* Total atividades em andamento (cartão filtro) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "EM_ANDAMENTO" ? "ALL" : "EM_ANDAMENTO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "EM_ANDAMENTO" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Total em Andamento</div>
+                <div className="text-2xl font-bold">{cardMetrics.totalEmAndamento}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Atrib./Desloc./N.Atrib./Receb./Exec.</div>
+              </CardContent>
+            </Card>
+
+            {/* Agenda do dia */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "AGENDA_DIA" ? "ALL" : "AGENDA_DIA")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "AGENDA_DIA" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Agenda do Dia</div>
+                <div className="text-2xl font-bold text-primary">{cardMetrics.totalAgendaDia}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Atribuídas para hoje</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Concluídas c/ Sucesso</div>
+                <div className="text-2xl font-bold text-success">{totals.sucesso}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
+                <div className="text-2xl font-bold text-destructive">{totals.insucesso}</div>
+              </CardContent>
+            </Card>
           </div>
+
+          {cardFilter !== "ALL" && (
+            <div className="flex items-center gap-2 text-xs">
+              <Badge variant="secondary">
+                Filtro ativo: {cardFilter === "ATIVOS" ? "Técnicos Ativos" : cardFilter === "PRESENCA_OK" ? "Presença Confirmada" : cardFilter === "EM_ANDAMENTO" ? "Em Andamento" : "Agenda do Dia"}
+              </Badge>
+              <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setCardFilter("ALL")}>
+                Limpar
+              </Button>
+            </div>
+          )}
 
           <Card>
             <CardHeader className="pb-2">
@@ -446,6 +637,20 @@ const AtividadesEncerramento = () => {
                   <SelectContent>
                     <SelectItem value="ALL">Todas as macro atividades</SelectItem>
                     {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={supervisorFilter} onValueChange={setSupervisorFilter}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Supervisor" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os supervisores</SelectItem>
+                    {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={coordenadorFilter} onValueChange={setCoordenadorFilter}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Coordenador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os coordenadores</SelectItem>
+                    {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input
