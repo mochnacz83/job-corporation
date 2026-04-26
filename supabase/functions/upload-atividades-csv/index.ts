@@ -66,8 +66,10 @@ function findCol(headers: string[], candidates: string[]): number {
 
 function parseDate(v: string): string | null {
   if (!v) return null;
-  const s = v.trim();
+  let s = v.trim();
   if (!s) return null;
+  // Remove sufixo " UTC" ou " GMT" e normaliza separador
+  s = s.replace(/\s+(UTC|GMT)\s*$/i, "Z").replace(" ", "T");
   const iso = new Date(s);
   if (!isNaN(iso.getTime())) return iso.toISOString();
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
