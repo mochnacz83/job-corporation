@@ -42,6 +42,29 @@ type PresencaRow = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+// Estados que contam como "Total de Atividades" (em andamento)
+const ESTADOS_EM_ANDAMENTO = [
+  "atribuído",
+  "em deslocamento",
+  "não atribuído",
+  "recebido",
+  "em execução",
+];
+
+// Macro atividades que contabilizam presença do técnico quando concluídas com sucesso
+const MACROS_PRESENCA_OK = ["INST-FTTH", "MUD-FTTH", "SRV-FTTH", "REP-FTTH"];
+const MACRO_PRESENCA_EXCLUIR = "RET-FTTH";
+
+const norm = (s: string | null | undefined) =>
+  (s || "").toString().trim().toLowerCase();
+
+type CardFilter =
+  | "ALL"
+  | "ATIVOS"
+  | "EM_ANDAMENTO"
+  | "AGENDA_DIA"
+  | "PRESENCA_OK";
+
 const AtividadesEncerramento = () => {
   const { isAdmin, profile } = useAuth();
   const { toast } = useToast();
@@ -57,6 +80,9 @@ const AtividadesEncerramento = () => {
   // filters
   const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
   const [macroFilter, setMacroFilter] = useState<string>("ALL");
+  const [supervisorFilter, setSupervisorFilter] = useState<string>("ALL");
+  const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
+  const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [search, setSearch] = useState("");
 
   // settings
