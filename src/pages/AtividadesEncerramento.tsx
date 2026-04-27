@@ -647,7 +647,7 @@ const AtividadesEncerramento = () => {
 
         {/* RESUMO POR TÉCNICO */}
         <TabsContent value="resumo" className="space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -659,7 +659,7 @@ const AtividadesEncerramento = () => {
                   <span className="text-primary">{cardMetrics.totalAtivos}</span>
                   <span className="text-muted-foreground text-base"> / {cardMetrics.totalTecnicosPresenca}</span>
                 </div>
-                <div className="text-[10px] text-muted-foreground mt-1">Status em branco = Ativo</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Ativos na escala</div>
               </CardContent>
             </Card>
 
@@ -671,7 +671,19 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Presença Confirmada</div>
                 <div className="text-2xl font-bold text-success">{cardMetrics.totalPresencaOK}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">INST/MUD/SRV/REP-FTTH OK</div>
+                <div className="text-[10px] text-muted-foreground mt-1">INST/MUD/SRV/REP OK</div>
+              </CardContent>
+            </Card>
+
+            {/* Sem Presença */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "SEM_PRESENCA" ? "ALL" : "SEM_PRESENCA")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "SEM_PRESENCA" ? "ring-2 ring-primary" : ""}`}
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Sem Presença</div>
+                <div className="text-2xl font-bold text-warning">{cardMetrics.totalSemPresenca}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Ativos/c/ ativ. sem OK</div>
               </CardContent>
             </Card>
 
@@ -683,7 +695,7 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Total em Andamento</div>
                 <div className="text-2xl font-bold">{cardMetrics.totalEmAndamento}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">Atrib./Desloc./N.Atrib./Receb./Exec.</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Em curso</div>
               </CardContent>
             </Card>
 
@@ -695,20 +707,26 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Agenda do Dia</div>
                 <div className="text-2xl font-bold text-primary">{cardMetrics.totalAgendaDia}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">Atribuídas para hoje</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Agendadas hoje (SC)</div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card
+              onClick={() => setCardFilter(cardFilter === "SUCESSO" ? "ALL" : "SUCESSO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "SUCESSO" ? "ring-2 ring-primary" : ""}`}
+            >
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas c/ Sucesso</div>
-                <div className="text-2xl font-bold text-success">{totals.sucesso}</div>
+                <div className="text-2xl font-bold text-success">{totalsAll.sucesso}</div>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              onClick={() => setCardFilter(cardFilter === "INSUCESSO" ? "ALL" : "INSUCESSO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "INSUCESSO" ? "ring-2 ring-primary" : ""}`}
+            >
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
-                <div className="text-2xl font-bold text-destructive">{totals.insucesso}</div>
+                <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
               </CardContent>
             </Card>
           </div>
@@ -716,7 +734,15 @@ const AtividadesEncerramento = () => {
           {cardFilter !== "ALL" && (
             <div className="flex items-center gap-2 text-xs">
               <Badge variant="secondary">
-                Filtro ativo: {cardFilter === "ATIVOS" ? "Técnicos Ativos" : cardFilter === "PRESENCA_OK" ? "Presença Confirmada" : cardFilter === "EM_ANDAMENTO" ? "Em Andamento" : "Agenda do Dia"}
+                Filtro ativo: {
+                  cardFilter === "ATIVOS" ? "Técnicos Ativos" :
+                  cardFilter === "PRESENCA_OK" ? "Presença Confirmada" :
+                  cardFilter === "SEM_PRESENCA" ? "Sem Presença" :
+                  cardFilter === "EM_ANDAMENTO" ? "Em Andamento" :
+                  cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
+                  cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
+                  "Agenda do Dia"
+                }
               </Badge>
               <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setCardFilter("ALL")}>
                 Limpar
