@@ -168,10 +168,12 @@ Deno.serve(async (req) => {
       "dh_fim_execucao_real", "dh fim execucao real",
     ]);
     const idxDataAtividade = findCol(headers, [
+      // Prioridade: dia agendado para o técnico
+      "dh_inicio_agendamento", "dh inicio agendamento",
       "dt_atividade", "data_atividade", "data atividade", "dt referencia", "data_referencia",
-      "data_naf", "data naf",
       "dh_dataaberturaos", "dh dataaberturaos",
       "dh_abertura_ba", "dh abertura ba",
+      "data_naf", "data naf",
     ]);
     const idxUF = findCol(headers, ["cd_uf", "uf", "cd uf", "estado_uf", "sg_uf"]);
 
