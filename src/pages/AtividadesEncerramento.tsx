@@ -86,6 +86,7 @@ const AtividadesEncerramento = () => {
   const [macroFilter, setMacroFilter] = useState<string>("ALL");
   const [supervisorFilter, setSupervisorFilter] = useState<string>("ALL");
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
+  const [tecnicoFilter, setTecnicoFilter] = useState<string>("ALL");
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [search, setSearch] = useState("");
 
@@ -174,15 +175,34 @@ const AtividadesEncerramento = () => {
   // Listas únicas de Supervisor / Coordenador a partir da Presença
   const supervisores = useMemo(() => {
     const s = new Set<string>();
-    presenca.forEach((p) => p.supervisor && s.add(p.supervisor.trim()));
+    presenca.forEach((p) => {
+      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
+      if (p.supervisor) s.add(p.supervisor.trim());
+    });
     return Array.from(s).filter(Boolean).sort();
-  }, [presenca]);
+  }, [presenca, coordenadorFilter]);
 
   const coordenadores = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => p.coordenador && s.add(p.coordenador.trim()));
     return Array.from(s).filter(Boolean).sort();
   }, [presenca]);
+
+  const tecnicos = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
+      if (p.funcionario) s.add(p.funcionario.trim());
+    });
+    fato.forEach((r) => {
+      const info = getPresencaInfo(r);
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
+      if (r.nome_tecnico) s.add(r.nome_tecnico.trim());
+    });
+    return Array.from(s).filter(Boolean).sort();
+  }, [presenca, fato, coordenadorFilter, supervisorFilter, presencaByTT, presencaByTR]);
 
   // Helper para obter info de presença de um registro fato
   const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
@@ -199,17 +219,25 @@ const AtividadesEncerramento = () => {
   const ttsAtivos = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
+      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
+      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return;
       const stat = (p.status || "").trim();
       if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
     });
     return s;
-  }, [presenca]);
+  }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
   // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
   // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
   const ttsPresencaOK = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
+      const info = getPresencaInfo(r);
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
+      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
+
       const estado = norm(r.ds_estado);
       const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
       if (
@@ -224,17 +252,22 @@ const AtividadesEncerramento = () => {
       }
     });
     return s;
-  }, [fato]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
 
   // TTs que fecharam alguma atividade no dia (qualquer estado/macro)
   const ttsComAtividade = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
+      const info = getPresencaInfo(r);
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
+      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
+
       const tt = (r.matricula_tt || "").trim().toUpperCase();
       if (tt) s.add(tt);
     });
     return s;
-  }, [fato]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
 
   // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
   // Parte da base de técnicos com TT (ou TR) cadastrados na planilha Dimensão (Presença)
@@ -243,6 +276,10 @@ const AtividadesEncerramento = () => {
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
+      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
+      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
+      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return;
+
       // Ignora linhas BUFFER
       const nome = (p.funcionario || "").toUpperCase();
       if (nome.includes("BUFFER")) return;
@@ -257,7 +294,7 @@ const AtividadesEncerramento = () => {
       s.add(key);
     });
     return s;
-  }, [presenca, ttsPresencaOK]);
+  }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
@@ -311,6 +348,7 @@ const AtividadesEncerramento = () => {
       const info = getPresencaInfo(r);
       if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
       if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
+      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return false;
 
       if (cardFilter === "EM_ANDAMENTO") {
         if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
@@ -341,7 +379,7 @@ const AtividadesEncerramento = () => {
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -427,12 +465,13 @@ const AtividadesEncerramento = () => {
       const info = getPresencaInfo(r);
       if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
       if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
+      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) insucesso++;
       else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
     });
     return { sucesso, insucesso };
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, presencaByTT, presencaByTR]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
 
   const totals = useMemo(() => {
     return aggregated.reduce(
@@ -446,17 +485,37 @@ const AtividadesEncerramento = () => {
     );
   }, [aggregated]);
 
-  // Métricas dos cartões (calculadas sobre o fato bruto do dia, ignorando cardFilter)
+  // Métricas dos cartões (calculadas aplicando os filtros globais sobre o fato bruto do dia)
   const cardMetrics = useMemo(() => {
-    const totalTecnicosPresenca = presenca.length;
+    const filteredPresenca = presenca.filter(p => {
+      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return false;
+      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return false;
+      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return false;
+      return true;
+    });
+
+    const totalTecnicosPresenca = filteredPresenca.length;
     const totalAtivos = ttsAtivos.size;
-    const baseSC = fato.filter(isSC);
-    const totalEmAndamento = baseSC.filter((r) =>
+
+    const baseFato = fato.filter(r => {
+      if (!isSC(r)) return false;
+      const info = getPresencaInfo(r);
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
+      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return false;
+      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
+      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+      return true;
+    });
+
+    const totalEmAndamento = baseFato.filter((r) =>
       ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado)),
     ).length;
-    const totalAgendaDia = baseSC.filter(isAgendadaParaDia).length;
+    const totalAgendaDia = baseFato.filter(isAgendadaParaDia).length;
+
     const totalPresencaOK = ttsPresencaOK.size;
     const totalSemPresenca = ttsSemPresenca.size;
+
     return {
       totalTecnicosPresenca,
       totalAtivos,
@@ -465,7 +524,7 @@ const AtividadesEncerramento = () => {
       totalPresencaOK,
       totalSemPresenca,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Deprecated via web
@@ -767,32 +826,39 @@ const AtividadesEncerramento = () => {
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
+                <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Coordenador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os coordenadores</SelectItem>
+                    {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Supervisor" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os supervisores</SelectItem>
+                    {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
+                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Técnico" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos os técnicos</SelectItem>
+                    {tecnicos.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="ds_estado" /></SelectTrigger>
+                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Todos os estados</SelectItem>
                     {estados.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={macroFilter} onValueChange={setMacroFilter}>
-                  <SelectTrigger className="w-[220px] h-8 text-xs"><SelectValue placeholder="ds_macro_atividade" /></SelectTrigger>
+                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Macro atividade" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">Todas as macro atividades</SelectItem>
+                    <SelectItem value="ALL">Todas as macro ativ.</SelectItem>
                     {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={supervisorFilter} onValueChange={setSupervisorFilter}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Supervisor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os supervisores</SelectItem>
-                    {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={coordenadorFilter} onValueChange={setCoordenadorFilter}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs"><SelectValue placeholder="Coordenador" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os coordenadores</SelectItem>
-                    {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input
