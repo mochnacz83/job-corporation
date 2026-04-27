@@ -173,6 +173,17 @@ const AtividadesEncerramento = () => {
     return m;
   }, [presenca]);
 
+  // Helper para obter info de presença de um registro fato
+  const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
+    const ttKey = (r.matricula_tt || "").trim().toUpperCase();
+    const trKey = (r.matricula_tr || "").trim().toUpperCase();
+    return (
+      (ttKey && presencaByTT.get(ttKey)) ||
+      (trKey && presencaByTR.get(trKey)) ||
+      null
+    );
+  };
+
   // Listas únicas de Supervisor / Coordenador a partir da Presença
   const supervisores = useMemo(() => {
     const s = new Set<string>();
@@ -205,16 +216,6 @@ const AtividadesEncerramento = () => {
     return Array.from(s).filter(Boolean).sort();
   }, [presenca, fato, coordenadorFilter, supervisorFilter, presencaByTT, presencaByTR]);
 
-  // Helper para obter info de presença de um registro fato
-  const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
-    const ttKey = (r.matricula_tt || "").trim().toUpperCase();
-    const trKey = (r.matricula_tr || "").trim().toUpperCase();
-    return (
-      (ttKey && presencaByTT.get(ttKey)) ||
-      (trKey && presencaByTR.get(trKey)) ||
-      null
-    );
-  };
 
   // Conjunto de TTs ativos na presença (status em branco/vazio)
   const ttsAtivos = useMemo(() => {
