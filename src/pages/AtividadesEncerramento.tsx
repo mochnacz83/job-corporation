@@ -696,7 +696,7 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Sem Presença</div>
                 <div className="text-2xl font-bold text-warning">{cardMetrics.totalSemPresenca}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">Ativos/c/ ativ. sem OK</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Dimensão sem OK</div>
               </CardContent>
             </Card>
 
