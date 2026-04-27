@@ -236,16 +236,28 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato]);
 
-  // Técnicos SEM PRESENÇA confirmada:
-  // Inclui técnicos ATIVOS na escala E técnicos que fecharam atividades,
-  // mas que NÃO estão em ttsPresencaOK
-  // (ou seja, só fecharam RET-FTTH, só insucesso, ou nada).
+  // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
+  // Parte da base de técnicos com TT (ou TR) cadastrados na planilha Dimensão (Presença)
+  // e remove aqueles que estão em ttsPresencaOK.
+  // Resultado: técnicos da escala que NÃO fecharam nenhuma INST/MUD/SRV/REP-FTTH com sucesso.
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
-    ttsAtivos.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
-    ttsComAtividade.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
+    presenca.forEach((p) => {
+      // Ignora linhas BUFFER
+      const nome = (p.funcionario || "").toUpperCase();
+      if (nome.includes("BUFFER")) return;
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+      // Identificador prioritário: TT; se não houver, usa TR
+      const key = tt || tr;
+      if (!key) return;
+      // Se o técnico (por TT ou TR) já confirmou presença, não entra em "Sem Presença"
+      if (tt && ttsPresencaOK.has(tt)) return;
+      if (tr && ttsPresencaOK.has(tr)) return;
+      s.add(key);
+    });
     return s;
-  }, [ttsAtivos, ttsComAtividade, ttsPresencaOK]);
+  }, [presenca, ttsPresencaOK]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
@@ -318,7 +330,8 @@ const AtividadesEncerramento = () => {
         if (!tt || !ttsAtivos.has(tt)) return false;
       } else if (cardFilter === "SEM_PRESENCA") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
-        if (!tt || !ttsSemPresenca.has(tt)) return false;
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsSemPresenca.has(tt)) && !(tr && ttsSemPresenca.has(tr))) return false;
       } else if (cardFilter === "SUCESSO") {
         const estado = norm(r.ds_estado);
         if (!(estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso"))) return false;
@@ -683,7 +696,7 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Sem Presença</div>
                 <div className="text-2xl font-bold text-warning">{cardMetrics.totalSemPresenca}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">Ativos/c/ ativ. sem OK</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Dimensão sem OK</div>
               </CardContent>
             </Card>
 
