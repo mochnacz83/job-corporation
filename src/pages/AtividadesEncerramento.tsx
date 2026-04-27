@@ -236,16 +236,28 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato]);
 
-  // Técnicos SEM PRESENÇA confirmada:
-  // Inclui técnicos ATIVOS na escala E técnicos que fecharam atividades,
-  // mas que NÃO estão em ttsPresencaOK
-  // (ou seja, só fecharam RET-FTTH, só insucesso, ou nada).
+  // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
+  // Parte da base de técnicos com TT (ou TR) cadastrados na planilha Dimensão (Presença)
+  // e remove aqueles que estão em ttsPresencaOK.
+  // Resultado: técnicos da escala que NÃO fecharam nenhuma INST/MUD/SRV/REP-FTTH com sucesso.
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
-    ttsAtivos.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
-    ttsComAtividade.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
+    presenca.forEach((p) => {
+      // Ignora linhas BUFFER
+      const nome = (p.funcionario || "").toUpperCase();
+      if (nome.includes("BUFFER")) return;
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+      // Identificador prioritário: TT; se não houver, usa TR
+      const key = tt || tr;
+      if (!key) return;
+      // Se o técnico (por TT ou TR) já confirmou presença, não entra em "Sem Presença"
+      if (tt && ttsPresencaOK.has(tt)) return;
+      if (tr && ttsPresencaOK.has(tr)) return;
+      s.add(key);
+    });
     return s;
-  }, [ttsAtivos, ttsComAtividade, ttsPresencaOK]);
+  }, [presenca, ttsPresencaOK]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
