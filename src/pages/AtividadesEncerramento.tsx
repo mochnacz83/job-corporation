@@ -88,6 +88,7 @@ const AtividadesEncerramento = () => {
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
   const [tecnicoFilter, setTecnicoFilter] = useState<string>("ALL");
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
+  const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
 
   // settings
@@ -419,7 +420,7 @@ const AtividadesEncerramento = () => {
           supervisor: presencaInfo?.supervisor || "",
           coordenador: presencaInfo?.coordenador || "",
           setor_atual: presencaInfo?.setor_atual || "",
-          status: presencaInfo?.status || "",
+          status: presencaInfo ? ((presencaInfo.status || "").trim() === "" ? "Ativo" : presencaInfo.status) : "",
           sucesso: 0,
           insucesso: 0,
           outros: {},
@@ -683,6 +684,17 @@ const AtividadesEncerramento = () => {
     }
   };
 
+  const handleNumberClick = (r: any) => {
+    if (r.nome && r.nome !== "—") {
+      setTecnicoFilter(r.nome);
+    } else if (r.tt) {
+      setSearch(r.tt);
+    } else if (r.tr) {
+      setSearch(r.tr);
+    }
+    setActiveTab("atividades");
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -710,7 +722,7 @@ const AtividadesEncerramento = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="resumo" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="resumo">Resumo Diário</TabsTrigger>
           <TabsTrigger value="atividades">Atividades</TabsTrigger>
@@ -903,10 +915,10 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px]">{r.supervisor}</TableCell>
                           <TableCell className="text-[11px]">{r.coordenador}</TableCell>
                           <TableCell className="text-[11px]">{r.setor_atual}</TableCell>
-                          <TableCell className="text-[11px] text-center">{r.status && <Badge variant="outline" className="text-[10px]">{r.status}</Badge>}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold text-success">{r.sucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold text-destructive">{r.insucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold">{r.total}</TableCell>
+                          <TableCell className="text-[11px] text-center">{r.status && <Badge variant="outline" className={`text-[10px] ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : ''}`}>{r.status}</Badge>}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold text-success cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.sucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold text-destructive cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.insucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.total}</TableCell>
                           <TableCell className="text-[11px] text-center">{fechadas > 0 ? `${pct.toFixed(1)}%` : "—"}</TableCell>
                         </TableRow>
                       );
