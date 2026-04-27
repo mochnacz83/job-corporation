@@ -26,6 +26,7 @@ type FatoRow = {
   matricula_tr: string | null;
   nome_tecnico: string | null;
   data_atividade: string | null;
+  raw: Record<string, unknown> | null;
 };
 
 type PresencaRow = {
@@ -63,7 +64,10 @@ type CardFilter =
   | "ATIVOS"
   | "EM_ANDAMENTO"
   | "AGENDA_DIA"
-  | "PRESENCA_OK";
+  | "PRESENCA_OK"
+  | "SEM_PRESENCA"
+  | "SUCESSO"
+  | "INSUCESSO";
 
 const AtividadesEncerramento = () => {
   const { isAdmin, profile } = useAuth();
@@ -98,7 +102,7 @@ const AtividadesEncerramento = () => {
       const [{ data: f }, { data: p }, { data: log }] = await Promise.all([
         supabase
           .from("atividades_fato")
-          .select("id, ds_estado, ds_macro_atividade, matricula_tt, matricula_tr, nome_tecnico, data_atividade")
+          .select("id, ds_estado, ds_macro_atividade, matricula_tt, matricula_tr, nome_tecnico, data_atividade, raw")
           .eq("data_atividade", date)
           .limit(10000),
         supabase
@@ -112,7 +116,12 @@ const AtividadesEncerramento = () => {
           .limit(1)
           .maybeSingle(),
       ]);
-      setFato((f || []) as FatoRow[]);
+      // Filtrar técnicos com "BUFFER" no nome (sai do relatório inteiro)
+      const cleaned = ((f || []) as FatoRow[]).filter((r) => {
+        const n = (r.nome_tecnico || "").toUpperCase();
+        return !n.includes("BUFFER");
+      });
+      setFato(cleaned);
       setPresenca((p || []) as PresencaRow[]);
       setLastSync(log?.finished_at ?? null);
     } finally {
@@ -217,9 +226,73 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato]);
 
+  // TTs que fecharam alguma atividade no dia (qualquer estado/macro)
+  const ttsComAtividade = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const tt = (r.matricula_tt || "").trim().toUpperCase();
+      if (tt) s.add(tt);
+    });
+    return s;
+  }, [fato]);
+
+  // Técnicos SEM PRESENÇA confirmada:
+  // Inclui técnicos ATIVOS na escala E técnicos que fecharam atividades,
+  // mas que NÃO estão em ttsPresencaOK
+  // (ou seja, só fecharam RET-FTTH, só insucesso, ou nada).
+  const ttsSemPresenca = useMemo(() => {
+    const s = new Set<string>();
+    ttsAtivos.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
+    ttsComAtividade.forEach((tt) => { if (!ttsPresencaOK.has(tt)) s.add(tt); });
+    return s;
+  }, [ttsAtivos, ttsComAtividade, ttsPresencaOK]);
+
+  // Helpers para ler raw
+  const getRawStr = (r: FatoRow, keys: string[]): string => {
+    const raw = r.raw || {};
+    const lookup = new Map<string, string>();
+    Object.keys(raw).forEach((k) => {
+      const norm = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      lookup.set(norm, String((raw as Record<string, unknown>)[k] ?? ""));
+    });
+    for (const c of keys) {
+      const n = c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      const v = lookup.get(n);
+      if (v) return v;
+    }
+    return "";
+  };
+
+  const isSC = (r: FatoRow): boolean => {
+    const uf = getRawStr(r, ["cd_uf", "uf", "sg_uf"]).trim().toUpperCase();
+    return uf === "" || uf === "SC";
+  };
+
+  // Atividade considerada "agendada para o dia": dh_inicio_agendamento cai na data selecionada
+  const isAgendadaParaDia = (r: FatoRow): boolean => {
+    const v = getRawStr(r, ["dh_inicio_agendamento", "dh inicio agendamento"]);
+    if (!v) return false;
+    // Extrair YYYY-MM-DD
+    let s = v.trim();
+    // formato dd/MM/yyyy ...
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    let iso = "";
+    if (m) {
+      iso = `${m[3]}-${m[2]}-${m[1]}`;
+    } else {
+      // ISO-like
+      s = s.replace(/\s+(UTC|GMT)\s*$/i, "Z").replace(" ", "T");
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) iso = d.toISOString().slice(0, 10);
+    }
+    return iso === date;
+  };
+
   // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
   const filteredFato = useMemo(() => {
     return fato.filter((r) => {
+      // sempre filtra UF=SC (quando informado)
+      if (!isSC(r)) return false;
       if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
       if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
 
@@ -230,7 +303,7 @@ const AtividadesEncerramento = () => {
       if (cardFilter === "EM_ANDAMENTO") {
         if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
       } else if (cardFilter === "AGENDA_DIA") {
-        if (norm(r.ds_estado) !== "atribuído") return false;
+        if (!isAgendadaParaDia(r)) return false;
       } else if (cardFilter === "PRESENCA_OK") {
         const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
         const estado = norm(r.ds_estado);
@@ -243,10 +316,19 @@ const AtividadesEncerramento = () => {
       } else if (cardFilter === "ATIVOS") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
         if (!tt || !ttsAtivos.has(tt)) return false;
+      } else if (cardFilter === "SEM_PRESENCA") {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        if (!tt || !ttsSemPresenca.has(tt)) return false;
+      } else if (cardFilter === "SUCESSO") {
+        const estado = norm(r.ds_estado);
+        if (!(estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso"))) return false;
+      } else if (cardFilter === "INSUCESSO") {
+        const estado = norm(r.ds_estado);
+        if (!(estado.includes("conclu") && estado.includes("sem sucesso"))) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -321,6 +403,24 @@ const AtividadesEncerramento = () => {
     return arr.sort((a, b) => b.total - a.total);
   }, [filteredFato, presencaByTT, presencaByTR, search]);
 
+  // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
+  // sem aplicar cardFilter — somente filtros de seletor (estado/macro/sup/coord).
+  const totalsAll = useMemo(() => {
+    let sucesso = 0, insucesso = 0;
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return;
+      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return;
+      const info = getPresencaInfo(r);
+      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
+      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
+      const estado = norm(r.ds_estado);
+      if (estado.includes("conclu") && estado.includes("sem sucesso")) insucesso++;
+      else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
+    });
+    return { sucesso, insucesso };
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, presencaByTT, presencaByTR]);
+
   const totals = useMemo(() => {
     return aggregated.reduce(
       (acc, x) => {
@@ -337,19 +437,22 @@ const AtividadesEncerramento = () => {
   const cardMetrics = useMemo(() => {
     const totalTecnicosPresenca = presenca.length;
     const totalAtivos = ttsAtivos.size;
-    const totalEmAndamento = fato.filter((r) =>
+    const baseSC = fato.filter(isSC);
+    const totalEmAndamento = baseSC.filter((r) =>
       ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado)),
     ).length;
-    const totalAgendaDia = fato.filter((r) => norm(r.ds_estado) === "atribuído").length;
+    const totalAgendaDia = baseSC.filter(isAgendadaParaDia).length;
     const totalPresencaOK = ttsPresencaOK.size;
+    const totalSemPresenca = ttsSemPresenca.size;
     return {
       totalTecnicosPresenca,
       totalAtivos,
       totalEmAndamento,
       totalAgendaDia,
       totalPresencaOK,
+      totalSemPresenca,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date]);
 
   const handleSync = async () => {
     // Deprecated via web
