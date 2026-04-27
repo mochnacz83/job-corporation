@@ -330,7 +330,8 @@ const AtividadesEncerramento = () => {
         if (!tt || !ttsAtivos.has(tt)) return false;
       } else if (cardFilter === "SEM_PRESENCA") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
-        if (!tt || !ttsSemPresenca.has(tt)) return false;
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsSemPresenca.has(tt)) && !(tr && ttsSemPresenca.has(tr))) return false;
       } else if (cardFilter === "SUCESSO") {
         const estado = norm(r.ds_estado);
         if (!(estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso"))) return false;
