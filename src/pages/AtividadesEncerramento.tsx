@@ -429,6 +429,50 @@ const AtividadesEncerramento = () => {
       }
     >();
 
+    const initTecnico = (p: PresencaRow) => {
+      const ttKey = (p.tt || "").trim().toUpperCase();
+      const trKey = (p.tr || "").trim().toUpperCase();
+      const key = ttKey || trKey;
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, {
+          tt: ttKey,
+          tr: trKey,
+          nome: p.funcionario || "—",
+          operadora: p.operadora || "",
+          supervisor: p.supervisor || "",
+          coordenador: p.coordenador || "",
+          setor_atual: p.setor_atual || "",
+          status: (p.status || "").trim() === "" ? "Ativo" : p.status,
+          sucesso: 0,
+          insucesso: 0,
+          outros: {},
+          total: 0,
+        });
+      }
+    };
+
+    // Pré-popular o map com técnicos da planilha de presença baseados no filtro do card.
+    // Assim, se um técnico não tem NENHUMA atividade no Fato, ele ainda aparece com total=0
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+
+      if (cardFilter === "SEM_PRESENCA") {
+        if ((tt && ttsSemPresenca.has(tt)) || (tr && ttsSemPresenca.has(tr))) initTecnico(p);
+      } else if (cardFilter === "ATIVOS") {
+        if ((tt && ttsAtivos.has(tt)) || (tr && ttsAtivos.has(tr))) initTecnico(p);
+      } else if (cardFilter === "PRESENCA_OK") {
+        if ((tt && ttsPresencaOK.has(tt)) || (tr && ttsPresencaOK.has(tr))) initTecnico(p);
+      } else if (cardFilter === "ALL") {
+        initTecnico(p);
+      }
+    });
+
     filteredFato.forEach((r) => {
       const ttKey = (r.matricula_tt || "").trim().toUpperCase();
       const trKey = (r.matricula_tr || "").trim().toUpperCase();
