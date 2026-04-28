@@ -230,6 +230,15 @@ const AtividadesEncerramento = () => {
     return s;
   }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
+  // Helper: identifica registros cujo motivo de encerramento é "Técnico Sem Dados".
+  // Esses NÃO contam como Insucesso (ficam fora da contagem do cartão e do filtro),
+  // mas continuam visíveis no painel inferior (em "outros") e não afetam a Presença.
+  const isTecnicoSemDados = (r: Fato) => {
+    const desc = norm((r.raw as any)?.ds_descricao || "");
+    const status = norm((r.raw as any)?.status_naf || "");
+    return desc.includes("tecnico sem dados") || status.includes("tecnico sem dados");
+  };
+
   // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
   // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
   const ttsPresencaOK = useMemo(() => {
