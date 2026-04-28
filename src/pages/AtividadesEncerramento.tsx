@@ -398,7 +398,6 @@ const AtividadesEncerramento = () => {
       } else if (cardFilter === "INSUCESSO") {
         const estado = norm(r.ds_estado);
         if (!(estado.includes("conclu") && estado.includes("sem sucesso"))) return false;
-        if (isTecnicoSemDados(r)) return false;
       }
       return true;
     });
@@ -452,13 +451,7 @@ const AtividadesEncerramento = () => {
       const row = map.get(key)!;
       const estado = (r.ds_estado || "").toLowerCase();
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
-        if (isTecnicoSemDados(r)) {
-          // "Técnico Sem Dados" não conta como insucesso, mas aparece em "outros"
-          const e = "Técnico Sem Dados";
-          row.outros[e] = (row.outros[e] || 0) + 1;
-        } else {
-          row.insucesso++;
-        }
+        row.insucesso++;
       } else if (estado.includes("conclu") && estado.includes("sucesso")) {
         row.sucesso++;
       } else {
@@ -497,7 +490,7 @@ const AtividadesEncerramento = () => {
       if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
-        if (!isTecnicoSemDados(r)) insucesso++;
+        insucesso++;
       }
       else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
     });
