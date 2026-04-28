@@ -230,14 +230,23 @@ const AtividadesEncerramento = () => {
     return s;
   }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
-  // Helper: identifica registros cujo motivo de encerramento é "Técnico Sem Dados".
-  // Esses NÃO contam como Insucesso (ficam fora da contagem do cartão e do filtro),
-  // mas continuam visíveis no painel inferior (em "outros") e não afetam a Presença.
-  const isTecnicoSemDados = (r: FatoRow) => {
-    const desc = norm((r.raw as any)?.ds_descricao || "");
-    const status = norm((r.raw as any)?.status_naf || "");
-    return desc.includes("tecnico sem dados") || status.includes("tecnico sem dados");
-  };
+  // Conjunto de TTs/TRs cujo Status na planilha Dimensão (tecnicos_presenca)
+  // é "Técnico de Dados". Esses técnicos NÃO contabilizam em "Técnicos Ativos"
+  // nem em "Sem Presença" — ficam fora do saldo. Porém, se fecharem alguma
+  // atividade Concluída Com Sucesso (regra da Presença Confirmada), entram
+  // normalmente em ttsPresencaOK, como qualquer outro técnico.
+  const ttsTecnicoDeDados = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      const stat = (p.status || "").trim().toLowerCase();
+      if (stat !== "técnico de dados" && stat !== "tecnico de dados") return;
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+      if (tt) s.add(tt);
+      if (tr) s.add(tr);
+    });
+    return s;
+  }, [presenca]);
 
   // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
   // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
@@ -299,13 +308,15 @@ const AtividadesEncerramento = () => {
       // Identificador prioritário: TT; se não houver, usa TR
       const key = tt || tr;
       if (!key) return;
+      // Status "Técnico de Dados" fica fora do saldo Sem Presença
+      if ((tt && ttsTecnicoDeDados.has(tt)) || (tr && ttsTecnicoDeDados.has(tr))) return;
       // Se o técnico (por TT ou TR) já confirmou presença, não entra em "Sem Presença"
       if (tt && ttsPresencaOK.has(tt)) return;
       if (tr && ttsPresencaOK.has(tr)) return;
       s.add(key);
     });
     return s;
-  }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter]);
+  }, [presenca, ttsPresencaOK, ttsTecnicoDeDados, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
@@ -387,7 +398,6 @@ const AtividadesEncerramento = () => {
       } else if (cardFilter === "INSUCESSO") {
         const estado = norm(r.ds_estado);
         if (!(estado.includes("conclu") && estado.includes("sem sucesso"))) return false;
-        if (isTecnicoSemDados(r)) return false;
       }
       return true;
     });
@@ -441,13 +451,7 @@ const AtividadesEncerramento = () => {
       const row = map.get(key)!;
       const estado = (r.ds_estado || "").toLowerCase();
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
-        if (isTecnicoSemDados(r)) {
-          // "Técnico Sem Dados" não conta como insucesso, mas aparece em "outros"
-          const e = "Técnico Sem Dados";
-          row.outros[e] = (row.outros[e] || 0) + 1;
-        } else {
-          row.insucesso++;
-        }
+        row.insucesso++;
       } else if (estado.includes("conclu") && estado.includes("sucesso")) {
         row.sucesso++;
       } else {
@@ -486,7 +490,7 @@ const AtividadesEncerramento = () => {
       if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
-        if (!isTecnicoSemDados(r)) insucesso++;
+        insucesso++;
       }
       else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
     });
