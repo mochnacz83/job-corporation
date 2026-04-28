@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type FatoRow = {
@@ -861,46 +861,82 @@ const AtividadesEncerramento = () => {
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
-                <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Coordenador" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os coordenadores</SelectItem>
-                    {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Supervisor" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os supervisores</SelectItem>
-                    {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Técnico" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os técnicos</SelectItem>
-                    {tecnicos.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos os estados</SelectItem>
-                    {estados.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={macroFilter} onValueChange={setMacroFilter}>
-                  <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue placeholder="Macro atividade" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todas as macro ativ.</SelectItem>
-                    {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                
+                {/* Botão de Limpar Todos os Filtros */}
+                {(coordenadorFilter !== "ALL" || supervisorFilter !== "ALL" || tecnicoFilter !== "ALL" || estadoFilter !== "ALL" || macroFilter !== "ALL" || search !== "") && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setCoordenadorFilter("ALL");
+                      setSupervisorFilter("ALL");
+                      setTecnicoFilter("ALL");
+                      setEstadoFilter("ALL");
+                      setMacroFilter("ALL");
+                      setSearch("");
+                    }} 
+                    className="h-8 text-xs border-dashed text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors mr-2"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Limpar Filtros
+                  </Button>
+                )}
+
+                <div className="relative group">
+                  <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
+                    <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Coordenador" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Coordenador --</SelectItem>
+                      {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative group">
+                  <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
+                    <SelectTrigger className={`w-[180px] h-8 text-xs ${supervisorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Supervisor" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Supervisor --</SelectItem>
+                      {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative group">
+                  <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
+                    <SelectTrigger className={`w-[180px] h-8 text-xs ${tecnicoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Técnico" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Técnico --</SelectItem>
+                      {tecnicos.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative group">
+                  <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                    <SelectTrigger className={`w-[180px] h-8 text-xs ${estadoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Estado" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Estado --</SelectItem>
+                      {estados.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative group">
+                  <Select value={macroFilter} onValueChange={setMacroFilter}>
+                    <SelectTrigger className={`w-[180px] h-8 text-xs ${macroFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Macro atividade" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Macro Ativ. --</SelectItem>
+                      {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Input
                   placeholder="Buscar técnico, TT, supervisor..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-[260px] h-8 text-xs"
+                  className={`w-[260px] h-8 text-xs ${search ? "border-primary/50 bg-primary/5" : ""}`}
                 />
               </div>
             </CardHeader>
