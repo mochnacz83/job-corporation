@@ -951,15 +951,28 @@ const AtividadesEncerramento = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFato.slice(0, 2000).map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
-                        <TableCell className="text-[11px] font-mono">{r.matricula_tr}</TableCell>
-                        <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
-                        <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
-                        <TableCell className="text-[11px]"><Badge variant="outline" className="text-[10px]">{r.ds_estado}</Badge></TableCell>
-                      </TableRow>
-                    ))}
+                    {filteredFato.slice(0, 2000).map((r) => {
+                      const estado = (r.ds_estado || "").toLowerCase().trim();
+                      const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
+                      const sucesso = estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso");
+                      const insucesso = estado.includes("conclu") && estado.includes("sem sucesso");
+                      const contaPresenca = MACROS_PRESENCA_OK.includes(macro) && macro !== MACRO_PRESENCA_EXCLUIR;
+                      
+                      let badgeColor = "";
+                      if (sucesso && contaPresenca) badgeColor = "bg-success/10 text-success border-success/20";
+                      else if (sucesso && !contaPresenca) badgeColor = "bg-warning/10 text-warning border-warning/20";
+                      else if (insucesso) badgeColor = "bg-destructive/10 text-destructive border-destructive/20";
+
+                      return (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{r.matricula_tr}</TableCell>
+                          <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
+                          <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
+                          <TableCell className="text-[11px]"><Badge variant="outline" className={`text-[10px] ${badgeColor}`}>{r.ds_estado}</Badge></TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
