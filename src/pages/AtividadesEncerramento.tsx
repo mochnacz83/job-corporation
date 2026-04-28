@@ -90,6 +90,12 @@ const AtividadesEncerramento = () => {
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
+  const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
+
+  const matchFilter = (val: string | null | undefined, filter: string) => {
+    if (filter === "ALL") return true;
+    return (val || "").trim().toUpperCase() === filter.toUpperCase();
+  };
 
   // settings
   const [csvUrl, setCsvUrl] = useState("");
@@ -188,30 +194,30 @@ const AtividadesEncerramento = () => {
   const supervisores = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
-      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
-      if (p.supervisor) s.add(p.supervisor.trim());
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (p.supervisor) s.add(p.supervisor.trim().toUpperCase());
     });
     return Array.from(s).filter(Boolean).sort();
   }, [presenca, coordenadorFilter]);
 
   const coordenadores = useMemo(() => {
     const s = new Set<string>();
-    presenca.forEach((p) => p.coordenador && s.add(p.coordenador.trim()));
+    presenca.forEach((p) => p.coordenador && s.add(p.coordenador.trim().toUpperCase()));
     return Array.from(s).filter(Boolean).sort();
   }, [presenca]);
 
   const tecnicos = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
-      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
-      if (p.funcionario) s.add(p.funcionario.trim());
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (p.funcionario) s.add(p.funcionario.trim().toUpperCase());
     });
     fato.forEach((r) => {
       const info = getPresencaInfo(r);
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
-      if (r.nome_tecnico) s.add(r.nome_tecnico.trim());
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return;
+      if (r.nome_tecnico) s.add(r.nome_tecnico.trim().toUpperCase());
     });
     return Array.from(s).filter(Boolean).sort();
   }, [presenca, fato, coordenadorFilter, supervisorFilter, presencaByTT, presencaByTR]);
@@ -221,9 +227,9 @@ const AtividadesEncerramento = () => {
   const ttsAtivos = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
-      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
-      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return;
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
       const stat = (p.status || "").trim();
       if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
     });
@@ -254,9 +260,9 @@ const AtividadesEncerramento = () => {
     const s = new Set<string>();
     fato.forEach((r) => {
       const info = getPresencaInfo(r);
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
-      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return;
+      if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
 
       const estado = norm(r.ds_estado);
       const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
@@ -279,9 +285,9 @@ const AtividadesEncerramento = () => {
     const s = new Set<string>();
     fato.forEach((r) => {
       const info = getPresencaInfo(r);
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
-      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return;
+      if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
 
       const tt = (r.matricula_tt || "").trim().toUpperCase();
       if (tt) s.add(tt);
@@ -296,9 +302,9 @@ const AtividadesEncerramento = () => {
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
-      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return;
-      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return;
-      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return;
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
 
       // Ignora linhas BUFFER
       const nome = (p.funcionario || "").toUpperCase();
@@ -368,9 +374,9 @@ const AtividadesEncerramento = () => {
       if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
 
       const info = getPresencaInfo(r);
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
-      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return false;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
+      if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
 
       if (cardFilter === "EM_ANDAMENTO") {
         if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
@@ -485,9 +491,9 @@ const AtividadesEncerramento = () => {
       if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return;
       if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return;
       const info = getPresencaInfo(r);
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return;
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return;
-      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return;
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
         insucesso++;
@@ -512,9 +518,9 @@ const AtividadesEncerramento = () => {
   // Métricas dos cartões (calculadas aplicando os filtros globais sobre o fato bruto do dia)
   const cardMetrics = useMemo(() => {
     const filteredPresenca = presenca.filter(p => {
-      if (coordenadorFilter !== "ALL" && p.coordenador?.trim() !== coordenadorFilter) return false;
-      if (supervisorFilter !== "ALL" && p.supervisor?.trim() !== supervisorFilter) return false;
-      if (tecnicoFilter !== "ALL" && p.funcionario?.trim() !== tecnicoFilter) return false;
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return false;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return false;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return false;
       return true;
     });
 
@@ -524,9 +530,9 @@ const AtividadesEncerramento = () => {
     const baseFato = fato.filter(r => {
       if (!isSC(r)) return false;
       const info = getPresencaInfo(r);
-      if (coordenadorFilter !== "ALL" && (info?.coordenador || "").trim() !== coordenadorFilter) return false;
-      if (supervisorFilter !== "ALL" && (info?.supervisor || "").trim() !== supervisorFilter) return false;
-      if (tecnicoFilter !== "ALL" && (info?.funcionario || "").trim() !== tecnicoFilter && (r.nome_tecnico || "").trim() !== tecnicoFilter) return false;
+      if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
+      if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
+      if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
       if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
       if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
       return true;
@@ -709,14 +715,27 @@ const AtividadesEncerramento = () => {
 
   const handleNumberClick = (r: any) => {
     if (r.nome && r.nome !== "—") {
-      setTecnicoFilter(r.nome);
+      setAtividadesTabSearch(r.nome);
     } else if (r.tt) {
-      setSearch(r.tt);
+      setAtividadesTabSearch(r.tt);
     } else if (r.tr) {
-      setSearch(r.tr);
+      setAtividadesTabSearch(r.tr);
     }
     setActiveTab("atividades");
   };
+
+  const atividadesTabFato = useMemo(() => {
+    let arr = filteredFato;
+    if (atividadesTabSearch.trim()) {
+      const q = atividadesTabSearch.trim().toLowerCase();
+      arr = arr.filter((r) => 
+        (r.nome_tecnico || "").toLowerCase().includes(q) ||
+        (r.matricula_tt || "").toLowerCase().includes(q) ||
+        (r.matricula_tr || "").toLowerCase().includes(q)
+      );
+    }
+    return arr;
+  }, [filteredFato, atividadesTabSearch]);
 
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
@@ -993,8 +1012,25 @@ const AtividadesEncerramento = () => {
         <TabsContent value="atividades">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Atividades do dia ({filteredFato.length})</CardTitle>
-              <CardDescription className="text-xs">Use os filtros acima para refinar.</CardDescription>
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
+                  <CardDescription className="text-xs">Use os filtros acima para refinar.</CardDescription>
+                </div>
+                {atividadesTabSearch && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">Filtrado por: {atividadesTabSearch}</Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setAtividadesTabSearch("")} 
+                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Limpar filtro
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-auto max-h-[600px]">
@@ -1009,7 +1045,7 @@ const AtividadesEncerramento = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredFato.slice(0, 2000).map((r) => {
+                    {atividadesTabFato.slice(0, 2000).map((r) => {
                       const estado = (r.ds_estado || "").toLowerCase().trim();
                       const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
                       const sucesso = estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso");
