@@ -233,7 +233,7 @@ const AtividadesEncerramento = () => {
   // Helper: identifica registros cujo motivo de encerramento é "Técnico Sem Dados".
   // Esses NÃO contam como Insucesso (ficam fora da contagem do cartão e do filtro),
   // mas continuam visíveis no painel inferior (em "outros") e não afetam a Presença.
-  const isTecnicoSemDados = (r: Fato) => {
+  const isTecnicoSemDados = (r: FatoRow) => {
     const desc = norm((r.raw as any)?.ds_descricao || "");
     const status = norm((r.raw as any)?.status_naf || "");
     return desc.includes("tecnico sem dados") || status.includes("tecnico sem dados");
