@@ -17,6 +17,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend,
+} from "recharts";
 
 type FatoRow = {
   id: string;
