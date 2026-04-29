@@ -96,6 +96,17 @@ const AtividadesEncerramento = () => {
   const [search, setSearch] = useState("");
   const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
 
+  // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
+  type HistRow = {
+    data_atividade: string | null;
+    ds_estado: string | null;
+    ds_macro_atividade: string | null;
+    matricula_tt: string | null;
+    nome_tecnico: string | null;
+  };
+  const [historico, setHistorico] = useState<HistRow[]>([]);
+  const [loadingHist, setLoadingHist] = useState(false);
+
   const matchFilter = (val: string | null | undefined, filter: string) => {
     if (filter === "ALL") return true;
     return (val || "").trim().toUpperCase() === filter.toUpperCase();
