@@ -296,9 +296,13 @@ const AtividadesEncerramento = () => {
   }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
 
   // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
-  // Parte da base de técnicos com TT (ou TR) cadastrados na planilha Dimensão (Presença)
-  // e remove aqueles que estão em ttsPresencaOK.
-  // Resultado: técnicos da escala que NÃO fecharam nenhuma INST/MUD/SRV/REP-FTTH com sucesso.
+  // Parte da base de técnicos ATIVOS na planilha Dimensão (Presença) — ou seja, com a
+  // coluna Status em branco ("Células Vazias"). Quem tem qualquer outro Status
+  // (ex.: "Técnico de Dados", afastado, etc.) NÃO entra nesse saldo.
+  // Em seguida remove os que estão em ttsPresencaOK (já confirmaram presença).
+  // Resultado: começa no total de Técnicos Ativos e só baixa conforme técnicos
+  // fecharem INST/MUD/SRV/REP-FTTH com sucesso. Técnicos com status alterado que
+  // fecharem atividade entram em Presença Confirmada normalmente, mas nunca em Sem Presença.
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
@@ -309,20 +313,21 @@ const AtividadesEncerramento = () => {
       // Ignora linhas BUFFER
       const nome = (p.funcionario || "").toUpperCase();
       if (nome.includes("BUFFER")) return;
+      // Só considera técnicos ATIVOS (status vazio na planilha Dimensão)
+      const stat = (p.status || "").trim();
+      if (stat) return;
       const tt = (p.tt || "").trim().toUpperCase();
       const tr = (p.tr || "").trim().toUpperCase();
       // Identificador prioritário: TT; se não houver, usa TR
       const key = tt || tr;
       if (!key) return;
-      // Status "Técnico de Dados" fica fora do saldo Sem Presença
-      if ((tt && ttsTecnicoDeDados.has(tt)) || (tr && ttsTecnicoDeDados.has(tr))) return;
       // Se o técnico (por TT ou TR) já confirmou presença, não entra em "Sem Presença"
       if (tt && ttsPresencaOK.has(tt)) return;
       if (tr && ttsPresencaOK.has(tr)) return;
       s.add(key);
     });
     return s;
-  }, [presenca, ttsPresencaOK, ttsTecnicoDeDados, coordenadorFilter, supervisorFilter, tecnicoFilter]);
+  }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
