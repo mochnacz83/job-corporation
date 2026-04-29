@@ -17,6 +17,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import {
+  ResponsiveContainer, LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip as RTooltip, CartesianGrid, Legend,
+} from "recharts";
 
 type FatoRow = {
   id: string;
@@ -91,6 +95,17 @@ const AtividadesEncerramento = () => {
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
   const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
+
+  // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
+  type HistRow = {
+    data_atividade: string | null;
+    ds_estado: string | null;
+    ds_macro_atividade: string | null;
+    matricula_tt: string | null;
+    nome_tecnico: string | null;
+  };
+  const [historico, setHistorico] = useState<HistRow[]>([]);
+  const [loadingHist, setLoadingHist] = useState(false);
 
   const matchFilter = (val: string | null | undefined, filter: string) => {
     if (filter === "ALL") return true;
@@ -269,9 +284,35 @@ const AtividadesEncerramento = () => {
     // This function is kept for signature compatibility but no longer fetches FATO CSV URL.
   };
 
+  // Carrega últimos 60 dias para o resumo histórico (cálculo on-the-fly)
+  const loadHistorico = async () => {
+    setLoadingHist(true);
+    try {
+      const start = new Date();
+      start.setDate(start.getDate() - 60);
+      const startISO = start.toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("atividades_fato")
+        .select("data_atividade, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico")
+        .gte("data_atividade", startISO)
+        .limit(200000);
+      const cleaned = ((data || []) as HistRow[]).filter(
+        (r) => !(r.nome_tecnico || "").toUpperCase().includes("BUFFER"),
+      );
+      setHistorico(cleaned);
+    } finally {
+      setLoadingHist(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [date]);
+
+  useEffect(() => {
+    loadHistorico();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isAdmin) loadSettings();
@@ -919,6 +960,100 @@ const AtividadesEncerramento = () => {
     return arr;
   }, [filteredFato, atividadesTabSearch]);
 
+  // ===== Histórico (60 dias) - agregações =====
+  const isOkClose = (estado: string | null) => {
+    const e = (estado || "").toLowerCase();
+    return e.includes("conclu") && e.includes("sucesso") && !e.includes("sem sucesso");
+  };
+  const isFailClose = (estado: string | null) => {
+    const e = (estado || "").toLowerCase();
+    return e.includes("conclu") && e.includes("sem sucesso");
+  };
+
+  // Diário: por dia => sucesso, insucesso, total
+  const histDaily = useMemo(() => {
+    const m = new Map<string, { dia: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      const d = r.data_atividade;
+      if (!d) return;
+      if (!m.has(d)) m.set(d, { dia: d, sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(d)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => a.dia.localeCompare(b.dia));
+  }, [historico]);
+
+  // Mensal: YYYY-MM
+  const histMonthly = useMemo(() => {
+    const m = new Map<string, { mes: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      const d = r.data_atividade;
+      if (!d) return;
+      const ym = d.slice(0, 7);
+      if (!m.has(ym)) m.set(ym, { mes: ym, sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(ym)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => a.mes.localeCompare(b.mes));
+  }, [historico]);
+
+  // Comparativo: dia selecionado vs anterior, mês atual vs anterior
+  const histCompare = useMemo(() => {
+    const byDay = new Map(histDaily.map((d) => [d.dia, d]));
+    const sel = byDay.get(date) || { sucesso: 0, insucesso: 0, total: 0 };
+    const prevDate = (() => {
+      const dt = new Date(date);
+      dt.setDate(dt.getDate() - 1);
+      return dt.toISOString().slice(0, 10);
+    })();
+    const prev = byDay.get(prevDate) || { sucesso: 0, insucesso: 0, total: 0 };
+    const ym = date.slice(0, 7);
+    const prevYm = (() => {
+      const dt = new Date(date + "T00:00:00");
+      dt.setMonth(dt.getMonth() - 1);
+      return dt.toISOString().slice(0, 7);
+    })();
+    const cur = histMonthly.find((m) => m.mes === ym) || { sucesso: 0, insucesso: 0, total: 0 };
+    const past = histMonthly.find((m) => m.mes === prevYm) || { sucesso: 0, insucesso: 0, total: 0 };
+    return { sel, prev, prevDate, cur, past, ym, prevYm };
+  }, [histDaily, histMonthly, date]);
+
+  // Ranking dos técnicos no DIA selecionado (do histórico — independente de filtros)
+  const rankingDia = useMemo(() => {
+    const m = new Map<string, { tt: string; nome: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      if (r.data_atividade !== date) return;
+      const tt = (r.matricula_tt || "").trim().toUpperCase();
+      const key = tt || (r.nome_tecnico || "—");
+      if (!m.has(key)) m.set(key, { tt, nome: r.nome_tecnico || "—", sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(key)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => b.sucesso - a.sucesso || b.total - a.total).slice(0, 10);
+  }, [historico, date]);
+
+  const fmtDateBR = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    return d ? `${d}/${m}/${y}` : iso;
+  };
+  const fmtMonthBR = (ym: string) => {
+    if (!ym) return "—";
+    const [y, m] = ym.split("-");
+    return `${m}/${y}`;
+  };
+  const delta = (cur: number, prev: number) => {
+    if (prev === 0) return cur > 0 ? "+∞" : "0%";
+    const v = ((cur - prev) / prev) * 100;
+    return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1057,6 +1192,140 @@ const AtividadesEncerramento = () => {
               </Button>
             </div>
           )}
+
+          {/* HISTÓRICO 60 DIAS — Resumo do dia + comparativo dia/mês */}
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Histórico (últimos 60 dias)</CardTitle>
+                  <CardDescription className="text-[11px]">
+                    Resumo do dia {fmtDateBR(date)} + comparativo diário e mensal
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={loadHistorico} disabled={loadingHist}>
+                  {loadingHist ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  <span className="ml-1 text-xs">Atualizar</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Tabela comparativa */}
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[11px]">Período</TableHead>
+                      <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
+                      <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
+                      <TableHead className="text-[11px] text-center">Total</TableHead>
+                      <TableHead className="text-[11px] text-center">Δ vs anterior</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-[11px] font-medium">Dia ({fmtDateBR(date)})</TableCell>
+                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.sel.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.sel.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.sel.total}</TableCell>
+                      <TableCell className="text-[11px] text-center">{delta(histCompare.sel.total, histCompare.prev.total)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] text-muted-foreground">Dia anterior ({fmtDateBR(histCompare.prevDate)})</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.total}</TableCell>
+                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] font-medium">Mês ({fmtMonthBR(histCompare.ym)})</TableCell>
+                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.cur.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.cur.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.cur.total}</TableCell>
+                      <TableCell className="text-[11px] text-center">{delta(histCompare.cur.total, histCompare.past.total)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] text-muted-foreground">Mês anterior ({fmtMonthBR(histCompare.prevYm)})</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.total}</TableCell>
+                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Gráficos */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium mb-1">Evolução diária (últimos 60 dias)</div>
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={histDaily} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RTooltip labelFormatter={(d: string) => fmtDateBR(d)} contentStyle={{ fontSize: 11 }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey="sucesso" stroke="hsl(var(--success))" strokeWidth={2} dot={false} name="Sucesso" />
+                        <Line type="monotone" dataKey="insucesso" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="Insucesso" />
+                        <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Total" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium mb-1">Comparativo mensal</div>
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={histMonthly} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickFormatter={fmtMonthBR} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RTooltip labelFormatter={(m: string) => fmtMonthBR(m)} contentStyle={{ fontSize: 11 }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="sucesso" fill="hsl(var(--success))" name="Sucesso" />
+                        <Bar dataKey="insucesso" fill="hsl(var(--destructive))" name="Insucesso" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top 10 técnicos do dia */}
+              <div>
+                <div className="text-xs font-medium mb-1">Top 10 técnicos — {fmtDateBR(date)}</div>
+                <div className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-[11px]">#</TableHead>
+                        <TableHead className="text-[11px]">TT</TableHead>
+                        <TableHead className="text-[11px]">Técnico</TableHead>
+                        <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
+                        <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
+                        <TableHead className="text-[11px] text-center">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rankingDia.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">Sem atividades neste dia.</TableCell></TableRow>
+                      ) : rankingDia.map((r, i) => (
+                        <TableRow key={`${r.tt}-${r.nome}-${i}`}>
+                          <TableCell className="text-[11px] font-mono">{i + 1}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{r.tt}</TableCell>
+                          <TableCell className="text-[11px]">{r.nome}</TableCell>
+                          <TableCell className="text-[11px] text-center text-success font-semibold">{r.sucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center text-destructive font-semibold">{r.insucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold">{r.total}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="pb-2">
