@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type FatoRow = {
@@ -104,6 +104,134 @@ const AtividadesEncerramento = () => {
   const fatoFileRef = useRef<HTMLInputElement>(null);
   const [uploadingFato, setUploadingFato] = useState(false);
 
+  // Sync schedule settings
+  type SyncMode = "comercial" | "hourly" | "daily" | "custom";
+  type SyncSchedule = {
+    mode: SyncMode;
+    intervalMinutes: number;       // for hourly mode (minutes between runs)
+    businessStart: string;          // "HH:MM"
+    businessEnd: string;            // "HH:MM"
+    businessIntervalMinutes: number;// for comercial mode
+    dailyTime: string;              // "HH:MM" for daily mode
+    customTimes: string[];          // ["HH:MM", ...] for custom mode
+    weekdaysOnly: boolean;
+    enabled: boolean;
+  };
+  const defaultSchedule: SyncSchedule = {
+    mode: "comercial",
+    intervalMinutes: 60,
+    businessStart: "08:00",
+    businessEnd: "18:00",
+    businessIntervalMinutes: 60,
+    dailyTime: "08:00",
+    customTimes: ["08:00", "12:00", "18:00"],
+    weekdaysOnly: true,
+    enabled: true,
+  };
+  const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [newCustomTime, setNewCustomTime] = useState("08:00");
+
+  const loadSchedule = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "atividades_sync_schedule")
+      .maybeSingle();
+    if (data?.value && typeof data.value === "object") {
+      setSchedule({ ...defaultSchedule, ...(data.value as Partial<SyncSchedule>) });
+    }
+  };
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    try {
+      const { data: existing } = await supabase
+        .from("app_settings")
+        .select("id")
+        .eq("key", "atividades_sync_schedule")
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("app_settings")
+          .update({ value: schedule as any, updated_by: profile?.user_id })
+          .eq("key", "atividades_sync_schedule");
+      } else {
+        await supabase.from("app_settings").insert({
+          key: "atividades_sync_schedule",
+          value: schedule as any,
+          updated_by: profile?.user_id,
+        });
+      }
+      toast({ title: "Configuração de sincronismo salva" });
+    } catch (e) {
+      toast({
+        title: "Erro ao salvar configuração",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  // Compute a human-readable summary + cron expression preview
+  const scheduleSummary = useMemo(() => {
+    if (!schedule.enabled) return "Sincronismo automático desativado.";
+    const dow = schedule.weekdaysOnly ? "Seg–Sex" : "Todos os dias";
+    switch (schedule.mode) {
+      case "comercial":
+        return `Horário comercial (${schedule.businessStart}–${schedule.businessEnd}) a cada ${schedule.businessIntervalMinutes} min — ${dow}.`;
+      case "hourly":
+        return `A cada ${schedule.intervalMinutes} minuto(s) — ${dow}, 24h.`;
+      case "daily":
+        return `Uma vez por dia às ${schedule.dailyTime} — ${dow}.`;
+      case "custom":
+        return `Horários específicos: ${schedule.customTimes.join(", ") || "—"} — ${dow}.`;
+    }
+  }, [schedule]);
+
+  const cronPreview = useMemo(() => {
+    const dow = schedule.weekdaysOnly ? "1-5" : "*";
+    switch (schedule.mode) {
+      case "comercial": {
+        const sh = parseInt(schedule.businessStart.split(":")[0] || "8", 10);
+        const eh = parseInt(schedule.businessEnd.split(":")[0] || "18", 10);
+        const m = `*/${Math.max(1, schedule.businessIntervalMinutes)}`;
+        return `${m} ${sh}-${eh} * * ${dow}`;
+      }
+      case "hourly":
+        return `*/${Math.max(1, schedule.intervalMinutes)} * * * ${dow}`;
+      case "daily": {
+        const [hh, mm] = schedule.dailyTime.split(":");
+        return `${parseInt(mm || "0", 10)} ${parseInt(hh || "8", 10)} * * ${dow}`;
+      }
+      case "custom": {
+        const byHour = new Map<number, number[]>();
+        schedule.customTimes.forEach((t) => {
+          const [h, m] = t.split(":").map((x) => parseInt(x, 10));
+          if (!byHour.has(h)) byHour.set(h, []);
+          byHour.get(h)!.push(m);
+        });
+        const hours = Array.from(byHour.keys()).sort((a, b) => a - b).join(",");
+        const mins = Array.from(new Set(schedule.customTimes.map((t) => parseInt(t.split(":")[1], 10)))).sort((a, b) => a - b).join(",");
+        return `${mins || 0} ${hours || "*"} * * ${dow}`;
+      }
+    }
+  }, [schedule]);
+
+  const addCustomTime = () => {
+    if (!/^\d{2}:\d{2}$/.test(newCustomTime)) return;
+    if (schedule.customTimes.includes(newCustomTime)) return;
+    setSchedule({
+      ...schedule,
+      customTimes: [...schedule.customTimes, newCustomTime].sort(),
+    });
+  };
+  const removeCustomTime = (t: string) => {
+    setSchedule({ ...schedule, customTimes: schedule.customTimes.filter((x) => x !== t) });
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -147,6 +275,11 @@ const AtividadesEncerramento = () => {
 
   useEffect(() => {
     if (isAdmin) loadSettings();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) loadSchedule();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   // unique values for filters
@@ -1126,6 +1259,169 @@ const AtividadesEncerramento = () => {
         {/* CONFIGURAÇÃO ADMIN */}
         {isAdmin && (
           <TabsContent value="config" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Agendamento do Sincronismo Automático
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Defina de quanto em quanto tempo a automação local deve enviar o CSV FATO. A automação lê esta configuração para saber quando executar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Label className="text-xs">Status:</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={schedule.enabled ? "default" : "outline"}
+                    onClick={() => setSchedule({ ...schedule, enabled: !schedule.enabled })}
+                  >
+                    {schedule.enabled ? "Ativo" : "Desativado"}
+                  </Button>
+                  <Label className="text-xs ml-4">Dias úteis (Seg–Sex):</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={schedule.weekdaysOnly ? "default" : "outline"}
+                    onClick={() => setSchedule({ ...schedule, weekdaysOnly: !schedule.weekdaysOnly })}
+                  >
+                    {schedule.weekdaysOnly ? "Sim" : "Todos os dias"}
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Modo de execução</Label>
+                  <Select
+                    value={schedule.mode}
+                    onValueChange={(v) => setSchedule({ ...schedule, mode: v as SyncMode })}
+                  >
+                    <SelectTrigger className="h-9 text-xs max-w-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="comercial">Horário comercial (intervalo)</SelectItem>
+                      <SelectItem value="hourly">A cada X minutos (24h)</SelectItem>
+                      <SelectItem value="daily">Uma vez por dia (horário fixo)</SelectItem>
+                      <SelectItem value="custom">Horários específicos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {schedule.mode === "comercial" && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-2xl">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Início</Label>
+                      <Input
+                        type="time"
+                        value={schedule.businessStart}
+                        onChange={(e) => setSchedule({ ...schedule, businessStart: e.target.value })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Fim</Label>
+                      <Input
+                        type="time"
+                        value={schedule.businessEnd}
+                        onChange={(e) => setSchedule({ ...schedule, businessEnd: e.target.value })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Intervalo (min)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={schedule.businessIntervalMinutes}
+                        onChange={(e) => setSchedule({ ...schedule, businessIntervalMinutes: Math.max(1, parseInt(e.target.value || "1", 10)) })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {schedule.mode === "hourly" && (
+                  <div className="space-y-1 max-w-xs">
+                    <Label className="text-xs">Intervalo entre execuções (minutos)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={schedule.intervalMinutes}
+                      onChange={(e) => setSchedule({ ...schedule, intervalMinutes: Math.max(1, parseInt(e.target.value || "1", 10)) })}
+                      className="h-9 text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Ex.: 60 = de hora em hora; 30 = a cada 30 min.</p>
+                  </div>
+                )}
+
+                {schedule.mode === "daily" && (
+                  <div className="space-y-1 max-w-xs">
+                    <Label className="text-xs">Horário (HH:MM)</Label>
+                    <Input
+                      type="time"
+                      value={schedule.dailyTime}
+                      onChange={(e) => setSchedule({ ...schedule, dailyTime: e.target.value })}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                )}
+
+                {schedule.mode === "custom" && (
+                  <div className="space-y-2 max-w-xl">
+                    <Label className="text-xs">Horários específicos</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {schedule.customTimes.length === 0 && (
+                        <span className="text-[11px] text-muted-foreground">Nenhum horário cadastrado.</span>
+                      )}
+                      {schedule.customTimes.map((t) => (
+                        <Badge key={t} variant="secondary" className="gap-1 text-[11px]">
+                          {t}
+                          <button
+                            type="button"
+                            onClick={() => removeCustomTime(t)}
+                            className="hover:text-destructive"
+                            aria-label={`Remover ${t}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        type="time"
+                        value={newCustomTime}
+                        onChange={(e) => setNewCustomTime(e.target.value)}
+                        className="h-9 text-xs w-32"
+                      />
+                      <Button type="button" size="sm" variant="outline" onClick={addCustomTime}>
+                        <Plus className="w-3 h-3 mr-1" /> Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-md border p-3 bg-muted/40 space-y-1">
+                  <div className="text-[11px] text-muted-foreground">Resumo</div>
+                  <div className="text-xs font-medium">{scheduleSummary}</div>
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Expressão cron: <code className="text-foreground">{cronPreview}</code>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button onClick={saveSchedule} size="sm" disabled={savingSchedule}>
+                    {savingSchedule ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+                    Salvar configuração
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Upload Manual CSV (FATO)</CardTitle>
