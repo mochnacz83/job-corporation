@@ -960,6 +960,100 @@ const AtividadesEncerramento = () => {
     return arr;
   }, [filteredFato, atividadesTabSearch]);
 
+  // ===== Histórico (60 dias) - agregações =====
+  const isOkClose = (estado: string | null) => {
+    const e = (estado || "").toLowerCase();
+    return e.includes("conclu") && e.includes("sucesso") && !e.includes("sem sucesso");
+  };
+  const isFailClose = (estado: string | null) => {
+    const e = (estado || "").toLowerCase();
+    return e.includes("conclu") && e.includes("sem sucesso");
+  };
+
+  // Diário: por dia => sucesso, insucesso, total
+  const histDaily = useMemo(() => {
+    const m = new Map<string, { dia: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      const d = r.data_atividade;
+      if (!d) return;
+      if (!m.has(d)) m.set(d, { dia: d, sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(d)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => a.dia.localeCompare(b.dia));
+  }, [historico]);
+
+  // Mensal: YYYY-MM
+  const histMonthly = useMemo(() => {
+    const m = new Map<string, { mes: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      const d = r.data_atividade;
+      if (!d) return;
+      const ym = d.slice(0, 7);
+      if (!m.has(ym)) m.set(ym, { mes: ym, sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(ym)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => a.mes.localeCompare(b.mes));
+  }, [historico]);
+
+  // Comparativo: dia selecionado vs anterior, mês atual vs anterior
+  const histCompare = useMemo(() => {
+    const byDay = new Map(histDaily.map((d) => [d.dia, d]));
+    const sel = byDay.get(date) || { sucesso: 0, insucesso: 0, total: 0 };
+    const prevDate = (() => {
+      const dt = new Date(date);
+      dt.setDate(dt.getDate() - 1);
+      return dt.toISOString().slice(0, 10);
+    })();
+    const prev = byDay.get(prevDate) || { sucesso: 0, insucesso: 0, total: 0 };
+    const ym = date.slice(0, 7);
+    const prevYm = (() => {
+      const dt = new Date(date + "T00:00:00");
+      dt.setMonth(dt.getMonth() - 1);
+      return dt.toISOString().slice(0, 7);
+    })();
+    const cur = histMonthly.find((m) => m.mes === ym) || { sucesso: 0, insucesso: 0, total: 0 };
+    const past = histMonthly.find((m) => m.mes === prevYm) || { sucesso: 0, insucesso: 0, total: 0 };
+    return { sel, prev, prevDate, cur, past, ym, prevYm };
+  }, [histDaily, histMonthly, date]);
+
+  // Ranking dos técnicos no DIA selecionado (do histórico — independente de filtros)
+  const rankingDia = useMemo(() => {
+    const m = new Map<string, { tt: string; nome: string; sucesso: number; insucesso: number; total: number }>();
+    historico.forEach((r) => {
+      if (r.data_atividade !== date) return;
+      const tt = (r.matricula_tt || "").trim().toUpperCase();
+      const key = tt || (r.nome_tecnico || "—");
+      if (!m.has(key)) m.set(key, { tt, nome: r.nome_tecnico || "—", sucesso: 0, insucesso: 0, total: 0 });
+      const row = m.get(key)!;
+      if (isOkClose(r.ds_estado)) row.sucesso++;
+      else if (isFailClose(r.ds_estado)) row.insucesso++;
+      row.total++;
+    });
+    return Array.from(m.values()).sort((a, b) => b.sucesso - a.sucesso || b.total - a.total).slice(0, 10);
+  }, [historico, date]);
+
+  const fmtDateBR = (iso: string) => {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-");
+    return d ? `${d}/${m}/${y}` : iso;
+  };
+  const fmtMonthBR = (ym: string) => {
+    if (!ym) return "—";
+    const [y, m] = ym.split("-");
+    return `${m}/${y}`;
+  };
+  const delta = (cur: number, prev: number) => {
+    if (prev === 0) return cur > 0 ? "+∞" : "0%";
+    const v = ((cur - prev) / prev) * 100;
+    return `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+  };
+
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
