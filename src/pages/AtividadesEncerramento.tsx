@@ -15,7 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 
 type FatoRow = {
@@ -104,6 +104,134 @@ const AtividadesEncerramento = () => {
   const fatoFileRef = useRef<HTMLInputElement>(null);
   const [uploadingFato, setUploadingFato] = useState(false);
 
+  // Sync schedule settings
+  type SyncMode = "comercial" | "hourly" | "daily" | "custom";
+  type SyncSchedule = {
+    mode: SyncMode;
+    intervalMinutes: number;       // for hourly mode (minutes between runs)
+    businessStart: string;          // "HH:MM"
+    businessEnd: string;            // "HH:MM"
+    businessIntervalMinutes: number;// for comercial mode
+    dailyTime: string;              // "HH:MM" for daily mode
+    customTimes: string[];          // ["HH:MM", ...] for custom mode
+    weekdaysOnly: boolean;
+    enabled: boolean;
+  };
+  const defaultSchedule: SyncSchedule = {
+    mode: "comercial",
+    intervalMinutes: 60,
+    businessStart: "08:00",
+    businessEnd: "18:00",
+    businessIntervalMinutes: 60,
+    dailyTime: "08:00",
+    customTimes: ["08:00", "12:00", "18:00"],
+    weekdaysOnly: true,
+    enabled: true,
+  };
+  const [schedule, setSchedule] = useState<SyncSchedule>(defaultSchedule);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [newCustomTime, setNewCustomTime] = useState("08:00");
+
+  const loadSchedule = async () => {
+    const { data } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "atividades_sync_schedule")
+      .maybeSingle();
+    if (data?.value && typeof data.value === "object") {
+      setSchedule({ ...defaultSchedule, ...(data.value as Partial<SyncSchedule>) });
+    }
+  };
+
+  const saveSchedule = async () => {
+    setSavingSchedule(true);
+    try {
+      const { data: existing } = await supabase
+        .from("app_settings")
+        .select("id")
+        .eq("key", "atividades_sync_schedule")
+        .maybeSingle();
+      if (existing) {
+        await supabase
+          .from("app_settings")
+          .update({ value: schedule as any, updated_by: profile?.user_id })
+          .eq("key", "atividades_sync_schedule");
+      } else {
+        await supabase.from("app_settings").insert({
+          key: "atividades_sync_schedule",
+          value: schedule as any,
+          updated_by: profile?.user_id,
+        });
+      }
+      toast({ title: "Configuração de sincronismo salva" });
+    } catch (e) {
+      toast({
+        title: "Erro ao salvar configuração",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  // Compute a human-readable summary + cron expression preview
+  const scheduleSummary = useMemo(() => {
+    if (!schedule.enabled) return "Sincronismo automático desativado.";
+    const dow = schedule.weekdaysOnly ? "Seg–Sex" : "Todos os dias";
+    switch (schedule.mode) {
+      case "comercial":
+        return `Horário comercial (${schedule.businessStart}–${schedule.businessEnd}) a cada ${schedule.businessIntervalMinutes} min — ${dow}.`;
+      case "hourly":
+        return `A cada ${schedule.intervalMinutes} minuto(s) — ${dow}, 24h.`;
+      case "daily":
+        return `Uma vez por dia às ${schedule.dailyTime} — ${dow}.`;
+      case "custom":
+        return `Horários específicos: ${schedule.customTimes.join(", ") || "—"} — ${dow}.`;
+    }
+  }, [schedule]);
+
+  const cronPreview = useMemo(() => {
+    const dow = schedule.weekdaysOnly ? "1-5" : "*";
+    switch (schedule.mode) {
+      case "comercial": {
+        const sh = parseInt(schedule.businessStart.split(":")[0] || "8", 10);
+        const eh = parseInt(schedule.businessEnd.split(":")[0] || "18", 10);
+        const m = `*/${Math.max(1, schedule.businessIntervalMinutes)}`;
+        return `${m} ${sh}-${eh} * * ${dow}`;
+      }
+      case "hourly":
+        return `*/${Math.max(1, schedule.intervalMinutes)} * * * ${dow}`;
+      case "daily": {
+        const [hh, mm] = schedule.dailyTime.split(":");
+        return `${parseInt(mm || "0", 10)} ${parseInt(hh || "8", 10)} * * ${dow}`;
+      }
+      case "custom": {
+        const byHour = new Map<number, number[]>();
+        schedule.customTimes.forEach((t) => {
+          const [h, m] = t.split(":").map((x) => parseInt(x, 10));
+          if (!byHour.has(h)) byHour.set(h, []);
+          byHour.get(h)!.push(m);
+        });
+        const hours = Array.from(byHour.keys()).sort((a, b) => a - b).join(",");
+        const mins = Array.from(new Set(schedule.customTimes.map((t) => parseInt(t.split(":")[1], 10)))).sort((a, b) => a - b).join(",");
+        return `${mins || 0} ${hours || "*"} * * ${dow}`;
+      }
+    }
+  }, [schedule]);
+
+  const addCustomTime = () => {
+    if (!/^\d{2}:\d{2}$/.test(newCustomTime)) return;
+    if (schedule.customTimes.includes(newCustomTime)) return;
+    setSchedule({
+      ...schedule,
+      customTimes: [...schedule.customTimes, newCustomTime].sort(),
+    });
+  };
+  const removeCustomTime = (t: string) => {
+    setSchedule({ ...schedule, customTimes: schedule.customTimes.filter((x) => x !== t) });
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -147,6 +275,11 @@ const AtividadesEncerramento = () => {
 
   useEffect(() => {
     if (isAdmin) loadSettings();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) loadSchedule();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
   // unique values for filters
