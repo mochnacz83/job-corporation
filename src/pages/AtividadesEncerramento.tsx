@@ -284,9 +284,35 @@ const AtividadesEncerramento = () => {
     // This function is kept for signature compatibility but no longer fetches FATO CSV URL.
   };
 
+  // Carrega últimos 60 dias para o resumo histórico (cálculo on-the-fly)
+  const loadHistorico = async () => {
+    setLoadingHist(true);
+    try {
+      const start = new Date();
+      start.setDate(start.getDate() - 60);
+      const startISO = start.toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from("atividades_fato")
+        .select("data_atividade, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico")
+        .gte("data_atividade", startISO)
+        .limit(200000);
+      const cleaned = ((data || []) as HistRow[]).filter(
+        (r) => !(r.nome_tecnico || "").toUpperCase().includes("BUFFER"),
+      );
+      setHistorico(cleaned);
+    } finally {
+      setLoadingHist(false);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [date]);
+
+  useEffect(() => {
+    loadHistorico();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isAdmin) loadSettings();
