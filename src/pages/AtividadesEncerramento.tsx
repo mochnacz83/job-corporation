@@ -84,6 +84,7 @@ const AtividadesEncerramento = () => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [lastSyncBy, setLastSyncBy] = useState<string | null>(null);
 
   // filters
   const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
