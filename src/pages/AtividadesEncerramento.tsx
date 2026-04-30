@@ -1245,6 +1245,7 @@ const AtividadesEncerramento = () => {
               </Button>
             </div>
           )}
+          </div>
 
           <Card className="bg-background shadow-sm">
             <CardHeader className="pb-2">
