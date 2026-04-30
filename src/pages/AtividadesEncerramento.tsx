@@ -1130,7 +1130,7 @@ const AtividadesEncerramento = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="sticky top-0 z-30 bg-background shadow-sm">
+        <TabsList className="sticky top-0 z-40 bg-background shadow-sm">
           <TabsTrigger value="resumo">Resumo Diário</TabsTrigger>
           <TabsTrigger value="atividades">Atividades</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
@@ -1139,6 +1139,10 @@ const AtividadesEncerramento = () => {
 
         {/* RESUMO POR TÉCNICO */}
         <TabsContent value="resumo" className="space-y-3">
+          {/* Container "sticky" — ao rolar a página, os cartões e o filtro
+              ficam congelados no topo (logo abaixo das abas). Apenas a tabela
+              de técnicos rola por baixo. */}
+          <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
