@@ -1246,31 +1246,11 @@ const AtividadesEncerramento = () => {
             </div>
           )}
 
-          <Card className="sticky top-10 z-20 bg-background shadow-sm">
+          <Card className="bg-background shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
-                {/* Botão de Limpar Todos os Filtros */}
-                {(coordenadorFilter !== "ALL" || supervisorFilter !== "ALL" || tecnicoFilter !== "ALL" || estadoFilter !== "ALL" || macroFilter !== "ALL" || search !== "") && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      setCoordenadorFilter("ALL");
-                      setSupervisorFilter("ALL");
-                      setTecnicoFilter("ALL");
-                      setEstadoFilter("ALL");
-                      setMacroFilter("ALL");
-                      setSearch("");
-                    }} 
-                    className="h-8 text-xs border-dashed text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors mr-2"
-                  >
-                    <X className="w-3 h-3 mr-1" />
-                    Limpar Filtros
-                  </Button>
-                )}
-
                 <div className="relative group">
                   <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
                     <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Coordenador" /></SelectTrigger>
