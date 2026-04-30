@@ -780,7 +780,24 @@ const AtividadesEncerramento = () => {
   }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
-    // Deprecated via web
+    // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
+    // Trabalha em conjunto com o agendamento automático (também grava em atividades_sync_log).
+    setSyncing(true);
+    try {
+      await Promise.all([loadData(), loadHistorico()]);
+      toast({
+        title: "Atualização manual concluída",
+        description: "Dados do dia e histórico recarregados.",
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao atualizar",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleSaveUrl = async () => {
@@ -1057,7 +1074,7 @@ const AtividadesEncerramento = () => {
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ActivityIcon className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
           {lastSync && (
@@ -1065,6 +1082,14 @@ const AtividadesEncerramento = () => {
               Última sync: {new Date(lastSync).toLocaleString("pt-BR")}
             </Badge>
           )}
+          <Badge
+            variant={schedule.enabled ? "default" : "outline"}
+            className="text-[10px] gap-1"
+            title={`Cron: ${cronPreview}`}
+          >
+            <Clock className="w-3 h-3" />
+            {schedule.enabled ? scheduleSummary : "Auto: desativado"}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="dt" className="text-xs">Data:</Label>
@@ -1075,16 +1100,28 @@ const AtividadesEncerramento = () => {
             onChange={(e) => setDate(e.target.value)}
             className="w-[160px] h-8"
           />
-          <Button onClick={loadData} size="sm" variant="outline" disabled={loading}>
-            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          <Button
+            onClick={handleSync}
+            size="sm"
+            variant="default"
+            disabled={syncing || loading}
+            title="Atualização manual — recarrega dados e histórico (trabalha junto com o sincronismo automático)"
+          >
+            {syncing || loading ? (
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            ) : (
+              <RefreshCw className="w-3 h-3 mr-1" />
+            )}
+            <span className="text-xs">Atualizar</span>
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
+        <TabsList className="sticky top-0 z-30 bg-background shadow-sm">
           <TabsTrigger value="resumo">Resumo Diário</TabsTrigger>
           <TabsTrigger value="atividades">Atividades</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
           {isAdmin && <TabsTrigger value="config">Configuração</TabsTrigger>}
         </TabsList>
 
@@ -1193,141 +1230,7 @@ const AtividadesEncerramento = () => {
             </div>
           )}
 
-          {/* HISTÓRICO 60 DIAS — Resumo do dia + comparativo dia/mês */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <CardTitle className="text-sm">Histórico (últimos 60 dias)</CardTitle>
-                  <CardDescription className="text-[11px]">
-                    Resumo do dia {fmtDateBR(date)} + comparativo diário e mensal
-                  </CardDescription>
-                </div>
-                <Button size="sm" variant="outline" onClick={loadHistorico} disabled={loadingHist}>
-                  {loadingHist ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  <span className="ml-1 text-xs">Atualizar</span>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Tabela comparativa */}
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-[11px]">Período</TableHead>
-                      <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
-                      <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
-                      <TableHead className="text-[11px] text-center">Total</TableHead>
-                      <TableHead className="text-[11px] text-center">Δ vs anterior</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="text-[11px] font-medium">Dia ({fmtDateBR(date)})</TableCell>
-                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.sel.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.sel.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.sel.total}</TableCell>
-                      <TableCell className="text-[11px] text-center">{delta(histCompare.sel.total, histCompare.prev.total)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] text-muted-foreground">Dia anterior ({fmtDateBR(histCompare.prevDate)})</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.total}</TableCell>
-                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] font-medium">Mês ({fmtMonthBR(histCompare.ym)})</TableCell>
-                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.cur.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.cur.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.cur.total}</TableCell>
-                      <TableCell className="text-[11px] text-center">{delta(histCompare.cur.total, histCompare.past.total)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] text-muted-foreground">Mês anterior ({fmtMonthBR(histCompare.prevYm)})</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.total}</TableCell>
-                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Gráficos */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs font-medium mb-1">Evolução diária (últimos 60 dias)</div>
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={histDaily} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RTooltip labelFormatter={(d: string) => fmtDateBR(d)} contentStyle={{ fontSize: 11 }} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Line type="monotone" dataKey="sucesso" stroke="hsl(var(--success))" strokeWidth={2} dot={false} name="Sucesso" />
-                        <Line type="monotone" dataKey="insucesso" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="Insucesso" />
-                        <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Total" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-medium mb-1">Comparativo mensal</div>
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={histMonthly} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickFormatter={fmtMonthBR} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RTooltip labelFormatter={(m: string) => fmtMonthBR(m)} contentStyle={{ fontSize: 11 }} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="sucesso" fill="hsl(var(--success))" name="Sucesso" />
-                        <Bar dataKey="insucesso" fill="hsl(var(--destructive))" name="Insucesso" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Top 10 técnicos do dia */}
-              <div>
-                <div className="text-xs font-medium mb-1">Top 10 técnicos — {fmtDateBR(date)}</div>
-                <div className="overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-[11px]">#</TableHead>
-                        <TableHead className="text-[11px]">TT</TableHead>
-                        <TableHead className="text-[11px]">Técnico</TableHead>
-                        <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
-                        <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
-                        <TableHead className="text-[11px] text-center">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rankingDia.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">Sem atividades neste dia.</TableCell></TableRow>
-                      ) : rankingDia.map((r, i) => (
-                        <TableRow key={`${r.tt}-${r.nome}-${i}`}>
-                          <TableCell className="text-[11px] font-mono">{i + 1}</TableCell>
-                          <TableCell className="text-[11px] font-mono">{r.tt}</TableCell>
-                          <TableCell className="text-[11px]">{r.nome}</TableCell>
-                          <TableCell className="text-[11px] text-center text-success font-semibold">{r.sucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center text-destructive font-semibold">{r.insucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold">{r.total}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
+          <Card className="sticky top-10 z-20 bg-background shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
@@ -1520,6 +1423,142 @@ const AtividadesEncerramento = () => {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* HISTÓRICO (60 dias) */}
+        <TabsContent value="historico" className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-sm">Histórico (últimos 60 dias)</CardTitle>
+                  <CardDescription className="text-[11px]">
+                    Resumo do dia {fmtDateBR(date)} + comparativo diário e mensal
+                  </CardDescription>
+                </div>
+                <Button size="sm" variant="outline" onClick={loadHistorico} disabled={loadingHist}>
+                  {loadingHist ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  <span className="ml-1 text-xs">Atualizar</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Tabela comparativa */}
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[11px]">Período</TableHead>
+                      <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
+                      <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
+                      <TableHead className="text-[11px] text-center">Total</TableHead>
+                      <TableHead className="text-[11px] text-center">Δ vs anterior</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-[11px] font-medium">Dia ({fmtDateBR(date)})</TableCell>
+                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.sel.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.sel.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.sel.total}</TableCell>
+                      <TableCell className="text-[11px] text-center">{delta(histCompare.sel.total, histCompare.prev.total)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] text-muted-foreground">Dia anterior ({fmtDateBR(histCompare.prevDate)})</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.prev.total}</TableCell>
+                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] font-medium">Mês ({fmtMonthBR(histCompare.ym)})</TableCell>
+                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.cur.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.cur.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.cur.total}</TableCell>
+                      <TableCell className="text-[11px] text-center">{delta(histCompare.cur.total, histCompare.past.total)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-[11px] text-muted-foreground">Mês anterior ({fmtMonthBR(histCompare.prevYm)})</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.sucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.insucesso}</TableCell>
+                      <TableCell className="text-[11px] text-center">{histCompare.past.total}</TableCell>
+                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Gráficos */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-medium mb-1">Evolução diária (últimos 60 dias)</div>
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={histDaily} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RTooltip labelFormatter={(d: string) => fmtDateBR(d)} contentStyle={{ fontSize: 11 }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey="sucesso" stroke="hsl(var(--success))" strokeWidth={2} dot={false} name="Sucesso" />
+                        <Line type="monotone" dataKey="insucesso" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="Insucesso" />
+                        <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Total" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-medium mb-1">Comparativo mensal</div>
+                  <div className="h-[220px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={histMonthly} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickFormatter={fmtMonthBR} />
+                        <YAxis tick={{ fontSize: 10 }} />
+                        <RTooltip labelFormatter={(m: string) => fmtMonthBR(m)} contentStyle={{ fontSize: 11 }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="sucesso" fill="hsl(var(--success))" name="Sucesso" />
+                        <Bar dataKey="insucesso" fill="hsl(var(--destructive))" name="Insucesso" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              {/* Top 10 técnicos do dia */}
+              <div>
+                <div className="text-xs font-medium mb-1">Top 10 técnicos — {fmtDateBR(date)}</div>
+                <div className="overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-[11px]">#</TableHead>
+                        <TableHead className="text-[11px]">TT</TableHead>
+                        <TableHead className="text-[11px]">Técnico</TableHead>
+                        <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
+                        <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
+                        <TableHead className="text-[11px] text-center">Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rankingDia.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">Sem atividades neste dia.</TableCell></TableRow>
+                      ) : rankingDia.map((r, i) => (
+                        <TableRow key={`${r.tt}-${r.nome}-${i}`}>
+                          <TableCell className="text-[11px] font-mono">{i + 1}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{r.tt}</TableCell>
+                          <TableCell className="text-[11px]">{r.nome}</TableCell>
+                          <TableCell className="text-[11px] text-center text-success font-semibold">{r.sucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center text-destructive font-semibold">{r.insucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold">{r.total}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </CardContent>
           </Card>
