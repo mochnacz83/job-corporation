@@ -84,6 +84,7 @@ const AtividadesEncerramento = () => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [lastSyncBy, setLastSyncBy] = useState<string | null>(null);
 
   // filters
   const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
@@ -262,7 +263,7 @@ const AtividadesEncerramento = () => {
           .limit(10000),
         supabase
           .from("atividades_sync_log")
-          .select("finished_at, status")
+          .select("finished_at, status, triggered_by")
           .order("started_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -275,6 +276,7 @@ const AtividadesEncerramento = () => {
       setFato(cleaned);
       setPresenca((p || []) as PresencaRow[]);
       setLastSync(log?.finished_at ?? null);
+      setLastSyncBy((log as { triggered_by?: string } | null)?.triggered_by ?? null);
     } finally {
       setLoading(false);
     }
@@ -1079,7 +1081,17 @@ const AtividadesEncerramento = () => {
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
           {lastSync && (
             <Badge variant="secondary" className="text-[10px]">
-              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}
+              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
+              <span
+                className="ml-1 font-bold"
+                title={
+                  (lastSyncBy || "").toLowerCase() === "cron"
+                    ? "A = Automático (cron)"
+                    : "M = Manual"
+                }
+              >
+                {(lastSyncBy || "").toLowerCase() === "cron" ? "A" : "M"}
+              </span>
             </Badge>
           )}
           <Badge
@@ -1118,7 +1130,7 @@ const AtividadesEncerramento = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="sticky top-0 z-30 bg-background shadow-sm">
+        <TabsList className="sticky top-0 z-40 bg-background shadow-sm">
           <TabsTrigger value="resumo">Resumo Diário</TabsTrigger>
           <TabsTrigger value="atividades">Atividades</TabsTrigger>
           <TabsTrigger value="historico">Histórico</TabsTrigger>
@@ -1127,6 +1139,10 @@ const AtividadesEncerramento = () => {
 
         {/* RESUMO POR TÉCNICO */}
         <TabsContent value="resumo" className="space-y-3">
+          {/* Container "sticky" — ao rolar a página, os cartões e o filtro
+              ficam congelados no topo (logo abaixo das abas). Apenas a tabela
+              de técnicos rola por baixo. */}
+          <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
@@ -1229,32 +1245,13 @@ const AtividadesEncerramento = () => {
               </Button>
             </div>
           )}
+          </div>
 
-          <Card className="sticky top-10 z-20 bg-background shadow-sm">
+          <Card className="bg-background shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
-                {/* Botão de Limpar Todos os Filtros */}
-                {(coordenadorFilter !== "ALL" || supervisorFilter !== "ALL" || tecnicoFilter !== "ALL" || estadoFilter !== "ALL" || macroFilter !== "ALL" || search !== "") && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      setCoordenadorFilter("ALL");
-                      setSupervisorFilter("ALL");
-                      setTecnicoFilter("ALL");
-                      setEstadoFilter("ALL");
-                      setMacroFilter("ALL");
-                      setSearch("");
-                    }} 
-                    className="h-8 text-xs border-dashed text-muted-foreground hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors mr-2"
-                  >
-                    <X className="w-3 h-3 mr-1" />
-                    Limpar Filtros
-                  </Button>
-                )}
-
                 <div className="relative group">
                   <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
                     <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Coordenador" /></SelectTrigger>
