@@ -1074,7 +1074,7 @@ const AtividadesEncerramento = () => {
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ActivityIcon className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
           {lastSync && (
@@ -1082,6 +1082,14 @@ const AtividadesEncerramento = () => {
               Última sync: {new Date(lastSync).toLocaleString("pt-BR")}
             </Badge>
           )}
+          <Badge
+            variant={schedule.enabled ? "default" : "outline"}
+            className="text-[10px] gap-1"
+            title={`Cron: ${cronPreview}`}
+          >
+            <Clock className="w-3 h-3" />
+            {schedule.enabled ? scheduleSummary : "Auto: desativado"}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="dt" className="text-xs">Data:</Label>
@@ -1092,16 +1100,28 @@ const AtividadesEncerramento = () => {
             onChange={(e) => setDate(e.target.value)}
             className="w-[160px] h-8"
           />
-          <Button onClick={loadData} size="sm" variant="outline" disabled={loading}>
-            {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          <Button
+            onClick={handleSync}
+            size="sm"
+            variant="default"
+            disabled={syncing || loading}
+            title="Atualização manual — recarrega dados e histórico (trabalha junto com o sincronismo automático)"
+          >
+            {syncing || loading ? (
+              <Loader2 className="w-3 h-3 animate-spin mr-1" />
+            ) : (
+              <RefreshCw className="w-3 h-3 mr-1" />
+            )}
+            <span className="text-xs">Atualizar</span>
           </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList>
+        <TabsList className="sticky top-0 z-30 bg-background shadow-sm">
           <TabsTrigger value="resumo">Resumo Diário</TabsTrigger>
           <TabsTrigger value="atividades">Atividades</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
           {isAdmin && <TabsTrigger value="config">Configuração</TabsTrigger>}
         </TabsList>
 
