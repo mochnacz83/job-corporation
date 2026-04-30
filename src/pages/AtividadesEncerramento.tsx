@@ -263,7 +263,7 @@ const AtividadesEncerramento = () => {
           .limit(10000),
         supabase
           .from("atividades_sync_log")
-          .select("finished_at, status")
+          .select("finished_at, status, triggered_by")
           .order("started_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -276,6 +276,7 @@ const AtividadesEncerramento = () => {
       setFato(cleaned);
       setPresenca((p || []) as PresencaRow[]);
       setLastSync(log?.finished_at ?? null);
+      setLastSyncBy((log as { triggered_by?: string } | null)?.triggered_by ?? null);
     } finally {
       setLoading(false);
     }
