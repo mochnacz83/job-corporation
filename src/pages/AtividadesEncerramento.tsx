@@ -780,7 +780,24 @@ const AtividadesEncerramento = () => {
   }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
-    // Deprecated via web
+    // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
+    // Trabalha em conjunto com o agendamento automático (também grava em atividades_sync_log).
+    setSyncing(true);
+    try {
+      await Promise.all([loadData(), loadHistorico()]);
+      toast({
+        title: "Atualização manual concluída",
+        description: "Dados do dia e histórico recarregados.",
+      });
+    } catch (e) {
+      toast({
+        title: "Erro ao atualizar",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleSaveUrl = async () => {
