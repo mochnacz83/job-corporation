@@ -1081,7 +1081,17 @@ const AtividadesEncerramento = () => {
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
           {lastSync && (
             <Badge variant="secondary" className="text-[10px]">
-              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}
+              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
+              <span
+                className="ml-1 font-bold"
+                title={
+                  (lastSyncBy || "").toLowerCase() === "cron"
+                    ? "A = Automático (cron)"
+                    : "M = Manual"
+                }
+              >
+                {(lastSyncBy || "").toLowerCase() === "cron" ? "A" : "M"}
+              </span>
             </Badge>
           )}
           <Badge
