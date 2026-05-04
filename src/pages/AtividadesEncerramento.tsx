@@ -1311,9 +1311,9 @@ const AtividadesEncerramento = () => {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div>
+              <div className="overflow-auto max-h-[600px] [&>div]:overflow-visible">
                 <Table>
-                  <TableHeader className="sticky top-[140px] bg-background z-20 shadow-sm">
+                  <TableHeader className="sticky top-0 bg-background z-20 shadow-sm">
                     <TableRow className="bg-background">
                       <TableHead className="text-[11px]">TT</TableHead>
                       <TableHead className="text-[11px]">TR</TableHead>
