@@ -1256,93 +1256,102 @@ const AtividadesEncerramento = () => {
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
                 {(() => {
-                  const renderToggleItem = (
-                    itemValue: string,
-                    currentValue: string,
-                    setValue: (v: string) => void,
-                  ) => (
-                    <SelectItem
-                      key={itemValue}
-                      value={itemValue}
-                      onPointerDown={(e) => {
-                        if (currentValue === itemValue) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setValue("ALL");
-                          // close popover by blurring active element
-                          (document.activeElement as HTMLElement | null)?.blur();
-                        }
-                      }}
-                    >
-                      {itemValue}
-                    </SelectItem>
-                  );
+                  const MultiFilter = ({
+                    label,
+                    options,
+                    value,
+                    onChange,
+                  }: {
+                    label: string;
+                    options: string[];
+                    value: string[];
+                    onChange: (v: string[]) => void;
+                  }) => {
+                    const active = value.length > 0;
+                    const toggle = (opt: string) => {
+                      if (value.includes(opt)) {
+                        const next = value.filter((x) => x !== opt);
+                        onChange(next);
+                      } else {
+                        const next = [...value, opt];
+                        // se selecionar todos => trata como "todos liberados" (limpa)
+                        if (next.length === options.length) onChange([]);
+                        else onChange(next);
+                      }
+                    };
+                    const display = !active
+                      ? <span className="text-muted-foreground">{label}</span>
+                      : value.length === 1
+                        ? <span className="truncate">{value[0]}</span>
+                        : <span className="truncate">{label}: {value.length} selecionados</span>;
+                    return (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={`flex h-8 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 text-xs ${active ? "border-primary/50 bg-primary/5" : ""}`}
+                          >
+                            {display}
+                            <span className="ml-2 opacity-50">▾</span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[240px] p-0" align="start">
+                          <div className="max-h-[280px] overflow-auto p-1">
+                            {options.length === 0 && (
+                              <div className="p-2 text-xs text-muted-foreground">Sem opções</div>
+                            )}
+                            {options.map((opt) => {
+                              const checked = value.includes(opt) || value.length === 0;
+                              return (
+                                <label
+                                  key={opt}
+                                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                                >
+                                  <Checkbox
+                                    checked={value.length === 0 ? false : checked}
+                                    onCheckedChange={() => toggle(opt)}
+                                  />
+                                  <span className="truncate">{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  };
                   return (
                     <>
-                      <div className="relative group">
-                        <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {coordenadorFilter !== "ALL"
-                              ? <span className="truncate">{coordenadorFilter}</span>
-                              : <span className="text-muted-foreground">Coordenador</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {coordenadores.map((e) => renderToggleItem(e, coordenadorFilter, setCoordenadorFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${supervisorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {supervisorFilter !== "ALL"
-                              ? <span className="truncate">{supervisorFilter}</span>
-                              : <span className="text-muted-foreground">Supervisor</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {supervisores.map((e) => renderToggleItem(e, supervisorFilter, setSupervisorFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${tecnicoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {tecnicoFilter !== "ALL"
-                              ? <span className="truncate">{tecnicoFilter}</span>
-                              : <span className="text-muted-foreground">Técnico</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {tecnicos.map((e) => renderToggleItem(e, tecnicoFilter, setTecnicoFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${estadoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {estadoFilter !== "ALL"
-                              ? <span className="truncate">{estadoFilter}</span>
-                              : <span className="text-muted-foreground">Estado</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {estados.map((e) => renderToggleItem(e, estadoFilter, setEstadoFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={macroFilter} onValueChange={setMacroFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${macroFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {macroFilter !== "ALL"
-                              ? <span className="truncate">{macroFilter}</span>
-                              : <span className="text-muted-foreground">Macro atividade</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {macros.map((e) => renderToggleItem(e, macroFilter, setMacroFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <MultiFilter
+                        label="Coordenador"
+                        options={coordenadores}
+                        value={coordenadorFilter}
+                        onChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter([]); setTecnicoFilter([]); }}
+                      />
+                      <MultiFilter
+                        label="Supervisor"
+                        options={supervisores}
+                        value={supervisorFilter}
+                        onChange={(v) => { setSupervisorFilter(v); setTecnicoFilter([]); }}
+                      />
+                      <MultiFilter
+                        label="Técnico"
+                        options={tecnicos}
+                        value={tecnicoFilter}
+                        onChange={setTecnicoFilter}
+                      />
+                      <MultiFilter
+                        label="Estado"
+                        options={estados}
+                        value={estadoFilter}
+                        onChange={setEstadoFilter}
+                      />
+                      <MultiFilter
+                        label="Macro atividade"
+                        options={macros}
+                        value={macroFilter}
+                        onChange={setMacroFilter}
+                      />
                     </>
                   );
                 })()}
