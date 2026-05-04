@@ -1252,55 +1252,97 @@ const AtividadesEncerramento = () => {
               <div className="flex flex-wrap items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
-                <div className="relative group">
-                  <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
-                    <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Coordenador" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Coordenador --</SelectItem>
-                      {coordenadores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {(() => {
+                  const renderToggleItem = (
+                    itemValue: string,
+                    currentValue: string,
+                    setValue: (v: string) => void,
+                  ) => (
+                    <SelectItem
+                      key={itemValue}
+                      value={itemValue}
+                      onPointerDown={(e) => {
+                        if (currentValue === itemValue) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setValue("ALL");
+                          // close popover by blurring active element
+                          (document.activeElement as HTMLElement | null)?.blur();
+                        }
+                      }}
+                    >
+                      {itemValue}
+                    </SelectItem>
+                  );
+                  return (
+                    <>
+                      <div className="relative group">
+                        <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
+                          <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
+                            {coordenadorFilter !== "ALL"
+                              ? <span className="truncate">{coordenadorFilter}</span>
+                              : <span className="text-muted-foreground">Coordenador</span>}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {coordenadores.map((e) => renderToggleItem(e, coordenadorFilter, setCoordenadorFilter))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div className="relative group">
-                  <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
-                    <SelectTrigger className={`w-[180px] h-8 text-xs ${supervisorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Supervisor" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Supervisor --</SelectItem>
-                      {supervisores.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="relative group">
+                        <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
+                          <SelectTrigger className={`w-[180px] h-8 text-xs ${supervisorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
+                            {supervisorFilter !== "ALL"
+                              ? <span className="truncate">{supervisorFilter}</span>
+                              : <span className="text-muted-foreground">Supervisor</span>}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {supervisores.map((e) => renderToggleItem(e, supervisorFilter, setSupervisorFilter))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div className="relative group">
-                  <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
-                    <SelectTrigger className={`w-[180px] h-8 text-xs ${tecnicoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Técnico" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Técnico --</SelectItem>
-                      {tecnicos.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="relative group">
+                        <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
+                          <SelectTrigger className={`w-[180px] h-8 text-xs ${tecnicoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
+                            {tecnicoFilter !== "ALL"
+                              ? <span className="truncate">{tecnicoFilter}</span>
+                              : <span className="text-muted-foreground">Técnico</span>}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tecnicos.map((e) => renderToggleItem(e, tecnicoFilter, setTecnicoFilter))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div className="relative group">
-                  <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                    <SelectTrigger className={`w-[180px] h-8 text-xs ${estadoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Estado" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Estado --</SelectItem>
-                      {estados.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="relative group">
+                        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                          <SelectTrigger className={`w-[180px] h-8 text-xs ${estadoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
+                            {estadoFilter !== "ALL"
+                              ? <span className="truncate">{estadoFilter}</span>
+                              : <span className="text-muted-foreground">Estado</span>}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {estados.map((e) => renderToggleItem(e, estadoFilter, setEstadoFilter))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                <div className="relative group">
-                  <Select value={macroFilter} onValueChange={setMacroFilter}>
-                    <SelectTrigger className={`w-[180px] h-8 text-xs ${macroFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}><SelectValue placeholder="Macro atividade" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL" className="font-medium text-muted-foreground">-- Limpar Macro Ativ. --</SelectItem>
-                      {macros.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="relative group">
+                        <Select value={macroFilter} onValueChange={setMacroFilter}>
+                          <SelectTrigger className={`w-[180px] h-8 text-xs ${macroFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
+                            {macroFilter !== "ALL"
+                              ? <span className="truncate">{macroFilter}</span>
+                              : <span className="text-muted-foreground">Macro atividade</span>}
+                          </SelectTrigger>
+                          <SelectContent>
+                            {macros.map((e) => renderToggleItem(e, macroFilter, setMacroFilter))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 <Input
                   placeholder="Buscar técnico, TT, supervisor..."
