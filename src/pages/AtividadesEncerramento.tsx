@@ -14,6 +14,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -86,12 +88,12 @@ const AtividadesEncerramento = () => {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [lastSyncBy, setLastSyncBy] = useState<string | null>(null);
 
-  // filters
-  const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
-  const [macroFilter, setMacroFilter] = useState<string>("ALL");
-  const [supervisorFilter, setSupervisorFilter] = useState<string>("ALL");
-  const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
-  const [tecnicoFilter, setTecnicoFilter] = useState<string>("ALL");
+  // filters (multi-select). Vazio = todos liberados.
+  const [estadoFilter, setEstadoFilter] = useState<string[]>([]);
+  const [macroFilter, setMacroFilter] = useState<string[]>([]);
+  const [supervisorFilter, setSupervisorFilter] = useState<string[]>([]);
+  const [coordenadorFilter, setCoordenadorFilter] = useState<string[]>([]);
+  const [tecnicoFilter, setTecnicoFilter] = useState<string[]>([]);
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
@@ -108,9 +110,10 @@ const AtividadesEncerramento = () => {
   const [historico, setHistorico] = useState<HistRow[]>([]);
   const [loadingHist, setLoadingHist] = useState(false);
 
-  const matchFilter = (val: string | null | undefined, filter: string) => {
-    if (filter === "ALL") return true;
-    return (val || "").trim().toUpperCase() === filter.toUpperCase();
+  const matchFilter = (val: string | null | undefined, filter: string[]) => {
+    if (!filter || filter.length === 0) return true;
+    const v = (val || "").trim().toUpperCase();
+    return filter.some((f) => v === f.toUpperCase());
   };
 
   // settings
