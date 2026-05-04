@@ -554,8 +554,8 @@ const AtividadesEncerramento = () => {
     return fato.filter((r) => {
       // sempre filtra UF=SC (quando informado)
       if (!isSC(r)) return false;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return false;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return false;
 
       const info = getPresencaInfo(r);
       if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
@@ -716,8 +716,8 @@ const AtividadesEncerramento = () => {
     let sucesso = 0, insucesso = 0;
     fato.forEach((r) => {
       if (!isSC(r)) return;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return;
       const info = getPresencaInfo(r);
       if (!matchFilter(info?.supervisor, supervisorFilter)) return;
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
@@ -761,8 +761,8 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
       if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return false;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return false;
       return true;
     });
 
