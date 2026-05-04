@@ -14,6 +14,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -86,12 +88,12 @@ const AtividadesEncerramento = () => {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [lastSyncBy, setLastSyncBy] = useState<string | null>(null);
 
-  // filters
-  const [estadoFilter, setEstadoFilter] = useState<string>("ALL");
-  const [macroFilter, setMacroFilter] = useState<string>("ALL");
-  const [supervisorFilter, setSupervisorFilter] = useState<string>("ALL");
-  const [coordenadorFilter, setCoordenadorFilter] = useState<string>("ALL");
-  const [tecnicoFilter, setTecnicoFilter] = useState<string>("ALL");
+  // filters (multi-select). Vazio = todos liberados.
+  const [estadoFilter, setEstadoFilter] = useState<string[]>([]);
+  const [macroFilter, setMacroFilter] = useState<string[]>([]);
+  const [supervisorFilter, setSupervisorFilter] = useState<string[]>([]);
+  const [coordenadorFilter, setCoordenadorFilter] = useState<string[]>([]);
+  const [tecnicoFilter, setTecnicoFilter] = useState<string[]>([]);
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
@@ -108,9 +110,10 @@ const AtividadesEncerramento = () => {
   const [historico, setHistorico] = useState<HistRow[]>([]);
   const [loadingHist, setLoadingHist] = useState(false);
 
-  const matchFilter = (val: string | null | undefined, filter: string) => {
-    if (filter === "ALL") return true;
-    return (val || "").trim().toUpperCase() === filter.toUpperCase();
+  const matchFilter = (val: string | null | undefined, filter: string[]) => {
+    if (!filter || filter.length === 0) return true;
+    const v = (val || "").trim().toUpperCase();
+    return filter.some((f) => v === f.toUpperCase());
   };
 
   // settings
@@ -551,8 +554,8 @@ const AtividadesEncerramento = () => {
     return fato.filter((r) => {
       // sempre filtra UF=SC (quando informado)
       if (!isSC(r)) return false;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return false;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return false;
 
       const info = getPresencaInfo(r);
       if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
@@ -713,8 +716,8 @@ const AtividadesEncerramento = () => {
     let sucesso = 0, insucesso = 0;
     fato.forEach((r) => {
       if (!isSC(r)) return;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return;
       const info = getPresencaInfo(r);
       if (!matchFilter(info?.supervisor, supervisorFilter)) return;
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
@@ -758,8 +761,8 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
       if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
-      if (estadoFilter !== "ALL" && r.ds_estado !== estadoFilter) return false;
-      if (macroFilter !== "ALL" && r.ds_macro_atividade !== macroFilter) return false;
+      if (!matchFilter(r.ds_estado, estadoFilter)) return false;
+      if (!matchFilter(r.ds_macro_atividade, macroFilter)) return false;
       return true;
     });
 
@@ -1253,93 +1256,102 @@ const AtividadesEncerramento = () => {
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
                 {(() => {
-                  const renderToggleItem = (
-                    itemValue: string,
-                    currentValue: string,
-                    setValue: (v: string) => void,
-                  ) => (
-                    <SelectItem
-                      key={itemValue}
-                      value={itemValue}
-                      onPointerDown={(e) => {
-                        if (currentValue === itemValue) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setValue("ALL");
-                          // close popover by blurring active element
-                          (document.activeElement as HTMLElement | null)?.blur();
-                        }
-                      }}
-                    >
-                      {itemValue}
-                    </SelectItem>
-                  );
+                  const MultiFilter = ({
+                    label,
+                    options,
+                    value,
+                    onChange,
+                  }: {
+                    label: string;
+                    options: string[];
+                    value: string[];
+                    onChange: (v: string[]) => void;
+                  }) => {
+                    const active = value.length > 0;
+                    const toggle = (opt: string) => {
+                      if (value.includes(opt)) {
+                        const next = value.filter((x) => x !== opt);
+                        onChange(next);
+                      } else {
+                        const next = [...value, opt];
+                        // se selecionar todos => trata como "todos liberados" (limpa)
+                        if (next.length === options.length) onChange([]);
+                        else onChange(next);
+                      }
+                    };
+                    const display = !active
+                      ? <span className="text-muted-foreground">{label}</span>
+                      : value.length === 1
+                        ? <span className="truncate">{value[0]}</span>
+                        : <span className="truncate">{label}: {value.length} selecionados</span>;
+                    return (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className={`flex h-8 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 text-xs ${active ? "border-primary/50 bg-primary/5" : ""}`}
+                          >
+                            {display}
+                            <span className="ml-2 opacity-50">▾</span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[240px] p-0" align="start">
+                          <div className="max-h-[280px] overflow-auto p-1">
+                            {options.length === 0 && (
+                              <div className="p-2 text-xs text-muted-foreground">Sem opções</div>
+                            )}
+                            {options.map((opt) => {
+                              const checked = value.includes(opt) || value.length === 0;
+                              return (
+                                <label
+                                  key={opt}
+                                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+                                >
+                                  <Checkbox
+                                    checked={value.length === 0 ? false : checked}
+                                    onCheckedChange={() => toggle(opt)}
+                                  />
+                                  <span className="truncate">{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  };
                   return (
                     <>
-                      <div className="relative group">
-                        <Select value={coordenadorFilter} onValueChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter("ALL"); setTecnicoFilter("ALL"); }}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${coordenadorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {coordenadorFilter !== "ALL"
-                              ? <span className="truncate">{coordenadorFilter}</span>
-                              : <span className="text-muted-foreground">Coordenador</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {coordenadores.map((e) => renderToggleItem(e, coordenadorFilter, setCoordenadorFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={supervisorFilter} onValueChange={(v) => { setSupervisorFilter(v); setTecnicoFilter("ALL"); }}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${supervisorFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {supervisorFilter !== "ALL"
-                              ? <span className="truncate">{supervisorFilter}</span>
-                              : <span className="text-muted-foreground">Supervisor</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {supervisores.map((e) => renderToggleItem(e, supervisorFilter, setSupervisorFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={tecnicoFilter} onValueChange={setTecnicoFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${tecnicoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {tecnicoFilter !== "ALL"
-                              ? <span className="truncate">{tecnicoFilter}</span>
-                              : <span className="text-muted-foreground">Técnico</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {tecnicos.map((e) => renderToggleItem(e, tecnicoFilter, setTecnicoFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${estadoFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {estadoFilter !== "ALL"
-                              ? <span className="truncate">{estadoFilter}</span>
-                              : <span className="text-muted-foreground">Estado</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {estados.map((e) => renderToggleItem(e, estadoFilter, setEstadoFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="relative group">
-                        <Select value={macroFilter} onValueChange={setMacroFilter}>
-                          <SelectTrigger className={`w-[180px] h-8 text-xs ${macroFilter !== "ALL" ? "border-primary/50 bg-primary/5" : ""}`}>
-                            {macroFilter !== "ALL"
-                              ? <span className="truncate">{macroFilter}</span>
-                              : <span className="text-muted-foreground">Macro atividade</span>}
-                          </SelectTrigger>
-                          <SelectContent>
-                            {macros.map((e) => renderToggleItem(e, macroFilter, setMacroFilter))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <MultiFilter
+                        label="Coordenador"
+                        options={coordenadores}
+                        value={coordenadorFilter}
+                        onChange={(v) => { setCoordenadorFilter(v); setSupervisorFilter([]); setTecnicoFilter([]); }}
+                      />
+                      <MultiFilter
+                        label="Supervisor"
+                        options={supervisores}
+                        value={supervisorFilter}
+                        onChange={(v) => { setSupervisorFilter(v); setTecnicoFilter([]); }}
+                      />
+                      <MultiFilter
+                        label="Técnico"
+                        options={tecnicos}
+                        value={tecnicoFilter}
+                        onChange={setTecnicoFilter}
+                      />
+                      <MultiFilter
+                        label="Estado"
+                        options={estados}
+                        value={estadoFilter}
+                        onChange={setEstadoFilter}
+                      />
+                      <MultiFilter
+                        label="Macro atividade"
+                        options={macros}
+                        value={macroFilter}
+                        onChange={setMacroFilter}
+                      />
                     </>
                   );
                 })()}
