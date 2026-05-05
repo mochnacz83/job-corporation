@@ -667,11 +667,16 @@ const AtividadesEncerramento = () => {
       }
     >();
 
+    const normStr = (s: string) => (s || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+
     const initTecnico = (p: PresencaRow) => {
+      const nomeKey = normStr(p.funcionario);
       const ttKey = (p.tt || "").trim().toUpperCase();
       const trKey = (p.tr || "").trim().toUpperCase();
-      const key = ttKey || trKey;
-      if (!key) return;
+      
+      const key = nomeKey || ttKey || trKey || "--";
+      if (key === "--") return; // se tudo for vazio
+
       if (!map.has(key)) {
         map.set(key, {
           tt: ttKey,
@@ -687,6 +692,10 @@ const AtividadesEncerramento = () => {
           outros: {},
           total: 0,
         });
+      } else {
+        const existing = map.get(key)!;
+        if (!existing.tt && ttKey) existing.tt = ttKey;
+        if (!existing.tr && trKey) existing.tr = trKey;
       }
     };
 
@@ -714,16 +723,29 @@ const AtividadesEncerramento = () => {
     filteredFato.forEach((r) => {
       const ttKey = (r.matricula_tt || "").trim().toUpperCase();
       const trKey = (r.matricula_tr || "").trim().toUpperCase();
-      const key = ttKey || trKey || (r.nome_tecnico || "SEM_TECNICO");
       const presencaInfo =
         (ttKey && presencaByTT.get(ttKey)) ||
         (trKey && presencaByTR.get(trKey)) ||
         null;
 
+      const nomeFato = (r.nome_tecnico || "").trim().toUpperCase();
+      const nomePresenca = (presencaInfo?.funcionario || "").trim().toUpperCase();
+      
+      const pTT = (presencaInfo?.tt || "").trim().toUpperCase();
+      const pTR = (presencaInfo?.tr || "").trim().toUpperCase();
+
+      const finalNome = nomePresenca || nomeFato || "SEM_TECNICO";
+      const finalTT = pTT || ttKey;
+      const finalTR = pTR || trKey;
+
+      const normFinalNome = normStr(finalNome);
+
+      const key = normFinalNome !== "SEM_TECNICO" ? normFinalNome : (finalTT || finalTR || "SEM_TECNICO");
+
       if (!map.has(key)) {
         map.set(key, {
-          tt: ttKey || presencaInfo?.tt || "",
-          tr: trKey || presencaInfo?.tr || "",
+          tt: finalTT,
+          tr: finalTR,
           nome: presencaInfo?.funcionario || r.nome_tecnico || "—",
           operadora: presencaInfo?.operadora || "",
           supervisor: presencaInfo?.supervisor || "",
@@ -736,7 +758,11 @@ const AtividadesEncerramento = () => {
           total: 0,
         });
       }
+      
       const row = map.get(key)!;
+      if (!row.tt && (ttKey || presencaInfo?.tt)) row.tt = (ttKey || presencaInfo?.tt) as string;
+      if (!row.tr && (trKey || presencaInfo?.tr)) row.tr = (trKey || presencaInfo?.tr) as string;
+
       const estado = (r.ds_estado || "").toLowerCase();
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
         row.insucesso++;
@@ -762,7 +788,11 @@ const AtividadesEncerramento = () => {
       );
     }
     return arr.sort((a, b) => b.total - a.total);
-  }, [filteredFato, presencaByTT, presencaByTR, search]);
+  }, [
+    filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
+    coordenadorFilter, supervisorFilter, tecnicoFilter,
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK
+  ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
   // sem aplicar cardFilter — somente filtros de seletor (estado/macro/sup/coord).
