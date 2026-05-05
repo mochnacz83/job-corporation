@@ -319,6 +319,60 @@ const AtividadesEncerramento = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-refresh do painel quando uma sincronização automática (cron/auto-*)
+  // grava no atividades_sync_log. Aguarda 15s para garantir que o INSERT na
+  // tabela atividades_fato terminou e então recarrega dados + histórico.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel("atividades-sync-log-auto")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "atividades_sync_log" },
+        (payload) => {
+          const by = ((payload.new as { triggered_by?: string } | null)?.triggered_by || "").toLowerCase();
+          const isAuto = by === "cron" || by.startsWith("auto");
+          if (!isAuto) return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            loadData();
+            loadHistorico();
+          }, 15000);
+        },
+      )
+      .subscribe();
+    // Polling de segurança a cada 60s para refletir o último log mesmo
+    // quando o realtime não estiver disponível.
+    const poll = setInterval(() => {
+      supabase
+        .from("atividades_sync_log")
+        .select("finished_at, triggered_by, status")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data?.finished_at) return;
+          const newSync = data.finished_at as string;
+          if (newSync !== lastSync) {
+            const by = ((data as { triggered_by?: string }).triggered_by || "").toLowerCase();
+            const isAuto = by === "cron" || by.startsWith("auto");
+            setLastSync(newSync);
+            setLastSyncBy((data as { triggered_by?: string }).triggered_by ?? null);
+            if (isAuto) {
+              loadData();
+              loadHistorico();
+            }
+          }
+        });
+    }, 60000);
+    return () => {
+      if (timer) clearTimeout(timer);
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSync]);
+
   useEffect(() => {
     if (isAdmin) loadSettings();
   }, [isAdmin]);
@@ -1082,21 +1136,21 @@ const AtividadesEncerramento = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <ActivityIcon className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
-          {lastSync && (
-            <Badge variant="secondary" className="text-[10px]">
-              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
-              <span
-                className="ml-1 font-bold"
-                title={
-                  (lastSyncBy || "").toLowerCase() === "cron"
-                    ? "A = Automático (cron)"
-                    : "M = Manual"
-                }
-              >
-                {(lastSyncBy || "").toLowerCase() === "cron" ? "A" : "M"}
-              </span>
-            </Badge>
-          )}
+          {lastSync && (() => {
+            const by = (lastSyncBy || "").toLowerCase();
+            const isAuto = by === "cron" || by.startsWith("auto");
+            return (
+              <Badge variant="secondary" className="text-[10px]">
+                Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
+                <span
+                  className="ml-1 font-bold"
+                  title={isAuto ? "A = Automático" : "M = Manual"}
+                >
+                  {isAuto ? "A" : "M"}
+                </span>
+              </Badge>
+            );
+          })()}
           <Badge
             variant={schedule.enabled ? "default" : "outline"}
             className="text-[10px] gap-1"
