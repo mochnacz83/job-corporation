@@ -1082,21 +1082,21 @@ const AtividadesEncerramento = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <ActivityIcon className="w-5 h-5 text-primary" />
           <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
-          {lastSync && (
-            <Badge variant="secondary" className="text-[10px]">
-              Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
-              <span
-                className="ml-1 font-bold"
-                title={
-                  (lastSyncBy || "").toLowerCase() === "cron"
-                    ? "A = Automático (cron)"
-                    : "M = Manual"
-                }
-              >
-                {(lastSyncBy || "").toLowerCase() === "cron" ? "A" : "M"}
-              </span>
-            </Badge>
-          )}
+          {lastSync && (() => {
+            const by = (lastSyncBy || "").toLowerCase();
+            const isAuto = by === "cron" || by.startsWith("auto");
+            return (
+              <Badge variant="secondary" className="text-[10px]">
+                Última sync: {new Date(lastSync).toLocaleString("pt-BR")}{" "}
+                <span
+                  className="ml-1 font-bold"
+                  title={isAuto ? "A = Automático" : "M = Manual"}
+                >
+                  {isAuto ? "A" : "M"}
+                </span>
+              </Badge>
+            );
+          })()}
           <Badge
             variant={schedule.enabled ? "default" : "outline"}
             className="text-[10px] gap-1"
