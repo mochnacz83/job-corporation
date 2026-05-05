@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  FileSpreadsheet, Plus, Pencil, Trash2, ExternalLink, ArrowLeft, Loader2, Star,
+  FileSpreadsheet, Plus, Pencil, Trash2, ExternalLink, Loader2, Sparkles,
 } from "lucide-react";
 
 type PlanilhaLink = {
@@ -33,7 +33,6 @@ const Planilhas = () => {
 
   const [links, setLinks] = useState<PlanilhaLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [active, setActive] = useState<PlanilhaLink | null>(null);
 
   // Editor state (admin)
   const [editorOpen, setEditorOpen] = useState(false);
@@ -59,13 +58,6 @@ const Planilhas = () => {
     }
     const list = (data || []) as PlanilhaLink[];
     setLinks(list);
-    // mantém seleção ou seleciona primeira ativa
-    if (active) {
-      const found = list.find((l) => l.id === active.id);
-      setActive(found || list.find((l) => l.ativo) || null);
-    } else {
-      setActive(list.find((l) => l.ativo) || null);
-    }
     setLoading(false);
   };
 
@@ -150,87 +142,27 @@ const Planilhas = () => {
       toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
       return;
     }
-    if (active?.id === l.id) setActive(null);
     toast({ title: "Link removido" });
     await load();
   };
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {/* Cabeçalho com a barra de "favoritos" */}
+      {/* Cabeçalho */}
       <div className="border-b bg-card/60 backdrop-blur-sm">
-        <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
+        <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
           <FileSpreadsheet className="w-5 h-5 text-primary" />
-          <h1 className="text-base font-bold mr-2">Planilhas Online</h1>
-
-          {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-
-          {!loading && visibleLinks.length === 0 && (
-            <span className="text-xs text-muted-foreground">
-              Nenhuma planilha cadastrada{isAdmin ? " — clique em Adicionar" : "."}
-            </span>
-          )}
-
-          <div className="flex items-center gap-1 flex-wrap">
-            {visibleLinks.map((l) => {
-              const isActive = active?.id === l.id;
-              return (
-                <div key={l.id} className="flex items-center">
-                  <Button
-                    size="sm"
-                    variant={isActive ? "default" : "outline"}
-                    className={`h-7 text-xs gap-1 ${!l.ativo ? "opacity-60" : ""}`}
-                    onClick={() => setActive(l)}
-                    title={l.descricao || l.url}
-                  >
-                    <Star className="w-3 h-3" />
-                    <span className="truncate max-w-[180px]">{l.titulo}</span>
-                    {!l.ativo && <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">off</Badge>}
-                  </Button>
-                  {isAdmin && (
-                    <div className="flex items-center -ml-1">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7"
-                        title="Editar"
-                        onClick={() => openEdit(l)}
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        title="Remover"
-                        onClick={() => remove(l)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div>
+            <h1 className="text-base font-bold leading-tight">Planilhas Online</h1>
+            <p className="text-[11px] text-muted-foreground">Acesse rapidamente suas planilhas favoritas</p>
           </div>
-
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-2" />}
           <div className="ml-auto flex items-center gap-2">
-            {active && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs gap-1"
-                onClick={() => window.open(active.url, "_blank", "noopener,noreferrer")}
-              >
-                <ExternalLink className="w-3 h-3" />
-                Abrir em nova aba
-              </Button>
-            )}
             {isAdmin && (
               <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="h-7 text-xs gap-1" onClick={openNew}>
-                    <Plus className="w-3 h-3" />
+                  <Button size="sm" className="h-8 text-xs gap-1" onClick={openNew}>
+                    <Plus className="w-3.5 h-3.5" />
                     Adicionar
                   </Button>
                 </DialogTrigger>
@@ -256,7 +188,7 @@ const Planilhas = () => {
                         placeholder="https://docs.google.com/spreadsheets/..."
                       />
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        Para Google Sheets, use o link com /pubhtml ou compartilhamento público para que abra dentro do site.
+                        O link será aberto em nova aba ao clicar no ícone.
                       </p>
                     </div>
                     <div>
@@ -300,18 +232,18 @@ const Planilhas = () => {
         </div>
       </div>
 
-      {/* Conteúdo: planilha embutida */}
-      <div className="flex-1 bg-muted/30">
-        {!active && !loading && (
+      {/* Grade de ícones */}
+      <div className="flex-1 overflow-auto p-6 bg-gradient-to-br from-background via-background to-primary/5">
+        {!loading && visibleLinks.length === 0 && (
           <div className="h-full flex items-center justify-center">
             <Card className="max-w-md">
               <CardHeader>
-                <CardTitle className="text-sm">Selecione uma planilha</CardTitle>
+                <CardTitle className="text-sm">Nenhuma planilha cadastrada</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
                   {isAdmin
-                    ? "Adicione um link no botão acima para começar."
+                    ? "Clique em Adicionar para cadastrar a primeira planilha."
                     : "Nenhuma planilha disponível no momento."}
                 </p>
               </CardContent>
@@ -319,14 +251,87 @@ const Planilhas = () => {
           </div>
         )}
 
-        {active && (
-          <iframe
-            key={active.id}
-            src={active.url}
-            title={active.titulo}
-            className="w-full h-full border-0"
-            allow="clipboard-read; clipboard-write; fullscreen"
-          />
+        {visibleLinks.length > 0 && (
+          <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))] auto-rows-max">
+            {visibleLinks.map((l) => (
+              <div
+                key={l.id}
+                className="group relative"
+              >
+                <button
+                  onClick={() => window.open(l.url, "_blank", "noopener,noreferrer")}
+                  title={l.descricao || l.url}
+                  className={`relative w-full aspect-square rounded-2xl overflow-hidden
+                    border border-primary/20 bg-card/70 backdrop-blur-md
+                    shadow-[0_4px_20px_-6px_hsl(var(--primary)/0.25)]
+                    transition-all duration-300 ease-out
+                    hover:-translate-y-1 hover:scale-[1.03]
+                    hover:border-primary/60 hover:shadow-[0_10px_40px_-8px_hsl(var(--primary)/0.5)]
+                    focus:outline-none focus:ring-2 focus:ring-primary
+                    ${!l.ativo ? "opacity-50" : ""}`}
+                >
+                  {/* glow */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="absolute -inset-px rounded-2xl bg-[conic-gradient(from_var(--g,0deg),hsl(var(--primary)/0.4),transparent_30%,transparent_70%,hsl(var(--primary)/0.4))] opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md" />
+                  {/* grid lines */}
+                  <div
+                    className="absolute inset-0 opacity-[0.07] group-hover:opacity-20 transition-opacity"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)",
+                      backgroundSize: "20px 20px",
+                    }}
+                  />
+                  {/* content */}
+                  <div className="relative h-full flex flex-col items-center justify-center p-4 text-center">
+                    <div className="relative mb-3">
+                      <div className="absolute inset-0 rounded-xl bg-primary/30 blur-xl group-hover:bg-primary/60 transition-all duration-500" />
+                      <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform duration-300">
+                        <FileSpreadsheet className="w-7 h-7 text-primary-foreground" />
+                      </div>
+                      <Sparkles className="absolute -top-1 -right-1 w-3.5 h-3.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <span className="text-xs font-semibold leading-tight line-clamp-2 text-foreground">
+                      {l.titulo}
+                    </span>
+                    {l.descricao && (
+                      <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
+                        {l.descricao}
+                      </span>
+                    )}
+                    {!l.ativo && (
+                      <Badge variant="secondary" className="mt-2 text-[9px] px-1.5 py-0">inativo</Badge>
+                    )}
+                    <div className="mt-2 flex items-center gap-1 text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ExternalLink className="w-3 h-3" /> Abrir
+                    </div>
+                  </div>
+                </button>
+                {isAdmin && (
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-6 w-6 shadow"
+                      title="Editar"
+                      onClick={(e) => { e.stopPropagation(); openEdit(l); }}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="h-6 w-6 shadow"
+                      title="Remover"
+                      onClick={(e) => { e.stopPropagation(); remove(l); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
