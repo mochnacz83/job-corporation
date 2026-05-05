@@ -94,6 +94,7 @@ const AtividadesEncerramento = () => {
   const [supervisorFilter, setSupervisorFilter] = useState<string[]>([]);
   const [coordenadorFilter, setCoordenadorFilter] = useState<string[]>([]);
   const [tecnicoFilter, setTecnicoFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
@@ -271,13 +272,17 @@ const AtividadesEncerramento = () => {
           .limit(1)
           .maybeSingle(),
       ]);
-      // Filtrar técnicos com "BUFFER" no nome (sai do relatório inteiro)
+      // Filtrar técnicos com "BUFFER" ou "EXTERNO" no nome (sai do relatório inteiro)
       const cleaned = ((f || []) as FatoRow[]).filter((r) => {
         const n = (r.nome_tecnico || "").toUpperCase();
-        return !n.includes("BUFFER");
+        return !n.includes("BUFFER") && !n.includes("EXTERNO");
       });
       setFato(cleaned);
-      setPresenca((p || []) as PresencaRow[]);
+      const cleanedPresenca = ((p || []) as PresencaRow[]).filter((r) => {
+        const n = (r.funcionario || "").toUpperCase();
+        return !n.includes("BUFFER") && !n.includes("EXTERNO");
+      });
+      setPresenca(cleanedPresenca);
       setLastSync(log?.finished_at ?? null);
       setLastSyncBy((log as { triggered_by?: string } | null)?.triggered_by ?? null);
     } finally {
@@ -301,9 +306,10 @@ const AtividadesEncerramento = () => {
         .select("data_atividade, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico")
         .gte("data_atividade", startISO)
         .limit(200000);
-      const cleaned = ((data || []) as HistRow[]).filter(
-        (r) => !(r.nome_tecnico || "").toUpperCase().includes("BUFFER"),
-      );
+      const cleaned = ((data || []) as HistRow[]).filter((r) => {
+        const n = (r.nome_tecnico || "").toUpperCase();
+        return !n.includes("BUFFER") && !n.includes("EXTERNO");
+      });
       setHistorico(cleaned);
     } finally {
       setLoadingHist(false);
@@ -439,6 +445,19 @@ const AtividadesEncerramento = () => {
     return Array.from(s).filter(Boolean).sort();
   }, [presenca]);
 
+  const statuses = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      const stat = (p.status || "").trim();
+      s.add(stat === "" ? "Ativo" : stat);
+    });
+    s.add("Ativo");
+    return Array.from(s).sort();
+  }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter]);
+
   const tecnicos = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
@@ -463,11 +482,15 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(p.coordenador, coordenadorFilter)) return;
       if (!matchFilter(p.supervisor, supervisorFilter)) return;
       if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      
       const stat = (p.status || "").trim();
+      const effStat = stat === "" ? "Ativo" : stat;
+      if (!matchFilter(effStat, statusFilter)) return;
+
       if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
     });
     return s;
-  }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter]);
+  }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
   // Conjunto de TTs/TRs cujo Status na planilha Dimensão (tecnicos_presenca)
   // é "Técnico de Dados". Esses técnicos NÃO contabilizam em "Técnicos Ativos"
@@ -497,6 +520,9 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.supervisor, supervisorFilter)) return;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
 
+      const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
+      if (!matchFilter(stat, statusFilter)) return;
+
       const estado = norm(r.ds_estado);
       const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
       if (
@@ -511,9 +537,8 @@ const AtividadesEncerramento = () => {
       }
     });
     return s;
-  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
 
-  // TTs que fecharam alguma atividade no dia (qualquer estado/macro)
   const ttsComAtividade = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
@@ -522,11 +547,14 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.supervisor, supervisorFilter)) return;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
 
+      const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
+      if (!matchFilter(stat, statusFilter)) return;
+
       const tt = (r.matricula_tt || "").trim().toUpperCase();
       if (tt) s.add(tt);
     });
     return s;
-  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
 
   // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
   // Parte da base de técnicos ATIVOS na planilha Dimensão (Presença) — ou seja, com a
@@ -543,12 +571,15 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(p.supervisor, supervisorFilter)) return;
       if (!matchFilter(p.funcionario, tecnicoFilter)) return;
 
-      // Ignora linhas BUFFER
+      const statRaw = (p.status || "").trim();
+      const effStat = statRaw === "" ? "Ativo" : statRaw;
+      if (!matchFilter(effStat, statusFilter)) return;
+
+      // Ignora linhas BUFFER/EXTERNO
       const nome = (p.funcionario || "").toUpperCase();
-      if (nome.includes("BUFFER")) return;
+      if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
       // Só considera técnicos ATIVOS (status vazio na planilha Dimensão)
-      const stat = (p.status || "").trim();
-      if (stat) return;
+      if (statRaw) return;
       const tt = (p.tt || "").trim().toUpperCase();
       const tr = (p.tr || "").trim().toUpperCase();
       // Identificador prioritário: TT; se não houver, usa TR
@@ -560,7 +591,7 @@ const AtividadesEncerramento = () => {
       s.add(key);
     });
     return s;
-  }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter]);
+  }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
@@ -616,6 +647,9 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
 
+      const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
+      if (!matchFilter(stat, statusFilter)) return false;
+
       if (cardFilter === "EM_ANDAMENTO") {
         if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
       } else if (cardFilter === "AGENDA_DIA") {
@@ -645,7 +679,7 @@ const AtividadesEncerramento = () => {
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -705,6 +739,9 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(p.coordenador, coordenadorFilter)) return;
       if (!matchFilter(p.supervisor, supervisorFilter)) return;
       if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+
+      const stat = (p.status || "").trim() === "" ? "Ativo" : p.status;
+      if (!matchFilter(stat, statusFilter)) return;
 
       const tt = (p.tt || "").trim().toUpperCase();
       const tr = (p.tr || "").trim().toUpperCase();
@@ -790,7 +827,7 @@ const AtividadesEncerramento = () => {
     return arr.sort((a, b) => b.total - a.total);
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
-    coordenadorFilter, supervisorFilter, tecnicoFilter,
+    coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
     ttsSemPresenca, ttsAtivos, ttsPresencaOK
   ]);
 
@@ -806,6 +843,10 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.supervisor, supervisorFilter)) return;
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return;
+      
+      const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
+      if (!matchFilter(stat, statusFilter)) return;
+
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
         insucesso++;
@@ -813,7 +854,7 @@ const AtividadesEncerramento = () => {
       else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
     });
     return { sucesso, insucesso };
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, presencaByTT, presencaByTR]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
 
   const totals = useMemo(() => {
     return aggregated.reduce(
@@ -833,6 +874,10 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(p.coordenador, coordenadorFilter)) return false;
       if (!matchFilter(p.supervisor, supervisorFilter)) return false;
       if (!matchFilter(p.funcionario, tecnicoFilter)) return false;
+      
+      const stat = (p.status || "").trim() === "" ? "Ativo" : p.status;
+      if (!matchFilter(stat, statusFilter)) return false;
+      
       return true;
     });
 
@@ -845,6 +890,10 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(info?.coordenador, coordenadorFilter)) return false;
       if (!matchFilter(info?.supervisor, supervisorFilter)) return false;
       if (!matchFilter(info?.funcionario, tecnicoFilter) && !matchFilter(r.nome_tecnico, tecnicoFilter)) return false;
+      
+      const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
+      if (!matchFilter(stat, statusFilter)) return false;
+
       if (!matchFilter(r.ds_estado, estadoFilter)) return false;
       if (!matchFilter(r.ds_macro_atividade, macroFilter)) return false;
       return true;
@@ -866,7 +915,7 @@ const AtividadesEncerramento = () => {
       totalPresencaOK,
       totalSemPresenca,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
@@ -1423,6 +1472,12 @@ const AtividadesEncerramento = () => {
                         options={tecnicos}
                         value={tecnicoFilter}
                         onChange={setTecnicoFilter}
+                      />
+                      <MultiFilter
+                        label="Status"
+                        options={statuses}
+                        value={statusFilter}
+                        onChange={setStatusFilter}
                       />
                       <MultiFilter
                         label="Estado"
