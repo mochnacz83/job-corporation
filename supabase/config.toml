@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.upload-atividades-csv]
 verify_jwt = false
+
+[functions.upload-presenca-xlsx]
+verify_jwt = false
