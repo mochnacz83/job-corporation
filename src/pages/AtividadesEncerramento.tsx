@@ -765,6 +765,9 @@ const AtividadesEncerramento = () => {
         (trKey && presencaByTR.get(trKey)) ||
         null;
 
+      // Técnicos que não estão na planilha Dimensão (presença) não devem aparecer no relatório
+      if (!presencaInfo) return;
+
       const nomeFato = (r.nome_tecnico || "").trim().toUpperCase();
       const nomePresenca = (presencaInfo?.funcionario || "").trim().toUpperCase();
       
