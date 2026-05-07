@@ -705,11 +705,11 @@ const AtividadesEncerramento = () => {
 
     const initTecnico = (p: PresencaRow) => {
       const nomeKey = normStr(p.funcionario);
+      if (!nomeKey) return; // não exibir técnicos sem nome
       const ttKey = (p.tt || "").trim().toUpperCase();
       const trKey = (p.tr || "").trim().toUpperCase();
-      
-      const key = nomeKey || ttKey || trKey || "--";
-      if (key === "--") return; // se tudo for vazio
+
+      const key = nomeKey;
 
       if (!map.has(key)) {
         map.set(key, {
