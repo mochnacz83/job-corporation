@@ -963,6 +963,7 @@ const AtividadesEncerramento = () => {
 
     const totalPresencaOK = ttsPresencaOK.size;
     const totalSemPresenca = ttsSemPresenca.size;
+    const totalSemEncerramento = ttsSemEncerramento.size;
 
     return {
       totalTecnicosPresenca,
@@ -971,8 +972,9 @@ const AtividadesEncerramento = () => {
       totalAgendaDia,
       totalPresencaOK,
       totalSemPresenca,
+      totalSemEncerramento,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
