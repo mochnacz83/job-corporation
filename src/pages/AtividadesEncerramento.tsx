@@ -1338,7 +1338,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1375,6 +1375,19 @@ const AtividadesEncerramento = () => {
                 <div className="text-[11px] text-muted-foreground">Sem Presença</div>
                 <div className="text-2xl font-bold text-warning">{cardMetrics.totalSemPresenca}</div>
                 <div className="text-[10px] text-muted-foreground mt-1">Sem OK</div>
+              </CardContent>
+            </Card>
+
+            {/* Sem Encerramento (P0 — Produção Zero) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "SEM_ENCERRAMENTO" ? "ALL" : "SEM_ENCERRAMENTO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "SEM_ENCERRAMENTO" ? "ring-2 ring-primary" : ""}`}
+              title="P0 — Produção Zero: técnicos ativos sem nenhuma atividade encerrada"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Sem Encerramento</div>
+                <div className="text-2xl font-bold text-destructive">{cardMetrics.totalSemEncerramento}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">P0 — Produção Zero</div>
               </CardContent>
             </Card>
 
@@ -1429,6 +1442,7 @@ const AtividadesEncerramento = () => {
                   cardFilter === "ATIVOS" ? "Técnicos Ativos" :
                   cardFilter === "PRESENCA_OK" ? "Presença Confirmada" :
                   cardFilter === "SEM_PRESENCA" ? "Sem Presença" :
+                  cardFilter === "SEM_ENCERRAMENTO" ? "Sem Encerramento (P0)" :
                   cardFilter === "EM_ANDAMENTO" ? "Em Andamento" :
                   cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
                   cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
