@@ -72,6 +72,7 @@ type CardFilter =
   | "AGENDA_DIA"
   | "PRESENCA_OK"
   | "SEM_PRESENCA"
+  | "SEM_ENCERRAMENTO"
   | "SUCESSO"
   | "INSUCESSO";
 
