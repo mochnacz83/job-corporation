@@ -118,6 +118,47 @@ const AtividadesEncerramento = () => {
     return filter.some((f) => v === f.toUpperCase());
   };
 
+  // Helpers para ler raw
+  const getRawStr = (r: FatoRow, keys: string[]): string => {
+    const raw = r.raw || {};
+    const lookup = new Map<string, string>();
+    Object.keys(raw).forEach((k) => {
+      const norm = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      lookup.set(norm, String((raw as Record<string, unknown>)[k] ?? ""));
+    });
+    for (const c of keys) {
+      const n = c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+      const v = lookup.get(n);
+      if (v) return v;
+    }
+    return "";
+  };
+
+  const isSC = (r: FatoRow): boolean => {
+    const uf = getRawStr(r, ["cd_uf", "uf", "sg_uf"]).trim().toUpperCase();
+    return uf === "" || uf === "SC";
+  };
+
+  // Atividade considerada "agendada para o dia": dh_inicio_agendamento cai na data selecionada
+  const isAgendadaParaDia = (r: FatoRow): boolean => {
+    const v = getRawStr(r, ["dh_inicio_agendamento", "dh inicio agendamento"]);
+    if (!v) return false;
+    // Extrair YYYY-MM-DD
+    let s = v.trim();
+    // formato dd/MM/yyyy ...
+    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+    let iso = "";
+    if (m) {
+      iso = `${m[3]}-${m[2]}-${m[1]}`;
+    } else {
+      // ISO-like
+      s = s.replace(/\s+(UTC|GMT)\s*$/i, "Z").replace(" ", "T");
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) iso = d.toISOString().slice(0, 10);
+    }
+    return iso === date;
+  };
+
   // settings
   const [csvUrl, setCsvUrl] = useState("");
   const [savingUrl, setSavingUrl] = useState(false);
@@ -639,46 +680,7 @@ const AtividadesEncerramento = () => {
     return s;
   }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
-  // Helpers para ler raw
-  const getRawStr = (r: FatoRow, keys: string[]): string => {
-    const raw = r.raw || {};
-    const lookup = new Map<string, string>();
-    Object.keys(raw).forEach((k) => {
-      const norm = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-      lookup.set(norm, String((raw as Record<string, unknown>)[k] ?? ""));
-    });
-    for (const c of keys) {
-      const n = c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-      const v = lookup.get(n);
-      if (v) return v;
-    }
-    return "";
-  };
 
-  const isSC = (r: FatoRow): boolean => {
-    const uf = getRawStr(r, ["cd_uf", "uf", "sg_uf"]).trim().toUpperCase();
-    return uf === "" || uf === "SC";
-  };
-
-  // Atividade considerada "agendada para o dia": dh_inicio_agendamento cai na data selecionada
-  const isAgendadaParaDia = (r: FatoRow): boolean => {
-    const v = getRawStr(r, ["dh_inicio_agendamento", "dh inicio agendamento"]);
-    if (!v) return false;
-    // Extrair YYYY-MM-DD
-    let s = v.trim();
-    // formato dd/MM/yyyy ...
-    const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-    let iso = "";
-    if (m) {
-      iso = `${m[3]}-${m[2]}-${m[1]}`;
-    } else {
-      // ISO-like
-      s = s.replace(/\s+(UTC|GMT)\s*$/i, "Z").replace(" ", "T");
-      const d = new Date(s);
-      if (!isNaN(d.getTime())) iso = d.toISOString().slice(0, 10);
-    }
-    return iso === date;
-  };
 
   // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
   const filteredFato = useMemo(() => {
