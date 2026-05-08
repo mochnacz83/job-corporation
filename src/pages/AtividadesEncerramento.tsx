@@ -885,7 +885,7 @@ const AtividadesEncerramento = () => {
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
     coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
-    ttsSemPresenca, ttsAtivos, ttsPresencaOK
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento
   ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
