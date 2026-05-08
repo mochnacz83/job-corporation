@@ -72,6 +72,7 @@ type CardFilter =
   | "AGENDA_DIA"
   | "PRESENCA_OK"
   | "SEM_PRESENCA"
+  | "SEM_ENCERRAMENTO"
   | "SUCESSO"
   | "INSUCESSO";
 
@@ -593,6 +594,51 @@ const AtividadesEncerramento = () => {
     return s;
   }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
+  // Conjunto de TTs/TRs que fecharam ALGUMA atividade no dia (sucesso OU insucesso),
+  // independente da macro. Usado para identificar "Sem Encerramento" (P0 — Produção Zero).
+  const ttsComFechamento = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      const estado = norm(r.ds_estado);
+      const isFechada = estado.includes("conclu"); // cobre "concluído com sucesso" e "concluído sem sucesso"
+      if (!isFechada) return;
+      const tt = (r.matricula_tt || "").trim().toUpperCase();
+      const tr = (r.matricula_tr || "").trim().toUpperCase();
+      if (tt) s.add(tt);
+      if (tr) s.add(tr);
+    });
+    return s;
+  }, [fato]);
+
+  // Técnicos SEM ENCERRAMENTO (P0 — Produção Zero): técnicos ATIVOS na planilha
+  // Dimensão (status em branco) que NÃO fecharam nenhuma atividade no dia.
+  // Mesma base que "Sem Presença", mas considera qualquer encerramento (sucesso
+  // ou insucesso, qualquer macro), não somente as macros de presença OK.
+  const ttsSemEncerramento = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      const statRaw = (p.status || "").trim();
+      const effStat = statRaw === "" ? "Ativo" : statRaw;
+      if (!matchFilter(effStat, statusFilter)) return;
+      const nome = (p.funcionario || "").toUpperCase();
+      if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
+      // Apenas técnicos ATIVOS (status vazio) entram em P0
+      if (statRaw) return;
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+      const key = tt || tr;
+      if (!key) return;
+      if (tt && ttsComFechamento.has(tt)) return;
+      if (tr && ttsComFechamento.has(tr)) return;
+      s.add(key);
+    });
+    return s;
+  }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
     const raw = r.raw || {};
@@ -670,6 +716,10 @@ const AtividadesEncerramento = () => {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
         const tr = (r.matricula_tr || "").trim().toUpperCase();
         if (!(tt && ttsSemPresenca.has(tt)) && !(tr && ttsSemPresenca.has(tr))) return false;
+      } else if (cardFilter === "SEM_ENCERRAMENTO") {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsSemEncerramento.has(tt)) && !(tr && ttsSemEncerramento.has(tr))) return false;
       } else if (cardFilter === "SUCESSO") {
         const estado = norm(r.ds_estado);
         if (!(estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso"))) return false;
@@ -748,6 +798,8 @@ const AtividadesEncerramento = () => {
 
       if (cardFilter === "SEM_PRESENCA") {
         if ((tt && ttsSemPresenca.has(tt)) || (tr && ttsSemPresenca.has(tr))) initTecnico(p);
+      } else if (cardFilter === "SEM_ENCERRAMENTO") {
+        if ((tt && ttsSemEncerramento.has(tt)) || (tr && ttsSemEncerramento.has(tr))) initTecnico(p);
       } else if (cardFilter === "ATIVOS") {
         if ((tt && ttsAtivos.has(tt)) || (tr && ttsAtivos.has(tr))) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
@@ -833,7 +885,7 @@ const AtividadesEncerramento = () => {
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
     coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
-    ttsSemPresenca, ttsAtivos, ttsPresencaOK
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento
   ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
@@ -911,6 +963,7 @@ const AtividadesEncerramento = () => {
 
     const totalPresencaOK = ttsPresencaOK.size;
     const totalSemPresenca = ttsSemPresenca.size;
+    const totalSemEncerramento = ttsSemEncerramento.size;
 
     return {
       totalTecnicosPresenca,
@@ -919,8 +972,9 @@ const AtividadesEncerramento = () => {
       totalAgendaDia,
       totalPresencaOK,
       totalSemPresenca,
+      totalSemEncerramento,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
@@ -1284,7 +1338,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1321,6 +1375,19 @@ const AtividadesEncerramento = () => {
                 <div className="text-[11px] text-muted-foreground">Sem Presença</div>
                 <div className="text-2xl font-bold text-warning">{cardMetrics.totalSemPresenca}</div>
                 <div className="text-[10px] text-muted-foreground mt-1">Sem OK</div>
+              </CardContent>
+            </Card>
+
+            {/* Sem Encerramento (P0 — Produção Zero) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "SEM_ENCERRAMENTO" ? "ALL" : "SEM_ENCERRAMENTO")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "SEM_ENCERRAMENTO" ? "ring-2 ring-primary" : ""}`}
+              title="P0 — Produção Zero: técnicos ativos sem nenhuma atividade encerrada"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Sem Encerramento</div>
+                <div className="text-2xl font-bold text-destructive">{cardMetrics.totalSemEncerramento}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">P0 — Produção Zero</div>
               </CardContent>
             </Card>
 
@@ -1375,6 +1442,7 @@ const AtividadesEncerramento = () => {
                   cardFilter === "ATIVOS" ? "Técnicos Ativos" :
                   cardFilter === "PRESENCA_OK" ? "Presença Confirmada" :
                   cardFilter === "SEM_PRESENCA" ? "Sem Presença" :
+                  cardFilter === "SEM_ENCERRAMENTO" ? "Sem Encerramento (P0)" :
                   cardFilter === "EM_ANDAMENTO" ? "Em Andamento" :
                   cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
                   cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
