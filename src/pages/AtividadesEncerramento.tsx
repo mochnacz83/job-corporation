@@ -798,6 +798,8 @@ const AtividadesEncerramento = () => {
 
       if (cardFilter === "SEM_PRESENCA") {
         if ((tt && ttsSemPresenca.has(tt)) || (tr && ttsSemPresenca.has(tr))) initTecnico(p);
+      } else if (cardFilter === "SEM_ENCERRAMENTO") {
+        if ((tt && ttsSemEncerramento.has(tt)) || (tr && ttsSemEncerramento.has(tr))) initTecnico(p);
       } else if (cardFilter === "ATIVOS") {
         if ((tt && ttsAtivos.has(tt)) || (tr && ttsAtivos.has(tr))) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
