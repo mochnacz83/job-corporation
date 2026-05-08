@@ -594,6 +594,51 @@ const AtividadesEncerramento = () => {
     return s;
   }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
+  // Conjunto de TTs/TRs que fecharam ALGUMA atividade no dia (sucesso OU insucesso),
+  // independente da macro. Usado para identificar "Sem Encerramento" (P0 — Produção Zero).
+  const ttsComFechamento = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      const estado = norm(r.ds_estado);
+      const isFechada = estado.includes("conclu"); // cobre "concluído com sucesso" e "concluído sem sucesso"
+      if (!isFechada) return;
+      const tt = (r.matricula_tt || "").trim().toUpperCase();
+      const tr = (r.matricula_tr || "").trim().toUpperCase();
+      if (tt) s.add(tt);
+      if (tr) s.add(tr);
+    });
+    return s;
+  }, [fato]);
+
+  // Técnicos SEM ENCERRAMENTO (P0 — Produção Zero): técnicos ATIVOS na planilha
+  // Dimensão (status em branco) que NÃO fecharam nenhuma atividade no dia.
+  // Mesma base que "Sem Presença", mas considera qualquer encerramento (sucesso
+  // ou insucesso, qualquer macro), não somente as macros de presença OK.
+  const ttsSemEncerramento = useMemo(() => {
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      const statRaw = (p.status || "").trim();
+      const effStat = statRaw === "" ? "Ativo" : statRaw;
+      if (!matchFilter(effStat, statusFilter)) return;
+      const nome = (p.funcionario || "").toUpperCase();
+      if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
+      // Apenas técnicos ATIVOS (status vazio) entram em P0
+      if (statRaw) return;
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = (p.tr || "").trim().toUpperCase();
+      const key = tt || tr;
+      if (!key) return;
+      if (tt && ttsComFechamento.has(tt)) return;
+      if (tr && ttsComFechamento.has(tr)) return;
+      s.add(key);
+    });
+    return s;
+  }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+
   // Helpers para ler raw
   const getRawStr = (r: FatoRow, keys: string[]): string => {
     const raw = r.raw || {};
