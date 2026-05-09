@@ -558,6 +558,8 @@ const AtividadesEncerramento = () => {
     return (
       (ttKey && presencaByTT.get(ttKey)) ||
       (trKey && presencaByTR.get(trKey)) ||
+      (ttKey && presencaByTR.get(ttKey)) ||
+      (trKey && presencaByTT.get(trKey)) ||
       null
     );
   };
@@ -621,6 +623,7 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(effStat, statusFilter)) return;
 
       if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
+      if (!stat && p.tr) s.add(p.tr.trim().toUpperCase());
     });
     return s;
   }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
@@ -666,7 +669,9 @@ const AtividadesEncerramento = () => {
         macro !== MACRO_PRESENCA_EXCLUIR
       ) {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
         if (tt) s.add(tt);
+        if (tr) s.add(tr);
       }
     });
     return s;
@@ -684,7 +689,9 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(stat, statusFilter)) return;
 
       const tt = (r.matricula_tt || "").trim().toUpperCase();
+      const tr = (r.matricula_tr || "").trim().toUpperCase();
       if (tt) s.add(tt);
+      if (tr) s.add(tr);
     });
     return s;
   }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
@@ -804,7 +811,8 @@ const AtividadesEncerramento = () => {
         if (!isOK) return false;
       } else if (cardFilter === "ATIVOS") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
-        if (!tt || !ttsAtivos.has(tt)) return false;
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsAtivos.has(tt)) && !(tr && ttsAtivos.has(tr))) return false;
       } else if (cardFilter === "SEM_PRESENCA") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
         const tr = (r.matricula_tr || "").trim().toUpperCase();
@@ -905,10 +913,7 @@ const AtividadesEncerramento = () => {
     filteredFato.forEach((r) => {
       const ttKey = (r.matricula_tt || "").trim().toUpperCase();
       const trKey = (r.matricula_tr || "").trim().toUpperCase();
-      const presencaInfo =
-        (ttKey && presencaByTT.get(ttKey)) ||
-        (trKey && presencaByTR.get(trKey)) ||
-        null;
+      const presencaInfo = getPresencaInfo(r);
 
       // Técnicos que não estão na planilha Dimensão (presença) não devem aparecer no relatório
       if (!presencaInfo) return;
@@ -1293,7 +1298,7 @@ const AtividadesEncerramento = () => {
   const atividadesSetorOptions = useMemo(() => {
     const s = new Set<string>();
     filteredFato.forEach((r) => {
-      const setor = getRawStr(r, ["ds_setor", "setor", "setor_atual", "setor_origem"]);
+      const setor = getRawStr(r, ["cd_setor", "ds_setor", "setor", "setor_atual", "setor_origem"]);
       if (setor) s.add(setor);
     });
     return Array.from(s).sort();
@@ -1335,7 +1340,7 @@ const AtividadesEncerramento = () => {
     }
     if (atividadesSetorFilter.length > 0) {
       arr = arr.filter((r) => {
-        const setor = getRawStr(r, ["ds_setor", "setor", "setor_atual", "setor_origem"]);
+        const setor = getRawStr(r, ["cd_setor", "ds_setor", "setor", "setor_atual", "setor_origem"]);
         return atividadesSetorFilter.includes(setor);
       });
     }
@@ -1811,13 +1816,10 @@ const AtividadesEncerramento = () => {
                     <TableRow>
                       <TableHead className="text-[11px]">TT</TableHead>
                       <TableHead className="text-[11px]">Técnico</TableHead>
-                      <TableHead className="text-[11px]">Setor</TableHead>
                       <TableHead className="text-[11px]">SA</TableHead>
-                      <TableHead className="text-[11px]">unico_sa</TableHead>
                       <TableHead className="text-[11px]">gpon</TableHead>
                       <TableHead className="text-[11px]">DocAssociado</TableHead>
                       <TableHead className="text-[11px]">Cps</TableHead>
-                      <TableHead className="text-[11px]">pronto_execucao</TableHead>
                       <TableHead className="text-[11px]">status_naf</TableHead>
                       <TableHead className="text-[11px]">data_naf</TableHead>
                       <TableHead className="text-[11px]">Hr_Fechado</TableHead>
@@ -1861,13 +1863,10 @@ const AtividadesEncerramento = () => {
                         <TableRow key={r.id}>
                           <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
                           <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
-                          <TableCell className="text-[11px]">{setorStr}</TableCell>
                           <TableCell className="text-[11px] font-mono">{sa}</TableCell>
-                          <TableCell className="text-[11px] font-mono">{unicoSa}</TableCell>
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
                           <TableCell className="text-[11px] font-mono">{docAssoc}</TableCell>
                           <TableCell className="text-[11px]">{cps}</TableCell>
-                          <TableCell className="text-[11px]">{prontoExecucao}</TableCell>
                           <TableCell className="text-[11px]">{statusNaf}</TableCell>
                           <TableCell className="text-[11px] font-mono">{dataNaf}</TableCell>
                           <TableCell className="text-[11px] font-mono">{hrFechado}</TableCell>
