@@ -191,6 +191,7 @@ const AtividadesEncerramento = () => {
   const [atividadesUnicoSaFilter, setAtividadesUnicoSaFilter] = useState<string[]>([]);
   const [atividadesStatusSaFilter, setAtividadesStatusSaFilter] = useState<string[]>([]);
   const [atividadesSetorFilter, setAtividadesSetorFilter] = useState<string[]>([]);
+  const [atividadesStatusNafFilter, setAtividadesStatusNafFilter] = useState<string[]>([]);
 
   // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
   type HistRow = {
@@ -1306,6 +1307,15 @@ const AtividadesEncerramento = () => {
     return Array.from(s).sort();
   }, [filteredFato]);
 
+  const atividadesStatusNafOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      const val = getRawStr(r, ["status_naf"]) || "-";
+      s.add(val);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
   const atividadesTabFato = useMemo(() => {
     let arr = filteredFato;
 
@@ -1346,6 +1356,12 @@ const AtividadesEncerramento = () => {
         return atividadesSetorFilter.includes(setor);
       });
     }
+    if (atividadesStatusNafFilter.length > 0) {
+      arr = arr.filter((r) => {
+        const statusNaf = getRawStr(r, ["status_naf"]) || "-";
+        return atividadesStatusNafFilter.includes(statusNaf);
+      });
+    }
 
     if (atividadesTabSearch.trim()) {
       const q = atividadesTabSearch.trim().toLowerCase();
@@ -1356,7 +1372,7 @@ const AtividadesEncerramento = () => {
       );
     }
     return arr;
-  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesResultadoFilter]);
+  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesStatusNafFilter, atividadesResultadoFilter]);
 
   const handleExportAtividades = () => {
     if (atividadesTabFato.length === 0) {
@@ -1861,6 +1877,12 @@ const AtividadesEncerramento = () => {
                     options={atividadesSetorOptions}
                     value={atividadesSetorFilter}
                     onChange={setAtividadesSetorFilter}
+                  />
+                  <MultiFilter
+                    label="Status NAF"
+                    options={atividadesStatusNafOptions}
+                    value={atividadesStatusNafFilter}
+                    onChange={setAtividadesStatusNafFilter}
                   />
                 </div>
               </div>
