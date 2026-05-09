@@ -1701,6 +1701,9 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
                           <TableCell className="text-[11px] font-mono">{docAssoc}</TableCell>
                           <TableCell className="text-[11px]">{cps}</TableCell>
+                          <TableCell className="text-[11px]">{statusNaf}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{dataNaf}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{hrFechado}</TableCell>
                           <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
                           <TableCell className="text-[11px]"><Badge variant="outline" className={`text-[10px] ${badgeColor}`}>{r.ds_estado}</Badge></TableCell>
                         </TableRow>
