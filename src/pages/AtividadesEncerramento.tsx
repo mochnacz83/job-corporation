@@ -164,7 +164,7 @@ const MultiFilter = ({
 const AtividadesEncerramento = () => {
   const { isAdmin, profile } = useAuth();
   const { toast } = useToast();
-  useAccessTracking("/atividades-encerramento", true, "Encerramento de Atividades");
+  useAccessTracking("/atividades-encerramento", true, "Acompanhamento de Atividades");
 
   const [date, setDate] = useState<string>(todayISO());
   const [fato, setFato] = useState<FatoRow[]>([]);
@@ -1516,7 +1516,7 @@ const AtividadesEncerramento = () => {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <ActivityIcon className="w-5 h-5 text-primary" />
-          <h1 className="text-xl font-bold">Encerramento de Atividades</h1>
+          <h1 className="text-xl font-bold">Acompanhamento de Atividades</h1>
           {lastSync && (() => {
             const by = (lastSyncBy || "").toLowerCase();
             const isAuto = by === "cron" || by.startsWith("auto");

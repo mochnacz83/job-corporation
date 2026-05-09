@@ -39,7 +39,7 @@ const AVAILABLE_MODULES = [
     { id: "material_coleta", label: "Coleta Material Dados", icon: ClipboardList },
     { id: "vistoria_campo", label: "Vistoria de Campo", icon: ClipboardCheck },
     { id: "inventario", label: "Mini Inventário", icon: Boxes },
-    { id: "atividades_encerramento", label: "Encerramento de Atividades", icon: CheckCircle2 },
+    { id: "atividades_encerramento", label: "Acompanhamento de Atividades", icon: CheckCircle2 },
     { id: "planilhas", label: "Planilhas Online", icon: FileSpreadsheet },
 ];
 

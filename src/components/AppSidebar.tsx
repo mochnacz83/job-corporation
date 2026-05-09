@@ -124,7 +124,7 @@ const AppSidebar = () => {
   const operacionalItems = [
     { show: hasModule("reagenda"), path: "/reagenda", icon: CalendarDays, label: "Reagendamento" },
     { show: hasModule("vistoria_campo"), path: "/vistoria-campo", icon: ClipboardCheck, label: "Vistoria de Campo" },
-    { show: hasModule("atividades_encerramento"), path: "/atividades-encerramento", icon: CheckCircle2, label: "Encerramento Atividades" },
+    { show: hasModule("atividades_encerramento"), path: "/atividades-encerramento", icon: CheckCircle2, label: "Acompanhamento Atividades" },
     { show: hasModule("planilhas"), path: "/planilhas", icon: FileSpreadsheet, label: "Planilhas Online" },
   ];
 
