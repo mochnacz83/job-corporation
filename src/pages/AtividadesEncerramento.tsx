@@ -84,6 +84,71 @@ type CardFilter =
   | "SUCESSO"
   | "INSUCESSO";
 
+const MultiFilter = ({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string[];
+  onChange: (v: string[]) => void;
+}) => {
+  const active = value.length > 0;
+  const toggle = (opt: string) => {
+    if (value.includes(opt)) {
+      const next = value.filter((x) => x !== opt);
+      onChange(next);
+    } else {
+      const next = [...value, opt];
+      // se selecionar todos => trata como "todos liberados" (limpa)
+      if (next.length === options.length) onChange([]);
+      else onChange(next);
+    }
+  };
+  const display = !active
+    ? <span className="text-muted-foreground">{label}</span>
+    : value.length === 1
+      ? <span className="truncate">{value[0]}</span>
+      : <span className="truncate">{label}: {value.length} selecionados</span>;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`flex h-8 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 text-xs ${active ? "border-primary/50 bg-primary/5" : ""}`}
+        >
+          {display}
+          <span className="ml-2 opacity-50">▾</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[240px] p-0" align="start">
+        <div className="max-h-[280px] overflow-auto p-1">
+          {options.length === 0 && (
+            <div className="p-2 text-xs text-muted-foreground">Sem opções</div>
+          )}
+          {options.map((opt) => {
+            const checked = value.includes(opt) || value.length === 0;
+            return (
+              <label
+                key={opt}
+                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
+              >
+                <Checkbox
+                  checked={value.length === 0 ? false : checked}
+                  onCheckedChange={() => toggle(opt)}
+                />
+                <span className="truncate">{opt}</span>
+              </label>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const AtividadesEncerramento = () => {
   const { isAdmin, profile } = useAuth();
   const { toast } = useToast();
@@ -108,6 +173,9 @@ const AtividadesEncerramento = () => {
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
   const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
+  const [atividadesMacroFilter, setAtividadesMacroFilter] = useState<string[]>([]);
+  const [atividadesProntoExecucaoFilter, setAtividadesProntoExecucaoFilter] = useState<string[]>([]);
+  const [atividadesUnicoSaFilter, setAtividadesUnicoSaFilter] = useState<string[]>([]);
 
   // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
   type HistRow = {
@@ -1171,8 +1239,53 @@ const AtividadesEncerramento = () => {
     setActiveTab("atividades");
   };
 
+  const prontoExecucaoOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      let val = getRawStr(r, ["in_pronto_execucao", "pronto_execucao"]).toUpperCase();
+      if (val === "NÃƒO" || val === "NÃO" || val === "NAO") val = "SIM";
+      if (val) s.add(val);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
+  const unicoSaOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      const val = getRawStr(r, ["primeiro_sa", "unico_sa"]);
+      if (val) s.add(val);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
+  const atividadesMacroOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      if (r.ds_macro_atividade) s.add(r.ds_macro_atividade);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
   const atividadesTabFato = useMemo(() => {
     let arr = filteredFato;
+    
+    if (atividadesMacroFilter.length > 0) {
+      arr = arr.filter((r) => r.ds_macro_atividade && atividadesMacroFilter.includes(r.ds_macro_atividade));
+    }
+    if (atividadesProntoExecucaoFilter.length > 0) {
+      arr = arr.filter((r) => {
+        let val = getRawStr(r, ["in_pronto_execucao", "pronto_execucao"]).toUpperCase();
+        if (val === "NÃƒO" || val === "NÃO" || val === "NAO") val = "SIM";
+        return atividadesProntoExecucaoFilter.includes(val);
+      });
+    }
+    if (atividadesUnicoSaFilter.length > 0) {
+      arr = arr.filter((r) => {
+        const val = getRawStr(r, ["primeiro_sa", "unico_sa"]);
+        return atividadesUnicoSaFilter.includes(val);
+      });
+    }
+
     if (atividadesTabSearch.trim()) {
       const q = atividadesTabSearch.trim().toLowerCase();
       arr = arr.filter((r) => 
@@ -1182,7 +1295,7 @@ const AtividadesEncerramento = () => {
       );
     }
     return arr;
-  }, [filteredFato, atividadesTabSearch]);
+  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter]);
 
   // ===== Histórico (60 dias) - agregações =====
   const isOkClose = (estado: string | null) => {
@@ -1472,70 +1585,6 @@ const AtividadesEncerramento = () => {
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 
                 {(() => {
-                  const MultiFilter = ({
-                    label,
-                    options,
-                    value,
-                    onChange,
-                  }: {
-                    label: string;
-                    options: string[];
-                    value: string[];
-                    onChange: (v: string[]) => void;
-                  }) => {
-                    const active = value.length > 0;
-                    const toggle = (opt: string) => {
-                      if (value.includes(opt)) {
-                        const next = value.filter((x) => x !== opt);
-                        onChange(next);
-                      } else {
-                        const next = [...value, opt];
-                        // se selecionar todos => trata como "todos liberados" (limpa)
-                        if (next.length === options.length) onChange([]);
-                        else onChange(next);
-                      }
-                    };
-                    const display = !active
-                      ? <span className="text-muted-foreground">{label}</span>
-                      : value.length === 1
-                        ? <span className="truncate">{value[0]}</span>
-                        : <span className="truncate">{label}: {value.length} selecionados</span>;
-                    return (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className={`flex h-8 w-[180px] items-center justify-between rounded-md border border-input bg-background px-3 text-xs ${active ? "border-primary/50 bg-primary/5" : ""}`}
-                          >
-                            {display}
-                            <span className="ml-2 opacity-50">▾</span>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[240px] p-0" align="start">
-                          <div className="max-h-[280px] overflow-auto p-1">
-                            {options.length === 0 && (
-                              <div className="p-2 text-xs text-muted-foreground">Sem opções</div>
-                            )}
-                            {options.map((opt) => {
-                              const checked = value.includes(opt) || value.length === 0;
-                              return (
-                                <label
-                                  key={opt}
-                                  className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent"
-                                >
-                                  <Checkbox
-                                    checked={value.length === 0 ? false : checked}
-                                    onCheckedChange={() => toggle(opt)}
-                                  />
-                                  <span className="truncate">{opt}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    );
-                  };
                   return (
                     <>
                       <MultiFilter
@@ -1639,24 +1688,48 @@ const AtividadesEncerramento = () => {
         <TabsContent value="atividades">
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <div>
-                  <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
-                  <CardDescription className="text-xs">Use os filtros acima para refinar.</CardDescription>
-                </div>
-                {atividadesTabSearch && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Filtrado por: {atividadesTabSearch}</Badge>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setAtividadesTabSearch("")} 
-                      className="h-6 text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      Limpar filtro
-                    </Button>
+              <div className="flex flex-col gap-3">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
+                    <CardDescription className="text-xs">Use os filtros abaixo para refinar os resultados desta aba.</CardDescription>
                   </div>
-                )}
+                  {atividadesTabSearch && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Filtrado por: {atividadesTabSearch}</Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setAtividadesTabSearch("")} 
+                        className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                      >
+                        Limpar filtro
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <MultiFilter
+                    label="Macro atividade"
+                    options={atividadesMacroOptions}
+                    value={atividadesMacroFilter}
+                    onChange={setAtividadesMacroFilter}
+                  />
+                  <MultiFilter
+                    label="Pronto execução"
+                    options={prontoExecucaoOptions}
+                    value={atividadesProntoExecucaoFilter}
+                    onChange={setAtividadesProntoExecucaoFilter}
+                  />
+                  <MultiFilter
+                    label="Único SA"
+                    options={unicoSaOptions}
+                    value={atividadesUnicoSaFilter}
+                    onChange={setAtividadesUnicoSaFilter}
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -1665,15 +1738,18 @@ const AtividadesEncerramento = () => {
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="text-[11px]">TT</TableHead>
-                      <TableHead className="text-[11px]">TR</TableHead>
                       <TableHead className="text-[11px]">Técnico</TableHead>
                       <TableHead className="text-[11px]">SA</TableHead>
+                      <TableHead className="text-[11px]">unico_sa</TableHead>
                       <TableHead className="text-[11px]">gpon</TableHead>
                       <TableHead className="text-[11px]">DocAssociado</TableHead>
                       <TableHead className="text-[11px]">Cps</TableHead>
+                      <TableHead className="text-[11px]">pronto_execucao</TableHead>
                       <TableHead className="text-[11px]">status_naf</TableHead>
                       <TableHead className="text-[11px]">data_naf</TableHead>
                       <TableHead className="text-[11px]">Hr_Fechado</TableHead>
+                      <TableHead className="text-[11px]">potencia_OLT</TableHead>
+                      <TableHead className="text-[11px]">potencia_ONT</TableHead>
                       <TableHead className="text-[11px]">ds_macro_atividade</TableHead>
                       <TableHead className="text-[11px]">ds_estado</TableHead>
                     </TableRow>
@@ -1696,6 +1772,13 @@ const AtividadesEncerramento = () => {
                       const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
                       const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
                       const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
+                      
+                      let prontoExecucao = getRawStr(r, ["in_pronto_execucao", "pronto_execucao"]).toUpperCase();
+                      if (prontoExecucao === "NÃƒO" || prontoExecucao === "NÃO" || prontoExecucao === "NAO") prontoExecucao = "SIM";
+                      const unicoSa = getRawStr(r, ["primeiro_sa", "unico_sa"]);
+                      const potOlt = getRawStr(r, ["potencia_na_olt", "potencia_olt"]);
+                      const potOnt = getRawStr(r, ["potencia_na_ont", "potencia_ont"]);
+
                       const statusNaf = getRawStr(r, ["status_naf"]) || "-";
                       const dataNaf = fmtDataNaf(getRawStr(r, ["data_naf"]));
                       const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
@@ -1703,15 +1786,18 @@ const AtividadesEncerramento = () => {
                       return (
                         <TableRow key={r.id}>
                           <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
-                          <TableCell className="text-[11px] font-mono">{r.matricula_tr}</TableCell>
                           <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
                           <TableCell className="text-[11px] font-mono">{sa}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{unicoSa}</TableCell>
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
                           <TableCell className="text-[11px] font-mono">{docAssoc}</TableCell>
                           <TableCell className="text-[11px]">{cps}</TableCell>
+                          <TableCell className="text-[11px]">{prontoExecucao}</TableCell>
                           <TableCell className="text-[11px]">{statusNaf}</TableCell>
                           <TableCell className="text-[11px] font-mono">{dataNaf}</TableCell>
                           <TableCell className="text-[11px] font-mono">{hrFechado}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{potOlt}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{potOnt}</TableCell>
                           <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
                           <TableCell className="text-[11px]"><Badge variant="outline" className={`text-[10px] ${badgeColor}`}>{r.ds_estado}</Badge></TableCell>
                         </TableRow>
