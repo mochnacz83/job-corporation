@@ -51,10 +51,22 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 
 function fmtDataNaf(val: string): string {
   if (!val || val.trim() === "") return "";
-  const d = new Date(val);
-  if (isNaN(d.getTime())) return val;
+  const v = val.trim();
+  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})[\sT]+(\d{2}:\d{2}:\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1].slice(-2)} - ${m[4]}`;
+  m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})[\sT]+(\d{2}:\d{2}:\d{2})/);
+  if (m) return `${m[1]}/${m[2]}/${m[3].slice(-2)} - ${m[4]}`;
+  const d = new Date(v.replace(" ", "T"));
+  if (isNaN(d.getTime())) return v;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)} - ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function fmtPotencia(val: string): string {
+  if (!val || val.trim() === "") return "";
+  const n = parseFloat(val.replace(",", "."));
+  if (isNaN(n)) return val;
+  return n.toFixed(2).replace(".", ",");
 }
 
 // Estados que contam como "Total de Atividades" (em andamento)
@@ -1776,12 +1788,12 @@ const AtividadesEncerramento = () => {
                       let prontoExecucao = getRawStr(r, ["in_pronto_execucao", "pronto_execucao"]).toUpperCase();
                       if (prontoExecucao === "NÃƒO" || prontoExecucao === "NÃO" || prontoExecucao === "NAO") prontoExecucao = "SIM";
                       const unicoSa = getRawStr(r, ["primeiro_sa", "unico_sa"]);
-                      const potOlt = getRawStr(r, ["potencia_na_olt", "potencia_olt"]);
-                      const potOnt = getRawStr(r, ["potencia_na_ont", "potencia_ont"]);
+                      const potOlt = fmtPotencia(getRawStr(r, ["potencia_na_olt", "potencia_olt"]));
+                      const potOnt = fmtPotencia(getRawStr(r, ["potencia_na_ont", "potencia_ont"]));
 
                       const statusNaf = getRawStr(r, ["status_naf"]) || "-";
                       const dataNaf = fmtDataNaf(getRawStr(r, ["data_naf"]));
-                      const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
+                      const hrFechado = fmtDataNaf(getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]));
 
                       return (
                         <TableRow key={r.id}>
