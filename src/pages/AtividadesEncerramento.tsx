@@ -49,6 +49,14 @@ type PresencaRow = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+function fmtDataNaf(val: string): string {
+  if (!val || val.trim() === "") return "";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)} - ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // Estados que contam como "Total de Atividades" (em andamento)
 const ESTADOS_EM_ANDAMENTO = [
   "atribuído",
