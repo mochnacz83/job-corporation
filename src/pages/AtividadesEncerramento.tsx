@@ -17,7 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2 } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -1358,6 +1358,49 @@ const AtividadesEncerramento = () => {
     return arr;
   }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesResultadoFilter]);
 
+  const handleExportAtividades = () => {
+    if (atividadesTabFato.length === 0) {
+      toast({ title: "Nenhum dado para exportar", variant: "destructive" });
+      return;
+    }
+    const dataToExport = atividadesTabFato.map(r => {
+      const setorStr = getRawStr(r, ["cd_setor", "ds_setor", "setor", "setor_atual", "setor_origem"]);
+      const sa = getRawStr(r, ["cd_nrba", "nrba", "sa"]);
+      const gpon = getRawStr(r, ["cd_gpon", "gpon"]);
+      const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
+      const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
+      const statusNaf = getRawStr(r, ["status_naf"]) || "-";
+      const dataNaf = fmtDataNaf(getRawStr(r, ["data_naf"]));
+      const hrFechado = fmtDataNaf(getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]));
+      const potOlt = fmtPotencia(getRawStr(r, ["potencia_na_olt", "potencia_olt"]));
+      const potOnt = fmtPotencia(getRawStr(r, ["potencia_na_ont", "potencia_ont"]));
+      
+      return {
+        "TT": r.matricula_tt || "",
+        "TR": r.matricula_tr || "",
+        "Técnico": r.nome_tecnico || "",
+        "Setor": setorStr,
+        "SA": sa,
+        "Gpon": gpon,
+        "Doc. Associado": docAssoc,
+        "Cps": cps,
+        "Status NAF": statusNaf,
+        "Data NAF": dataNaf,
+        "Hora Fechado": hrFechado,
+        "Potência OLT": potOlt,
+        "Potência ONT": potOnt,
+        "Macro Atividade": r.ds_macro_atividade || "",
+        "Estado": r.ds_estado || "",
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Atividades");
+    XLSX.writeFile(wb, `Atividades_Filtradas_${date}.xlsx`);
+  };
+
   // ===== Histórico (60 dias) - agregações =====
   const isOkClose = (estado: string | null) => {
     const e = (estado || "").toLowerCase();
@@ -1751,9 +1794,20 @@ const AtividadesEncerramento = () => {
             <CardHeader className="pb-2">
               <div className="flex flex-col gap-3">
                 <div className="flex justify-between items-center flex-wrap gap-2">
-                  <div>
-                    <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
-                    <CardDescription className="text-xs">Use os filtros abaixo para refinar os resultados desta aba.</CardDescription>
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
+                      <CardDescription className="text-xs">Use os filtros abaixo para refinar os resultados desta aba.</CardDescription>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-primary ml-2"
+                      onClick={handleExportAtividades}
+                      title="Exportar para Excel"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
                   </div>
                   {(atividadesTabSearch || atividadesResultadoFilter !== "ALL") && (
                     <div className="flex items-center gap-2">
@@ -1813,7 +1867,7 @@ const AtividadesEncerramento = () => {
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-auto max-h-[600px]">
-                <Table>
+                <Table className="whitespace-nowrap">
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
                       <TableHead className="text-[11px]">Técnico</TableHead>
