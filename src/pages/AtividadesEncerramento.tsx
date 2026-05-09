@@ -185,9 +185,12 @@ const AtividadesEncerramento = () => {
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
   const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
+  const [atividadesResultadoFilter, setAtividadesResultadoFilter] = useState<"ALL" | "SUCESSO" | "INSUCESSO">("ALL");
   const [atividadesMacroFilter, setAtividadesMacroFilter] = useState<string[]>([]);
   const [atividadesProntoExecucaoFilter, setAtividadesProntoExecucaoFilter] = useState<string[]>([]);
   const [atividadesUnicoSaFilter, setAtividadesUnicoSaFilter] = useState<string[]>([]);
+  const [atividadesStatusSaFilter, setAtividadesStatusSaFilter] = useState<string[]>([]);
+  const [atividadesSetorFilter, setAtividadesSetorFilter] = useState<string[]>([]);
 
   // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
   type HistRow = {
@@ -1240,7 +1243,7 @@ const AtividadesEncerramento = () => {
     }
   };
 
-  const handleNumberClick = (r: any) => {
+  const handleNumberClick = (r: any, tipo: "ALL" | "SUCESSO" | "INSUCESSO") => {
     if (r.nome && r.nome !== "—") {
       setAtividadesTabSearch(r.nome);
     } else if (r.tt) {
@@ -1248,6 +1251,7 @@ const AtividadesEncerramento = () => {
     } else if (r.tr) {
       setAtividadesTabSearch(r.tr);
     }
+    setAtividadesResultadoFilter(tipo);
     setActiveTab("atividades");
   };
 
@@ -1278,8 +1282,37 @@ const AtividadesEncerramento = () => {
     return Array.from(s).sort();
   }, [filteredFato]);
 
+  const atividadesStatusSaOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      if (r.ds_estado) s.add(r.ds_estado);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
+  const atividadesSetorOptions = useMemo(() => {
+    const s = new Set<string>();
+    filteredFato.forEach((r) => {
+      const setor = getRawStr(r, ["ds_setor", "setor", "setor_atual", "setor_origem"]);
+      if (setor) s.add(setor);
+    });
+    return Array.from(s).sort();
+  }, [filteredFato]);
+
   const atividadesTabFato = useMemo(() => {
     let arr = filteredFato;
+
+    if (atividadesResultadoFilter === "SUCESSO") {
+      arr = arr.filter((r) => {
+        const est = (r.ds_estado || "").toLowerCase().trim();
+        return est.includes("conclu") && est.includes("sucesso") && !est.includes("sem sucesso");
+      });
+    } else if (atividadesResultadoFilter === "INSUCESSO") {
+      arr = arr.filter((r) => {
+        const est = (r.ds_estado || "").toLowerCase().trim();
+        return est.includes("conclu") && est.includes("sem sucesso");
+      });
+    }
     
     if (atividadesMacroFilter.length > 0) {
       arr = arr.filter((r) => r.ds_macro_atividade && atividadesMacroFilter.includes(r.ds_macro_atividade));
@@ -1297,6 +1330,15 @@ const AtividadesEncerramento = () => {
         return atividadesUnicoSaFilter.includes(val);
       });
     }
+    if (atividadesStatusSaFilter.length > 0) {
+      arr = arr.filter((r) => r.ds_estado && atividadesStatusSaFilter.includes(r.ds_estado));
+    }
+    if (atividadesSetorFilter.length > 0) {
+      arr = arr.filter((r) => {
+        const setor = getRawStr(r, ["ds_setor", "setor", "setor_atual", "setor_origem"]);
+        return atividadesSetorFilter.includes(setor);
+      });
+    }
 
     if (atividadesTabSearch.trim()) {
       const q = atividadesTabSearch.trim().toLowerCase();
@@ -1307,7 +1349,7 @@ const AtividadesEncerramento = () => {
       );
     }
     return arr;
-  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter]);
+  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesResultadoFilter]);
 
   // ===== Histórico (60 dias) - agregações =====
   const isOkClose = (estado: string | null) => {
@@ -1682,9 +1724,9 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px]">{r.coordenador}</TableCell>
                           <TableCell className="text-[11px]">{r.setor_atual}</TableCell>
                           <TableCell className="text-[11px] text-center">{r.status && <Badge variant="outline" className={`text-[10px] ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : ''}`}>{r.status}</Badge>}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold text-success cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.sucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold text-destructive cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.insucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold cursor-pointer hover:underline" onClick={() => handleNumberClick(r)}>{r.total}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold text-success cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "SUCESSO")}>{r.sucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold text-destructive cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "INSUCESSO")}>{r.insucesso}</TableCell>
+                          <TableCell className="text-[11px] text-center font-semibold cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "ALL")}>{r.total}</TableCell>
                           <TableCell className="text-[11px] text-center">{fechadas > 0 ? `${pct.toFixed(1)}%` : "—"}</TableCell>
                         </TableRow>
                       );
@@ -1706,13 +1748,19 @@ const AtividadesEncerramento = () => {
                     <CardTitle className="text-sm">Atividades do dia ({atividadesTabFato.length})</CardTitle>
                     <CardDescription className="text-xs">Use os filtros abaixo para refinar os resultados desta aba.</CardDescription>
                   </div>
-                  {atividadesTabSearch && (
+                  {(atividadesTabSearch || atividadesResultadoFilter !== "ALL") && (
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Filtrado por: {atividadesTabSearch}</Badge>
+                      <Badge variant="secondary">
+                        Exibindo: {atividadesTabSearch || "Todos"} 
+                        {atividadesResultadoFilter !== "ALL" && ` (${atividadesResultadoFilter === "SUCESSO" ? "Sucesso" : "Insucesso"})`}
+                      </Badge>
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => setAtividadesTabSearch("")} 
+                        onClick={() => {
+                          setAtividadesTabSearch("");
+                          setAtividadesResultadoFilter("ALL");
+                        }} 
                         className="h-6 text-xs text-muted-foreground hover:text-destructive"
                       >
                         Limpar filtro
@@ -1741,6 +1789,18 @@ const AtividadesEncerramento = () => {
                     value={atividadesUnicoSaFilter}
                     onChange={setAtividadesUnicoSaFilter}
                   />
+                  <MultiFilter
+                    label="Status_SA"
+                    options={atividadesStatusSaOptions}
+                    value={atividadesStatusSaFilter}
+                    onChange={setAtividadesStatusSaFilter}
+                  />
+                  <MultiFilter
+                    label="Setor"
+                    options={atividadesSetorOptions}
+                    value={atividadesSetorFilter}
+                    onChange={setAtividadesSetorFilter}
+                  />
                 </div>
               </div>
             </CardHeader>
@@ -1751,6 +1811,7 @@ const AtividadesEncerramento = () => {
                     <TableRow>
                       <TableHead className="text-[11px]">TT</TableHead>
                       <TableHead className="text-[11px]">Técnico</TableHead>
+                      <TableHead className="text-[11px]">Setor</TableHead>
                       <TableHead className="text-[11px]">SA</TableHead>
                       <TableHead className="text-[11px]">unico_sa</TableHead>
                       <TableHead className="text-[11px]">gpon</TableHead>
@@ -1779,6 +1840,7 @@ const AtividadesEncerramento = () => {
                       else if (sucesso && !contaPresenca) badgeColor = "bg-warning/10 text-warning border-warning/20";
                       else if (insucesso) badgeColor = "bg-destructive/10 text-destructive border-destructive/20";
 
+                      const setorStr = getRawStr(r, ["ds_setor", "setor", "setor_atual", "setor_origem"]);
                       const sa = getRawStr(r, ["cd_nrba", "nrba", "sa"]);
                       const gpon = getRawStr(r, ["cd_gpon", "gpon"]);
                       const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
@@ -1799,6 +1861,7 @@ const AtividadesEncerramento = () => {
                         <TableRow key={r.id}>
                           <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
                           <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
+                          <TableCell className="text-[11px]">{setorStr}</TableCell>
                           <TableCell className="text-[11px] font-mono">{sa}</TableCell>
                           <TableCell className="text-[11px] font-mono">{unicoSa}</TableCell>
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
