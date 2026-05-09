@@ -49,6 +49,14 @@ type PresencaRow = {
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+function fmtDataNaf(val: string): string {
+  if (!val || val.trim() === "") return "";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)} - ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // Estados que contam como "Total de Atividades" (em andamento)
 const ESTADOS_EM_ANDAMENTO = [
   "atribuído",
@@ -1689,7 +1697,7 @@ const AtividadesEncerramento = () => {
                       const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
                       const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
                       const statusNaf = getRawStr(r, ["status_naf"]) || "-";
-                      const dataNaf = getRawStr(r, ["data_naf"]);
+                      const dataNaf = fmtDataNaf(getRawStr(r, ["data_naf"]));
                       const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
 
                       return (
