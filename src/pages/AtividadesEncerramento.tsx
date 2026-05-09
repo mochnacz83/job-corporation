@@ -623,7 +623,6 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(effStat, statusFilter)) return;
 
       if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
-      if (!stat && p.tr) s.add(p.tr.trim().toUpperCase());
     });
     return s;
   }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
@@ -668,10 +667,12 @@ const AtividadesEncerramento = () => {
         MACROS_PRESENCA_OK.includes(macro) &&
         macro !== MACRO_PRESENCA_EXCLUIR
       ) {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (tt) s.add(tt);
-        if (tr) s.add(tr);
+        const pTT = info ? (info.tt || "").trim().toUpperCase() : "";
+        const pTR = info ? (info.tr || "").trim().toUpperCase() : "";
+        const fTT = (r.matricula_tt || "").trim().toUpperCase();
+        const fTR = (r.matricula_tr || "").trim().toUpperCase();
+        const key = pTT || pTR || fTT || fTR;
+        if (key) s.add(key);
       }
     });
     return s;
@@ -688,10 +689,12 @@ const AtividadesEncerramento = () => {
       const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
       if (!matchFilter(stat, statusFilter)) return;
 
-      const tt = (r.matricula_tt || "").trim().toUpperCase();
-      const tr = (r.matricula_tr || "").trim().toUpperCase();
-      if (tt) s.add(tt);
-      if (tr) s.add(tr);
+      const pTT = info ? (info.tt || "").trim().toUpperCase() : "";
+      const pTR = info ? (info.tr || "").trim().toUpperCase() : "";
+      const fTT = (r.matricula_tt || "").trim().toUpperCase();
+      const fTR = (r.matricula_tr || "").trim().toUpperCase();
+      const key = pTT || pTR || fTT || fTR;
+      if (key) s.add(key);
     });
     return s;
   }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
@@ -811,8 +814,7 @@ const AtividadesEncerramento = () => {
         if (!isOK) return false;
       } else if (cardFilter === "ATIVOS") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (!(tt && ttsAtivos.has(tt)) && !(tr && ttsAtivos.has(tr))) return false;
+        if (!tt || !ttsAtivos.has(tt)) return false;
       } else if (cardFilter === "SEM_PRESENCA") {
         const tt = (r.matricula_tt || "").trim().toUpperCase();
         const tr = (r.matricula_tr || "").trim().toUpperCase();
