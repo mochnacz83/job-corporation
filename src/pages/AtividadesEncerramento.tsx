@@ -1816,7 +1816,6 @@ const AtividadesEncerramento = () => {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead className="text-[11px]">TT</TableHead>
                       <TableHead className="text-[11px]">Técnico</TableHead>
                       <TableHead className="text-[11px]">SA</TableHead>
                       <TableHead className="text-[11px]">gpon</TableHead>
@@ -1863,7 +1862,6 @@ const AtividadesEncerramento = () => {
 
                       return (
                         <TableRow key={r.id}>
-                          <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
                           <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
                           <TableCell className="text-[11px] font-mono">{sa}</TableCell>
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
