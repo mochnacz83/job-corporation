@@ -1663,6 +1663,9 @@ const AtividadesEncerramento = () => {
                       <TableHead className="text-[11px]">gpon</TableHead>
                       <TableHead className="text-[11px]">DocAssociado</TableHead>
                       <TableHead className="text-[11px]">Cps</TableHead>
+                      <TableHead className="text-[11px]">status_naf</TableHead>
+                      <TableHead className="text-[11px]">data_naf</TableHead>
+                      <TableHead className="text-[11px]">Hr_Fechado</TableHead>
                       <TableHead className="text-[11px]">ds_macro_atividade</TableHead>
                       <TableHead className="text-[11px]">ds_estado</TableHead>
                     </TableRow>
@@ -1685,6 +1688,9 @@ const AtividadesEncerramento = () => {
                       const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
                       const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
                       const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
+                      const statusNaf = getRawStr(r, ["status_naf"]) || "-";
+                      const dataNaf = getRawStr(r, ["data_naf"]);
+                      const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
 
                       return (
                         <TableRow key={r.id}>
@@ -1695,6 +1701,9 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
                           <TableCell className="text-[11px] font-mono">{docAssoc}</TableCell>
                           <TableCell className="text-[11px]">{cps}</TableCell>
+                          <TableCell className="text-[11px]">{statusNaf}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{dataNaf}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{hrFechado}</TableCell>
                           <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
                           <TableCell className="text-[11px]"><Badge variant="outline" className={`text-[10px] ${badgeColor}`}>{r.ds_estado}</Badge></TableCell>
                         </TableRow>
