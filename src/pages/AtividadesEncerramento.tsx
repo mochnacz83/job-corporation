@@ -1688,6 +1688,9 @@ const AtividadesEncerramento = () => {
                       const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
                       const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
                       const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
+                      const statusNaf = getRawStr(r, ["status_naf"]) || "-";
+                      const dataNaf = getRawStr(r, ["data_naf"]);
+                      const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
 
                       return (
                         <TableRow key={r.id}>
