@@ -1663,6 +1663,9 @@ const AtividadesEncerramento = () => {
                       <TableHead className="text-[11px]">gpon</TableHead>
                       <TableHead className="text-[11px]">DocAssociado</TableHead>
                       <TableHead className="text-[11px]">Cps</TableHead>
+                      <TableHead className="text-[11px]">status_naf</TableHead>
+                      <TableHead className="text-[11px]">data_naf</TableHead>
+                      <TableHead className="text-[11px]">Hr_Fechado</TableHead>
                       <TableHead className="text-[11px]">ds_macro_atividade</TableHead>
                       <TableHead className="text-[11px]">ds_estado</TableHead>
                     </TableRow>
