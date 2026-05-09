@@ -1697,7 +1697,7 @@ const AtividadesEncerramento = () => {
                       const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
                       const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
                       const statusNaf = getRawStr(r, ["status_naf"]) || "-";
-                      const dataNaf = getRawStr(r, ["data_naf"]);
+                      const dataNaf = fmtDataNaf(getRawStr(r, ["data_naf"]));
                       const hrFechado = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
 
                       return (
