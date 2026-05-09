@@ -1659,6 +1659,10 @@ const AtividadesEncerramento = () => {
                       <TableHead className="text-[11px]">TT</TableHead>
                       <TableHead className="text-[11px]">TR</TableHead>
                       <TableHead className="text-[11px]">Técnico</TableHead>
+                      <TableHead className="text-[11px]">SA</TableHead>
+                      <TableHead className="text-[11px]">gpon</TableHead>
+                      <TableHead className="text-[11px]">DocAssociado</TableHead>
+                      <TableHead className="text-[11px]">Cps</TableHead>
                       <TableHead className="text-[11px]">ds_macro_atividade</TableHead>
                       <TableHead className="text-[11px]">ds_estado</TableHead>
                     </TableRow>
@@ -1676,11 +1680,21 @@ const AtividadesEncerramento = () => {
                       else if (sucesso && !contaPresenca) badgeColor = "bg-warning/10 text-warning border-warning/20";
                       else if (insucesso) badgeColor = "bg-destructive/10 text-destructive border-destructive/20";
 
+                      const sa = getRawStr(r, ["cd_nrba", "nrba", "sa"]);
+                      const gpon = getRawStr(r, ["cd_gpon", "gpon"]);
+                      const docAssoc = getRawStr(r, ["cd_documento_associado", "documento_associado", "doc_associado"]);
+                      const cpRaw = getRawStr(r, ["cp", "cd_cp"]).trim().toUpperCase();
+                      const cps = cpRaw === "" ? "" : (cpRaw === "NIO" ? "NIO" : cpRaw === "TIM" ? "TIM" : "Others");
+
                       return (
                         <TableRow key={r.id}>
                           <TableCell className="text-[11px] font-mono">{r.matricula_tt}</TableCell>
                           <TableCell className="text-[11px] font-mono">{r.matricula_tr}</TableCell>
                           <TableCell className="text-[11px]">{r.nome_tecnico}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{sa}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{gpon}</TableCell>
+                          <TableCell className="text-[11px] font-mono">{docAssoc}</TableCell>
+                          <TableCell className="text-[11px]">{cps}</TableCell>
                           <TableCell className="text-[11px]">{r.ds_macro_atividade}</TableCell>
                           <TableCell className="text-[11px]"><Badge variant="outline" className={`text-[10px] ${badgeColor}`}>{r.ds_estado}</Badge></TableCell>
                         </TableRow>
