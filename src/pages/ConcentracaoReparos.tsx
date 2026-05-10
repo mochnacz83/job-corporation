@@ -115,6 +115,9 @@ const ConcentracaoReparos = () => {
   const [municipioFilter, setMunicipioFilter] = useState<string[]>([]);
   const [setorFilter, setSetorFilter] = useState<string[]>([]);
   const [statusNafFilter, setStatusNafFilter] = useState<string[]>([]);
+  const [estacaoFilter, setEstacaoFilter] = useState<string[]>([]);
+  const [cdoFilter, setCdoFilter] = useState<string[]>([]);
+  const [bairroFilter, setBairroFilter] = useState<string[]>([]);
   const [bairroOnlyConc, setBairroOnlyConc] = useState(false);
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
@@ -162,7 +165,34 @@ const ConcentracaoReparos = () => {
     }
   };
 
+  const clearAllFilters = () => {
+    setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]);
+    setEstacaoFilter([]); setCdoFilter([]); setBairroFilter([]);
+    setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false);
+    setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch("");
+  };
+
   useEffect(() => { fetchData(); }, []);
+
+  // Realtime: quando uma nova sincronização da FATO concluir, recarrega
+  // os dados automaticamente e limpa filtros aplicados — sem refresh.
+  useEffect(() => {
+    const channel = supabase
+      .channel("atividades-sync-log-watch")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "atividades_sync_log" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { status?: string } | null;
+          if (row?.status === "success") {
+            clearAllFilters();
+            fetchData();
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   // Status considerados "em aberto" (exclui Concluído Com Sucesso e demais)
   const STATUS_ABERTO = useMemo(
@@ -195,13 +225,19 @@ const ConcentracaoReparos = () => {
       if (setorFilter.length && !setorFilter.includes(setor)) return false;
       const sn = getRaw(r, ["status_naf"]);
       if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      const estacao = getRaw(r, ["cd_estacao"]);
+      if (estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
+      const cdoVal = getRaw(r, ["cdo"]);
+      if (cdoFilter.length && !cdoFilter.includes(cdoVal)) return false;
+      const bairroVal = fixText(getRaw(r, ["ds_bairro"]));
+      if (bairroFilter.length && !bairroFilter.includes(bairroVal)) return false;
       if (q) {
         const blob = JSON.stringify(r.raw || {}).toLowerCase();
         if (!blob.includes(q)) return false;
       }
       return true;
     });
-  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, search]);
+  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, estacaoFilter, cdoFilter, bairroFilter, search]);
 
   // Mapas de concentração base (sobre filteredBase) - usados para identificar
   // bairros/cdos/cidades concentradas independentemente dos toggles dos cards
@@ -343,6 +379,24 @@ const ConcentracaoReparos = () => {
   const statusNafOptions = useMemo(() => {
     const s = new Set<string>();
     base.forEach((r) => { const v = getRaw(r, ["status_naf"]); if (v) s.add(v); });
+    return Array.from(s).sort();
+  }, [base]);
+
+  const estacaoOptions = useMemo(() => {
+    const s = new Set<string>();
+    base.forEach((r) => { const v = getRaw(r, ["cd_estacao"]); if (v) s.add(v); });
+    return Array.from(s).sort();
+  }, [base]);
+
+  const cdoOptions = useMemo(() => {
+    const s = new Set<string>();
+    base.forEach((r) => { const v = getRaw(r, ["cdo"]); if (v) s.add(v); });
+    return Array.from(s).sort();
+  }, [base]);
+
+  const bairroOptions = useMemo(() => {
+    const s = new Set<string>();
+    base.forEach((r) => { const v = fixText(getRaw(r, ["ds_bairro"])); if (v) s.add(v); });
     return Array.from(s).sort();
   }, [base]);
 
@@ -548,17 +602,20 @@ const ConcentracaoReparos = () => {
         <Input placeholder="Buscar (SA, GPON, endereço...)" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-[260px] text-xs" />
         <MultiFilter label="Status_SA" options={estadoOptions} value={estadoFilter} onChange={setEstadoFilter} />
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
+        <MultiFilter label="Bairro" options={bairroOptions} value={bairroFilter} onChange={setBairroFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
+        <MultiFilter label="Estação" options={estacaoOptions} value={estacaoFilter} onChange={setEstacaoFilter} />
+        <MultiFilter label="CDO" options={cdoOptions} value={cdoFilter} onChange={setCdoFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
         {(() => {
-          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
           return (
             <Button
               variant={hasAny ? "default" : "outline"}
               size="sm"
               disabled={!hasAny}
               className="h-8 text-xs"
-              onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}
+              onClick={clearAllFilters}
             >
               Limpar todos os filtros
             </Button>
