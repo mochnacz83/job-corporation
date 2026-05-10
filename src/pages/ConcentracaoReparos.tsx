@@ -71,6 +71,30 @@ const fmtPot = (val: string): string => {
   return n.toFixed(2).replace(".", ",");
 };
 
+const parsePot = (val: string): number | null => {
+  if (!val) return null;
+  const n = parseFloat(val.replace(",", "."));
+  return isNaN(n) ? null : n;
+};
+
+// Calcula Status Potências combinando Status NAF + Ptcia_OLT + Ptcia_ONT.
+// Regra: < -27 => atenuado (sinal pior). Ambas atenuadas => Sinal_Atenuado.
+const computeStatusPot = (statusNaf: string, potOlt: string, potOnt: string): string => {
+  if (!statusNaf) return "";
+  if (/sem\s*pot/i.test(statusNaf)) return "Sem Potência";
+  if (/com\s*pot/i.test(statusNaf)) {
+    const olt = parsePot(potOlt);
+    const ont = parsePot(potOnt);
+    const oltAt = olt !== null && olt < -27;
+    const ontAt = ont !== null && ont < -27;
+    if (oltAt && ontAt) return "Sinal_Atenuado";
+    if (oltAt) return "OLT_Atenuado";
+    if (ontAt) return "ONT_Atenuada";
+    return "Potência OK";
+  }
+  return statusNaf;
+};
+
 const MultiFilter = ({
   label, options, value, onChange, width = 170,
 }: { label: string; options: string[]; value: string[]; onChange: (v: string[]) => void; width?: number }) => {
@@ -115,6 +139,7 @@ const ConcentracaoReparos = () => {
   const [municipioFilter, setMunicipioFilter] = useState<string[]>([]);
   const [setorFilter, setSetorFilter] = useState<string[]>([]);
   const [statusNafFilter, setStatusNafFilter] = useState<string[]>([]);
+  const [statusPotFilter, setStatusPotFilter] = useState<string[]>([]);
   const [estacaoFilter, setEstacaoFilter] = useState<string[]>([]);
   const [cdoFilter, setCdoFilter] = useState<string[]>([]);
   const [bairroFilter, setBairroFilter] = useState<string[]>([]);
@@ -166,7 +191,7 @@ const ConcentracaoReparos = () => {
   };
 
   const clearAllFilters = () => {
-    setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]);
+    setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setStatusPotFilter([]);
     setEstacaoFilter([]); setCdoFilter([]); setBairroFilter([]);
     setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false);
     setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch("");
@@ -225,6 +250,10 @@ const ConcentracaoReparos = () => {
       if (setorFilter.length && !setorFilter.includes(setor)) return false;
       const sn = getRaw(r, ["status_naf"]);
       if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (statusPotFilter.length) {
+        const sp = computeStatusPot(sn, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        if (!statusPotFilter.includes(sp)) return false;
+      }
       const estacao = getRaw(r, ["cd_estacao"]);
       if (estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
@@ -237,7 +266,7 @@ const ConcentracaoReparos = () => {
       }
       return true;
     });
-  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, estacaoFilter, cdoFilter, bairroFilter, search]);
+  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, statusPotFilter, estacaoFilter, cdoFilter, bairroFilter, search]);
 
   // Mapas de concentração base (sobre filteredBase) - usados para identificar
   // bairros/cdos/cidades concentradas independentemente dos toggles dos cards
@@ -366,7 +395,7 @@ const ConcentracaoReparos = () => {
   // listas suspensas + busca), exceto o próprio filtro. Isso garante que
   // ao filtrar por uma cidade, as outras listas mostrem apenas valores
   // existentes para essa cidade, e vice-versa.
-  type DropKey = "estado" | "municipio" | "setor" | "statusNaf" | "estacao" | "cdo" | "bairro";
+  type DropKey = "estado" | "municipio" | "setor" | "statusNaf" | "statusPot" | "estacao" | "cdo" | "bairro";
   const buildPool = (skip: DropKey) => {
     const q = search.trim().toLowerCase();
     const dropFiltered = base.filter((r) => {
@@ -378,6 +407,10 @@ const ConcentracaoReparos = () => {
       if (skip !== "setor" && setorFilter.length && !setorFilter.includes(setor)) return false;
       const sn = getRaw(r, ["status_naf"]);
       if (skip !== "statusNaf" && statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (skip !== "statusPot" && statusPotFilter.length) {
+        const sp = computeStatusPot(sn, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        if (!statusPotFilter.includes(sp)) return false;
+      }
       const estacao = getRaw(r, ["cd_estacao"]);
       if (skip !== "estacao" && estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
@@ -413,7 +446,7 @@ const ConcentracaoReparos = () => {
 
   const optionsDeps = [
     base, estadoFilter, municipioFilter, setorFilter, statusNafFilter,
-    estacaoFilter, cdoFilter, bairroFilter, search,
+    statusPotFilter, estacaoFilter, cdoFilter, bairroFilter, search,
     bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly,
     bairroCount, cdoCount, cidadeCount,
   ];
@@ -442,6 +475,16 @@ const ConcentracaoReparos = () => {
   const statusNafOptions = useMemo(() => {
     const s = new Set<string>();
     buildPool("statusNaf").forEach((r) => { const v = getRaw(r, ["status_naf"]); if (v) s.add(v); });
+    return Array.from(s).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
+
+  const statusPotOptions = useMemo(() => {
+    const s = new Set<string>();
+    buildPool("statusPot").forEach((r) => {
+      const v = computeStatusPot(getRaw(r, ["status_naf"]), getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+      if (v) s.add(v);
+    });
     return Array.from(s).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, optionsDeps);
@@ -493,7 +536,8 @@ const ConcentracaoReparos = () => {
         const statusNaf = getRaw(r, ["status_naf"]);
         const potOlt = fmtPot(getRaw(r, ["potencia_na_olt"]));
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
-        return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
+        const statusPot = computeStatusPot(statusNaf, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, statusPot, potOlt, potOnt };
     });
   }, [fullyFiltered, bairroCount, cdoCount]);
 
@@ -536,6 +580,7 @@ const ConcentracaoReparos = () => {
       cdo: r.cdo,
       "Afet. CDO": r.cdoAfet,
       "Status Naf": r.statusNaf,
+      "Status Potências": r.statusPot,
       Ptcia_OLT: r.potOlt,
       Ptcia_ONT: r.potOnt,
     }));
@@ -674,8 +719,9 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Estação" options={estacaoOptions} value={estacaoFilter} onChange={setEstacaoFilter} />
         <MultiFilter label="CDO" options={cdoOptions} value={cdoFilter} onChange={setCdoFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
+        <MultiFilter label="Status Potências" options={statusPotOptions} value={statusPotFilter} onChange={setStatusPotFilter} width={190} />
         {(() => {
-          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
           return (
             <Button
               variant={hasAny ? "default" : "outline"}
@@ -692,8 +738,9 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Tabela: um único container com scroll vertical+horizontal,
-          cabeçalho sticky no topo, barra horizontal sempre no rodapé visível */}
-      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative">
+          cabeçalho sticky no topo. Barra de rolagem fica oculta e só aparece
+          ao passar o mouse sobre a tabela (classe scroll-hover). */}
+      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative scroll-hover">
         <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
           <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
@@ -715,6 +762,7 @@ const ConcentracaoReparos = () => {
                 { k: "cdo", l: "cdo" },
                 { k: "cdoAfet", l: "Afet. CDO", align: "center" as const },
                 { k: "statusNaf", l: "Status Naf" },
+                { k: "statusPot", l: "Status Potências" },
                 { k: "potOlt", l: "Ptcia_OLT", align: "right" as const },
                 { k: "potOnt", l: "Ptcia_ONT", align: "right" as const },
               ].map((c) => (
@@ -730,7 +778,7 @@ const ConcentracaoReparos = () => {
           </TableHeader>
           <TableBody>
             {sortedRows.length === 0 && (
-              <TableRow><TableCell colSpan={19} className="text-center text-muted-foreground text-xs py-6">
+              <TableRow><TableCell colSpan={20} className="text-center text-muted-foreground text-xs py-6">
                 {loading ? "Carregando..." : "Nenhum registro"}
               </TableCell></TableRow>
             )}
@@ -757,6 +805,19 @@ const ConcentracaoReparos = () => {
                   {r.cdoAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.cdoAfet}</Badge> : <span className="text-muted-foreground">-</span>}
                 </TableCell>
                 <TableCell className="p-2">{r.statusNaf}</TableCell>
+                <TableCell className="p-2">
+                  {r.statusPot === "Sem Potência" ? (
+                    <Badge variant="secondary" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                  ) : r.statusPot === "Potência OK" ? (
+                    <Badge className="text-[10px] px-1.5 bg-emerald-600 hover:bg-emerald-600">{r.statusPot}</Badge>
+                  ) : r.statusPot === "Sinal_Atenuado" ? (
+                    <Badge variant="destructive" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                  ) : r.statusPot === "OLT_Atenuado" || r.statusPot === "ONT_Atenuada" ? (
+                    <Badge className="text-[10px] px-1.5 bg-amber-600 hover:bg-amber-600">{r.statusPot}</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">{r.statusPot || "-"}</span>
+                  )}
+                </TableCell>
                 <TableCell className="p-2 text-right font-mono">{r.potOlt}</TableCell>
                 <TableCell className="p-2 text-right font-mono">{r.potOnt}</TableCell>
               </TableRow>
