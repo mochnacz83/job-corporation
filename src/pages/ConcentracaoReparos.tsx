@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
-import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown, Building2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench, FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown, Building2, Filter } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -583,6 +582,8 @@ const ConcentracaoReparos = () => {
       "Status Potências": r.statusPot,
       Ptcia_OLT: r.potOlt,
       Ptcia_ONT: r.potOnt,
+      "Nome do Cliente": "",
+      "Contato": "",
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -710,31 +711,45 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Input placeholder="Buscar (SA, GPON, endereço...)" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-[260px] text-xs" />
-        <MultiFilter label="Status_SA" options={estadoOptions} value={estadoFilter} onChange={setEstadoFilter} />
-        <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
-        <MultiFilter label="Bairro" options={bairroOptions} value={bairroFilter} onChange={setBairroFilter} />
-        <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
-        <MultiFilter label="Estação" options={estacaoOptions} value={estacaoFilter} onChange={setEstacaoFilter} />
-        <MultiFilter label="CDO" options={cdoOptions} value={cdoFilter} onChange={setCdoFilter} />
-        <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        <MultiFilter label="Status Potências" options={statusPotOptions} value={statusPotFilter} onChange={setStatusPotFilter} width={190} />
-        {(() => {
-          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
-          return (
-            <Button
-              variant={hasAny ? "default" : "outline"}
-              size="sm"
-              disabled={!hasAny}
-              className="h-8 text-xs"
-              onClick={clearAllFilters}
-            >
-              Limpar todos os filtros
-            </Button>
-          );
-        })()}
-        <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground mr-1" />
+          <MultiFilter label="Status_SA" options={estadoOptions} value={estadoFilter} onChange={setEstadoFilter} />
+          <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
+          <MultiFilter label="Bairro" options={bairroOptions} value={bairroFilter} onChange={setBairroFilter} />
+          <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
+          <MultiFilter label="Estação" options={estacaoOptions} value={estacaoFilter} onChange={setEstacaoFilter} />
+          <MultiFilter label="CDO" options={cdoOptions} value={cdoFilter} onChange={setCdoFilter} />
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-2">
+          <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
+          <MultiFilter label="Status Potências" options={statusPotOptions} value={statusPotFilter} onChange={setStatusPotFilter} width={190} />
+          
+          <div className="ml-auto flex items-center gap-2">
+            {(() => {
+              const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+              return (
+                <Button
+                  variant={hasAny ? "default" : "outline"}
+                  size="sm"
+                  disabled={!hasAny}
+                  className="h-8 text-xs"
+                  onClick={clearAllFilters}
+                >
+                  Limpar todos os filtros
+                </Button>
+              );
+            })()}
+            <Input 
+              placeholder="Buscar (SA, GPON, endereço...)" 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              className="h-8 w-[240px] text-xs" 
+            />
+            <Badge variant="secondary" className="text-xs h-8 px-3">{sortedRows.length} registros</Badge>
+          </div>
+        </div>
       </div>
 
       {/* Tabela: um único container com scroll vertical+horizontal,
