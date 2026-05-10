@@ -300,10 +300,16 @@ const ConcentracaoReparos = () => {
           <h1 className="text-xl font-semibold">Concentração de Reparos</h1>
           <p className="text-xs text-muted-foreground">Reparos REP-FTTH em SC com prontidão de execução</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportXlsx} disabled={loading || rows.length === 0}>
+            <FileSpreadsheet className="w-4 h-4 mr-1" />
+            Exportar Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Cards */}
