@@ -362,48 +362,110 @@ const ConcentracaoReparos = () => {
     [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, bairroCount, cdoCount, cidadeCount]
   );
 
-  // Opções de filtros
+  // Opções de filtros — refletem todos os filtros ativos (cards + demais
+  // listas suspensas + busca), exceto o próprio filtro. Isso garante que
+  // ao filtrar por uma cidade, as outras listas mostrem apenas valores
+  // existentes para essa cidade, e vice-versa.
+  type DropKey = "estado" | "municipio" | "setor" | "statusNaf" | "estacao" | "cdo" | "bairro";
+  const buildPool = (skip: DropKey) => {
+    const q = search.trim().toLowerCase();
+    const dropFiltered = base.filter((r) => {
+      const estado = fixEstado(r.ds_estado || "");
+      if (skip !== "estado" && estadoFilter.length && !estadoFilter.includes(estado)) return false;
+      const mun = fixText(getRaw(r, ["ds_municipio"]));
+      if (skip !== "municipio" && municipioFilter.length && !municipioFilter.includes(mun)) return false;
+      const setor = getRaw(r, ["cd_setor"]);
+      if (skip !== "setor" && setorFilter.length && !setorFilter.includes(setor)) return false;
+      const sn = getRaw(r, ["status_naf"]);
+      if (skip !== "statusNaf" && statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      const estacao = getRaw(r, ["cd_estacao"]);
+      if (skip !== "estacao" && estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
+      const cdoVal = getRaw(r, ["cdo"]);
+      if (skip !== "cdo" && cdoFilter.length && !cdoFilter.includes(cdoVal)) return false;
+      const bairroVal = fixText(getRaw(r, ["ds_bairro"]));
+      if (skip !== "bairro" && bairroFilter.length && !bairroFilter.includes(bairroVal)) return false;
+      if (q) {
+        const blob = JSON.stringify(r.raw || {}).toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
+    });
+    // Aplica também os toggles dos cards
+    return dropFiltered.filter((r) => {
+      if (bairroOnlyConc) {
+        const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
+        const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        if ((bairroCount.get(`${mun}||${b}`) || 0) < 2) return false;
+      }
+      if (cdoOnlyConc) {
+        const c = getRaw(r, ["cdo"]).toUpperCase();
+        if ((cdoCount.get(c) || 0) < 2) return false;
+      }
+      if (cidadeOnlyConc) {
+        const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        if ((cidadeCount.get(c) || 0) <= 20) return false;
+      }
+      if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      return true;
+    });
+  };
+
+  const optionsDeps = [
+    base, estadoFilter, municipioFilter, setorFilter, statusNafFilter,
+    estacaoFilter, cdoFilter, bairroFilter, search,
+    bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly,
+    bairroCount, cdoCount, cidadeCount,
+  ];
+
   const estadoOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = fixEstado(r.ds_estado || ""); if (v) s.add(v); });
+    buildPool("estado").forEach((r) => { const v = fixEstado(r.ds_estado || ""); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const municipioOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = fixText(getRaw(r, ["ds_municipio"])); if (v) s.add(v); });
+    buildPool("municipio").forEach((r) => { const v = fixText(getRaw(r, ["ds_municipio"])); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const setorOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = getRaw(r, ["cd_setor"]); if (v) s.add(v); });
+    buildPool("setor").forEach((r) => { const v = getRaw(r, ["cd_setor"]); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const statusNafOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = getRaw(r, ["status_naf"]); if (v) s.add(v); });
+    buildPool("statusNaf").forEach((r) => { const v = getRaw(r, ["status_naf"]); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const estacaoOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = getRaw(r, ["cd_estacao"]); if (v) s.add(v); });
+    buildPool("estacao").forEach((r) => { const v = getRaw(r, ["cd_estacao"]); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const cdoOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = getRaw(r, ["cdo"]); if (v) s.add(v); });
+    buildPool("cdo").forEach((r) => { const v = getRaw(r, ["cdo"]); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   const bairroOptions = useMemo(() => {
     const s = new Set<string>();
-    base.forEach((r) => { const v = fixText(getRaw(r, ["ds_bairro"])); if (v) s.add(v); });
+    buildPool("bairro").forEach((r) => { const v = fixText(getRaw(r, ["ds_bairro"])); if (v) s.add(v); });
     return Array.from(s).sort();
-  }, [base]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
 
   // Linhas para tabela usando o conjunto totalmente filtrado
   const rows = useMemo(() => {
