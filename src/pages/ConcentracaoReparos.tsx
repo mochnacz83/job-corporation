@@ -119,6 +119,7 @@ const ConcentracaoReparos = () => {
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
   const [semPotenciaOnly, setSemPotenciaOnly] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -144,6 +145,7 @@ const ConcentracaoReparos = () => {
         .eq("ds_macro_atividade", "REP-FTTH");
       if (error) throw error;
       setFato((data || []) as FatoRow[]);
+      setLastUpdate(new Date());
     } finally {
       setLoading(false);
     }
@@ -353,7 +355,14 @@ const ConcentracaoReparos = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Concentração de Reparos</h1>
-          <p className="text-xs text-muted-foreground">Reparos REP-FTTH em SC com prontidão de execução</p>
+          <p className="text-xs text-muted-foreground">
+            Reparos REP-FTTH em SC com prontidão de execução
+            {lastUpdate && (
+              <span className="ml-2 text-[10px] opacity-70">
+                · atualizado em {lastUpdate.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={exportXlsx} disabled={loading || rows.length === 0}>
