@@ -71,6 +71,30 @@ const fmtPot = (val: string): string => {
   return n.toFixed(2).replace(".", ",");
 };
 
+const parsePot = (val: string): number | null => {
+  if (!val) return null;
+  const n = parseFloat(val.replace(",", "."));
+  return isNaN(n) ? null : n;
+};
+
+// Calcula Status Potências combinando Status NAF + Ptcia_OLT + Ptcia_ONT.
+// Regra: < -27 => atenuado (sinal pior). Ambas atenuadas => Sinal_Atenuado.
+const computeStatusPot = (statusNaf: string, potOlt: string, potOnt: string): string => {
+  if (!statusNaf) return "";
+  if (/sem\s*pot/i.test(statusNaf)) return "Sem Potência";
+  if (/com\s*pot/i.test(statusNaf)) {
+    const olt = parsePot(potOlt);
+    const ont = parsePot(potOnt);
+    const oltAt = olt !== null && olt < -27;
+    const ontAt = ont !== null && ont < -27;
+    if (oltAt && ontAt) return "Sinal_Atenuado";
+    if (oltAt) return "OLT_Atenuado";
+    if (ontAt) return "ONT_Atenuada";
+    return "Potência OK";
+  }
+  return statusNaf;
+};
+
 const MultiFilter = ({
   label, options, value, onChange, width = 170,
 }: { label: string; options: string[]; value: string[]; onChange: (v: string[]) => void; width?: number }) => {
@@ -115,6 +139,7 @@ const ConcentracaoReparos = () => {
   const [municipioFilter, setMunicipioFilter] = useState<string[]>([]);
   const [setorFilter, setSetorFilter] = useState<string[]>([]);
   const [statusNafFilter, setStatusNafFilter] = useState<string[]>([]);
+  const [statusPotFilter, setStatusPotFilter] = useState<string[]>([]);
   const [estacaoFilter, setEstacaoFilter] = useState<string[]>([]);
   const [cdoFilter, setCdoFilter] = useState<string[]>([]);
   const [bairroFilter, setBairroFilter] = useState<string[]>([]);
@@ -166,7 +191,7 @@ const ConcentracaoReparos = () => {
   };
 
   const clearAllFilters = () => {
-    setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]);
+    setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setStatusPotFilter([]);
     setEstacaoFilter([]); setCdoFilter([]); setBairroFilter([]);
     setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false);
     setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch("");
