@@ -383,7 +383,7 @@ const ConcentracaoReparos = () => {
 
       {/* Tabela */}
       <div className="flex-1 overflow-auto rounded-md border">
-        <Table>
+        <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead className="text-[11px]">SA</TableHead>
@@ -423,7 +423,7 @@ const ConcentracaoReparos = () => {
                 <TableCell className="p-2">{r.municipio}</TableCell>
                 <TableCell className="p-2">{r.estacao}</TableCell>
                 <TableCell className="p-2">{r.setor}</TableCell>
-                <TableCell className="p-2 max-w-[260px] truncate" title={r.rua}>{r.rua}</TableCell>
+                <TableCell className="p-2" title={r.rua}>{r.rua}</TableCell>
                 <TableCell className="p-2">{r.bairro}</TableCell>
                 <TableCell className="p-2 text-center">
                   {r.bairroAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.bairroAfet}</Badge> : <span className="text-muted-foreground">-</span>}
