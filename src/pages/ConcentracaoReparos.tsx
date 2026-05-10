@@ -368,7 +368,7 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -431,6 +431,19 @@ const ConcentracaoReparos = () => {
             <p className="text-[10px] text-muted-foreground">Apenas status_naf "Com Potência"</p>
           </CardContent>
         </Card>
+
+        <Card className={`cursor-pointer transition ${semPotenciaOnly ? "ring-2 ring-primary" : ""}`}
+          onClick={() => setSemPotenciaOnly((v) => !v)}>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5" /> Status NAF Sem Potência
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-amber-600">{semPotenciaCount}</div>
+            <p className="text-[10px] text-muted-foreground">Apenas status_naf "Sem Potência"</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}
@@ -440,9 +453,9 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || search) ? (
+        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
           <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSearch(""); }}>
+            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
             Limpar
           </Button>
         ) : null}
