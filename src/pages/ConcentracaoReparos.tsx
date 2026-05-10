@@ -593,7 +593,7 @@ const ConcentracaoReparos = () => {
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden p-3 gap-3">
+    <div className="flex flex-col h-[calc(100vh-3rem)] overflow-hidden p-3 gap-3">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Concentração de Reparos</h1>
