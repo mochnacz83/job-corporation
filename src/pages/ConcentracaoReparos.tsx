@@ -550,12 +550,20 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
-          <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
-            Limpar
-          </Button>
-        ) : null}
+        {(() => {
+          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+          return (
+            <Button
+              variant={hasAny ? "default" : "outline"}
+              size="sm"
+              disabled={!hasAny}
+              className="h-8 text-xs"
+              onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}
+            >
+              Limpar todos os filtros
+            </Button>
+          );
+        })()}
         <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
       </div>
 
