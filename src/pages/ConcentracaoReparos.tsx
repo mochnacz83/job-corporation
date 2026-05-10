@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +119,21 @@ const ConcentracaoReparos = () => {
   const [statusNafFilter, setStatusNafFilter] = useState<string[]>([]);
   const [bairroOnlyConc, setBairroOnlyConc] = useState(false);
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
+  const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (k: string) => {
+    if (sortKey !== k) { setSortKey(k); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortKey(null); setSortDir("asc"); }
+  };
+  const SortIcon = ({ k }: { k: string }) => {
+    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="w-3 h-3 inline ml-1" />
+      : <ArrowDown className="w-3 h-3 inline ml-1" />;
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -148,26 +163,46 @@ const ConcentracaoReparos = () => {
     });
   }, [fato]);
 
-  // Mapas de concentração por bairro e cdo (na base)
+  // Aplica filtros das listas suspensas + busca (cards refletem isso)
+  const filteredBase = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return base.filter((r) => {
+      const estado = fixEstado(r.ds_estado || "");
+      if (estadoFilter.length && !estadoFilter.includes(estado)) return false;
+      const mun = fixText(getRaw(r, ["ds_municipio"]));
+      if (municipioFilter.length && !municipioFilter.includes(mun)) return false;
+      const setor = getRaw(r, ["cd_setor"]);
+      if (setorFilter.length && !setorFilter.includes(setor)) return false;
+      const sn = getRaw(r, ["status_naf"]);
+      if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (q) {
+        const blob = JSON.stringify(r.raw || {}).toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, search]);
+
+  // Mapas de concentração (recalculados dentro do escopo filtrado)
   const bairroCount = useMemo(() => {
     const m = new Map<string, number>();
-    base.forEach((r) => {
+    filteredBase.forEach((r) => {
       const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
       if (!b) return;
       m.set(b, (m.get(b) || 0) + 1);
     });
     return m;
-  }, [base]);
+  }, [filteredBase]);
 
   const cdoCount = useMemo(() => {
     const m = new Map<string, number>();
-    base.forEach((r) => {
+    filteredBase.forEach((r) => {
       const c = getRaw(r, ["cdo"]).toUpperCase();
       if (!c) return;
       m.set(c, (m.get(c) || 0) + 1);
     });
     return m;
-  }, [base]);
+  }, [filteredBase]);
 
   const bairrosConcentrados = useMemo(
     () => Array.from(bairroCount.entries()).filter(([, n]) => n > 1),
@@ -178,10 +213,16 @@ const ConcentracaoReparos = () => {
     [cdoCount]
   );
 
-  // Total REP-FTTH aberto (exclui cancelado)
+  // Total REP-FTTH aberto (exclui cancelado) — refletindo filtros
   const totalAberto = useMemo(
-    () => base.filter((r) => !/cancel/i.test(fixText(r.ds_estado || ""))).length,
-    [base]
+    () => filteredBase.filter((r) => !/cancel/i.test(fixText(r.ds_estado || ""))).length,
+    [filteredBase]
+  );
+
+  // Status NAF "Com Potência" — refletindo filtros
+  const comPotenciaCount = useMemo(
+    () => filteredBase.filter((r) => /com\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    [filteredBase]
   );
 
   // Opções de filtros
@@ -209,19 +250,10 @@ const ConcentracaoReparos = () => {
     return Array.from(s).sort();
   }, [base]);
 
-  // Linhas para tabela com filtros aplicados
+  // Linhas para tabela com filtros aplicados (toggles dos cards)
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return base
+    return filteredBase
       .filter((r) => {
-        const estado = fixEstado(r.ds_estado || "");
-        if (estadoFilter.length && !estadoFilter.includes(estado)) return false;
-        const mun = fixText(getRaw(r, ["ds_municipio"]));
-        if (municipioFilter.length && !municipioFilter.includes(mun)) return false;
-        const setor = getRaw(r, ["cd_setor"]);
-        if (setorFilter.length && !setorFilter.includes(setor)) return false;
-        const sn = getRaw(r, ["status_naf"]);
-        if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
         if (bairroOnlyConc) {
           const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
           if ((bairroCount.get(b) || 0) < 2) return false;
@@ -230,10 +262,7 @@ const ConcentracaoReparos = () => {
           const c = getRaw(r, ["cdo"]).toUpperCase();
           if ((cdoCount.get(c) || 0) < 2) return false;
         }
-        if (q) {
-          const blob = JSON.stringify(r.raw || {}).toLowerCase();
-          if (!blob.includes(q)) return false;
-        }
+        if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         return true;
       })
       .map((r) => {
@@ -262,7 +291,27 @@ const ConcentracaoReparos = () => {
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
       });
-  }, [base, search, estadoFilter, municipioFilter, setorFilter, statusNafFilter, bairroOnlyConc, cdoOnlyConc, bairroCount, cdoCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, bairroCount, cdoCount]);
+
+  // Ordenação
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const arr = [...rows];
+    arr.sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortKey];
+      const bv = (b as Record<string, unknown>)[sortKey];
+      const an = typeof av === "number" ? av : parseFloat(String(av ?? "").replace(",", "."));
+      const bn = typeof bv === "number" ? bv : parseFloat(String(bv ?? "").replace(",", "."));
+      let cmp: number;
+      if (!isNaN(an) && !isNaN(bn) && String(av).match(/^[\d.,\s-]+$/) && String(bv).match(/^[\d.,\s-]+$/)) {
+        cmp = an - bn;
+      } else {
+        cmp = String(av ?? "").localeCompare(String(bv ?? ""), "pt-BR", { numeric: true });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [rows, sortKey, sortDir]);
 
   const exportXlsx = () => {
     const data = rows.map((r) => ({
