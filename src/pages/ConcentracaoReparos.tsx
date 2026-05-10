@@ -9,6 +9,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
+import { FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -262,6 +264,35 @@ const ConcentracaoReparos = () => {
       });
   }, [base, search, estadoFilter, municipioFilter, setorFilter, statusNafFilter, bairroOnlyConc, cdoOnlyConc, bairroCount, cdoCount]);
 
+  const exportXlsx = () => {
+    const data = rows.map((r) => ({
+      SA: r.sa,
+      Atividade: r.atividade,
+      Status_SA: r.estado,
+      Abertura: r.abertura,
+      Gpon: r.gpon,
+      "Município": r.municipio,
+      "Estação": r.estacao,
+      Setor: r.setor,
+      Rua: r.rua,
+      Bairro: r.bairro,
+      "Afet. Bairro": r.bairroAfet,
+      Cabo_Primario: r.cabo1,
+      Cabo_Secundario: r.cabo2,
+      olt: r.olt,
+      cdo: r.cdo,
+      "Afet. CDO": r.cdoAfet,
+      "Status Naf": r.statusNaf,
+      Ptcia_OLT: r.potOlt,
+      Ptcia_ONT: r.potOnt,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Concentracao");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    XLSX.writeFile(wb, `concentracao_reparos_${ts}.xlsx`);
+  };
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-3 gap-3">
       <div className="flex items-center justify-between">
@@ -269,10 +300,16 @@ const ConcentracaoReparos = () => {
           <h1 className="text-xl font-semibold">Concentração de Reparos</h1>
           <p className="text-xs text-muted-foreground">Reparos REP-FTTH em SC com prontidão de execução</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportXlsx} disabled={loading || rows.length === 0}>
+            <FileSpreadsheet className="w-4 h-4 mr-1" />
+            Exportar Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Cards */}
@@ -346,7 +383,7 @@ const ConcentracaoReparos = () => {
 
       {/* Tabela */}
       <div className="flex-1 overflow-auto rounded-md border">
-        <Table>
+        <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
               <TableHead className="text-[11px]">SA</TableHead>
@@ -386,7 +423,7 @@ const ConcentracaoReparos = () => {
                 <TableCell className="p-2">{r.municipio}</TableCell>
                 <TableCell className="p-2">{r.estacao}</TableCell>
                 <TableCell className="p-2">{r.setor}</TableCell>
-                <TableCell className="p-2 max-w-[260px] truncate" title={r.rua}>{r.rua}</TableCell>
+                <TableCell className="p-2" title={r.rua}>{r.rua}</TableCell>
                 <TableCell className="p-2">{r.bairro}</TableCell>
                 <TableCell className="p-2 text-center">
                   {r.bairroAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.bairroAfet}</Badge> : <span className="text-muted-foreground">-</span>}
