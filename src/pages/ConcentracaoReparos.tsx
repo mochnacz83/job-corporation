@@ -203,7 +203,8 @@ const ConcentracaoReparos = () => {
     });
   }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, search]);
 
-  // Mapas de concentração (recalculados dentro do escopo filtrado)
+  // Mapas de concentração base (sobre filteredBase) - usados para identificar
+  // bairros/cdos/cidades concentradas independentemente dos toggles dos cards
   const bairroCount = useMemo(() => {
     const m = new Map<string, number>();
     filteredBase.forEach((r) => {
@@ -234,32 +235,90 @@ const ConcentracaoReparos = () => {
     return m;
   }, [filteredBase]);
 
-  const bairrosConcentrados = useMemo(
-    () => Array.from(bairroCount.entries()).filter(([, n]) => n > 1),
-    [bairroCount]
-  );
-  const cdosConcentradas = useMemo(
-    () => Array.from(cdoCount.entries()).filter(([, n]) => n > 1),
-    [cdoCount]
-  );
-  const cidadesConcentradas = useMemo(
-    () => Array.from(cidadeCount.entries()).filter(([, n]) => n > 20),
-    [cidadeCount]
+  // Aplica os toggles dos cards sobre filteredBase, com possibilidade de
+  // pular determinado toggle (para o card daquele toggle continuar mostrando
+  // sua contagem mesmo quando ativo).
+  type SkipKeys = { bairro?: boolean; cdo?: boolean; cidade?: boolean; comPot?: boolean; semPot?: boolean };
+  const applyCardToggles = (skip: SkipKeys = {}) => {
+    return filteredBase.filter((r) => {
+      if (!skip.bairro && bairroOnlyConc) {
+        const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
+        if ((bairroCount.get(b) || 0) < 2) return false;
+      }
+      if (!skip.cdo && cdoOnlyConc) {
+        const c = getRaw(r, ["cdo"]).toUpperCase();
+        if ((cdoCount.get(c) || 0) < 2) return false;
+      }
+      if (!skip.cidade && cidadeOnlyConc) {
+        const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        if ((cidadeCount.get(c) || 0) <= 20) return false;
+      }
+      if (!skip.comPot && comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      if (!skip.semPot && semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      return true;
+    });
+  };
+
+  // Conjunto totalmente filtrado (filtros suspensos + busca + toggles dos cards)
+  const fullyFiltered = useMemo(
+    () => applyCardToggles(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]
   );
 
-  // Total REP-FTTH em aberto — refletindo filtros (status já restrito na base)
-  const totalAberto = useMemo(() => filteredBase.length, [filteredBase]);
+  // Cards de concentração: cada card usa o conjunto filtrado pelos demais
+  // toggles (pulando o próprio), de modo que a interação entre filtros é
+  // cumulativa, mas o usuário ainda enxerga a contagem do próprio card ativo.
+  const bairrosConcentrados = useMemo(() => {
+    const m = new Map<string, number>();
+    applyCardToggles({ bairro: true }).forEach((r) => {
+      const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
+      if (!b) return;
+      m.set(b, (m.get(b) || 0) + 1);
+    });
+    return Array.from(m.entries()).filter(([, n]) => n > 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredBase, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
 
-  // Status NAF "Com Potência" — refletindo filtros
+  const cdosConcentradas = useMemo(() => {
+    const m = new Map<string, number>();
+    applyCardToggles({ cdo: true }).forEach((r) => {
+      const c = getRaw(r, ["cdo"]).toUpperCase();
+      if (!c) return;
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+    return Array.from(m.entries()).filter(([, n]) => n > 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredBase, bairroOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+
+  const cidadesConcentradas = useMemo(() => {
+    const m = new Map<string, number>();
+    applyCardToggles({ cidade: true }).forEach((r) => {
+      const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      if (!c) return;
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+    return Array.from(m.entries()).filter(([, n]) => n > 20);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+
+  // Total REP-FTTH em aberto — reflete TODOS os filtros (suspensos + cards)
+  const totalAberto = useMemo(() => fullyFiltered.length, [fullyFiltered]);
+
+  // Status NAF "Com Potência" — pula o próprio toggle e o oposto (excludentes)
   const comPotenciaCount = useMemo(
-    () => filteredBase.filter((r) => /com\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
-    [filteredBase]
+    () => applyCardToggles({ comPot: true, semPot: true })
+      .filter((r) => /com\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, bairroCount, cdoCount, cidadeCount]
   );
 
-  // Status NAF "Sem Potência" — refletindo filtros
+  // Status NAF "Sem Potência" — idem
   const semPotenciaCount = useMemo(
-    () => filteredBase.filter((r) => /sem\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
-    [filteredBase]
+    () => applyCardToggles({ comPot: true, semPot: true })
+      .filter((r) => /sem\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, bairroCount, cdoCount, cidadeCount]
   );
 
   // Opções de filtros
@@ -287,27 +346,9 @@ const ConcentracaoReparos = () => {
     return Array.from(s).sort();
   }, [base]);
 
-  // Linhas para tabela com filtros aplicados (toggles dos cards)
+  // Linhas para tabela usando o conjunto totalmente filtrado
   const rows = useMemo(() => {
-    return filteredBase
-      .filter((r) => {
-        if (bairroOnlyConc) {
-          const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-          if ((bairroCount.get(b) || 0) < 2) return false;
-        }
-        if (cdoOnlyConc) {
-          const c = getRaw(r, ["cdo"]).toUpperCase();
-          if ((cdoCount.get(c) || 0) < 2) return false;
-        }
-        if (cidadeOnlyConc) {
-          const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
-          if ((cidadeCount.get(c) || 0) <= 20) return false;
-        }
-        if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
-        if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
-        return true;
-      })
-      .map((r) => {
+    return fullyFiltered.map((r) => {
         const sa = getRaw(r, ["cd_nrba", "nrba"]);
         const estado = fixEstado(r.ds_estado || "");
         const abertura = fmtDateTime(getRaw(r, ["dh_abertura_ba"]));
@@ -332,8 +373,8 @@ const ConcentracaoReparos = () => {
         const potOlt = fmtPot(getRaw(r, ["potencia_na_olt"]));
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
-      });
-  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+    });
+  }, [fullyFiltered, bairroCount, cdoCount]);
 
   // Ordenação
   const sortedRows = useMemo(() => {
@@ -509,12 +550,20 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
-          <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
-            Limpar
-          </Button>
-        ) : null}
+        {(() => {
+          const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+          return (
+            <Button
+              variant={hasAny ? "default" : "outline"}
+              size="sm"
+              disabled={!hasAny}
+              className="h-8 text-xs"
+              onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}
+            >
+              Limpar todos os filtros
+            </Button>
+          );
+        })()}
         <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
       </div>
 
