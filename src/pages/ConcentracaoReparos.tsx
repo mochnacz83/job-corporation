@@ -5,9 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
 import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -443,12 +441,11 @@ const ConcentracaoReparos = () => {
         <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
       </div>
 
-      {/* Tabela: scroll horizontal no wrapper externo (barra fixa no rodapé visível),
-          scroll vertical no wrapper interno (cabeçalho sticky no topo) */}
-      <div className="flex-1 min-h-0 rounded-md border overflow-x-auto overflow-y-hidden">
-        <div className="h-full w-max max-w-none overflow-y-auto">
-        <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
-          <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+      {/* Tabela: um único container com scroll vertical+horizontal,
+          cabeçalho sticky no topo, barra horizontal sempre no rodapé visível */}
+      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative">
+        <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
+          <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
               {[
                 { k: "sa", l: "SA" },
@@ -515,8 +512,7 @@ const ConcentracaoReparos = () => {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-        </div>
+        </table>
       </div>
     </div>
   );
