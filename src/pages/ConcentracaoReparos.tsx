@@ -536,7 +536,8 @@ const ConcentracaoReparos = () => {
         const statusNaf = getRaw(r, ["status_naf"]);
         const potOlt = fmtPot(getRaw(r, ["potencia_na_olt"]));
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
-        return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
+        const statusPot = computeStatusPot(statusNaf, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, statusPot, potOlt, potOnt };
     });
   }, [fullyFiltered, bairroCount, cdoCount]);
 
@@ -579,6 +580,7 @@ const ConcentracaoReparos = () => {
       cdo: r.cdo,
       "Afet. CDO": r.cdoAfet,
       "Status Naf": r.statusNaf,
+      "Status Potências": r.statusPot,
       Ptcia_OLT: r.potOlt,
       Ptcia_ONT: r.potOnt,
     }));
