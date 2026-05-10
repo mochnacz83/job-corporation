@@ -145,7 +145,17 @@ const ConcentracaoReparos = () => {
         .eq("ds_macro_atividade", "REP-FTTH");
       if (error) throw error;
       setFato((data || []) as FatoRow[]);
-      setLastUpdate(new Date());
+
+      // Buscar timestamp da última importação/sincronização da tabela FATO
+      const { data: logData } = await supabase
+        .from("atividades_sync_log")
+        .select("finished_at, started_at")
+        .eq("status", "success")
+        .order("finished_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+      const ts = logData?.finished_at || logData?.started_at;
+      setLastUpdate(ts ? new Date(ts) : null);
     } finally {
       setLoading(false);
     }
