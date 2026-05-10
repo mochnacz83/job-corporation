@@ -138,6 +138,32 @@
   .glass-card {
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg;
   }
+
+  /* Scroll container que esconde a barra e a mostra ao passar o mouse.
+     Usado em tabelas grandes p/ liberar visualização sem perder a barra
+     quando o usuário precisar rolar horizontalmente. */
+  .scroll-hover {
+    scrollbar-width: none; /* Firefox */
+  }
+  .scroll-hover::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+    background: transparent;
+  }
+  .scroll-hover:hover {
+    scrollbar-width: thin;
+  }
+  .scroll-hover:hover::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scroll-hover:hover::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 6px;
+  }
+  .scroll-hover:hover::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.2);
+  }
 }
 
 /* Hide Lovable branding and other automated badges */
