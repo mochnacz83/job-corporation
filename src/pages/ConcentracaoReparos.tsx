@@ -720,12 +720,11 @@ const ConcentracaoReparos = () => {
           <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
           <MultiFilter label="Estação" options={estacaoOptions} value={estacaoFilter} onChange={setEstacaoFilter} />
           <MultiFilter label="CDO" options={cdoOptions} value={cdoFilter} onChange={setCdoFilter} />
+          <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
+          <MultiFilter label="Status Potências" options={statusPotOptions} value={statusPotFilter} onChange={setStatusPotFilter} width={190} />
         </div>
         
         <div className="flex flex-wrap items-center gap-2">
-          <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-          <MultiFilter label="Status Potências" options={statusPotOptions} value={statusPotFilter} onChange={setStatusPotFilter} width={190} />
-          
           <div className="ml-auto flex items-center gap-2">
             {(() => {
               const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
