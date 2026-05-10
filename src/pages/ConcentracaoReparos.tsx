@@ -443,9 +443,10 @@ const ConcentracaoReparos = () => {
         <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
       </div>
 
-      {/* Tabela */}
+      {/* Tabela: scroll horizontal no wrapper externo (barra fixa no rodapé visível),
+          scroll vertical no wrapper interno (cabeçalho sticky no topo) */}
       <div className="flex-1 min-h-0 rounded-md border overflow-x-auto overflow-y-hidden">
-        <div className="h-full overflow-y-auto">
+        <div className="h-full w-max max-w-none overflow-y-auto">
         <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
             <TableRow>
