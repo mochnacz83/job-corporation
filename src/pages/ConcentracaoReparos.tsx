@@ -118,6 +118,7 @@ const ConcentracaoReparos = () => {
   const [bairroOnlyConc, setBairroOnlyConc] = useState(false);
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
+  const [semPotenciaOnly, setSemPotenciaOnly] = useState(false);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -223,6 +224,12 @@ const ConcentracaoReparos = () => {
     [filteredBase]
   );
 
+  // Status NAF "Sem Potência" — refletindo filtros
+  const semPotenciaCount = useMemo(
+    () => filteredBase.filter((r) => /sem\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    [filteredBase]
+  );
+
   // Opções de filtros
   const estadoOptions = useMemo(() => {
     const s = new Set<string>();
@@ -261,6 +268,7 @@ const ConcentracaoReparos = () => {
           if ((cdoCount.get(c) || 0) < 2) return false;
         }
         if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+        if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         return true;
       })
       .map((r) => {
@@ -289,7 +297,7 @@ const ConcentracaoReparos = () => {
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
       });
-  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, bairroCount, cdoCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount]);
 
   // Ordenação
   const sortedRows = useMemo(() => {
@@ -360,7 +368,7 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -423,6 +431,19 @@ const ConcentracaoReparos = () => {
             <p className="text-[10px] text-muted-foreground">Apenas status_naf "Com Potência"</p>
           </CardContent>
         </Card>
+
+        <Card className={`cursor-pointer transition ${semPotenciaOnly ? "ring-2 ring-primary" : ""}`}
+          onClick={() => setSemPotenciaOnly((v) => !v)}>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5" /> Status NAF Sem Potência
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-amber-600">{semPotenciaCount}</div>
+            <p className="text-[10px] text-muted-foreground">Apenas status_naf "Sem Potência"</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}
@@ -432,9 +453,9 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || search) ? (
+        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
           <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSearch(""); }}>
+            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
             Limpar
           </Button>
         ) : null}
