@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
-import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown, Building2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +119,7 @@ const ConcentracaoReparos = () => {
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
   const [semPotenciaOnly, setSemPotenciaOnly] = useState(false);
+  const [cidadeOnlyConc, setCidadeOnlyConc] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -163,16 +164,24 @@ const ConcentracaoReparos = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Base já filtrada por: macro=REP-FTTH, UF=SC, in_pronto_execucao=SIM
+  // Status considerados "em aberto" (exclui Concluído Com Sucesso e demais)
+  const STATUS_ABERTO = useMemo(
+    () => new Set(["atribuido", "cancelado", "emdeslocamento", "emexecucao", "naoatribuido", "recebido"]),
+    []
+  );
+
+  // Base já filtrada por: macro=REP-FTTH, UF=SC, in_pronto_execucao=SIM, status em aberto
   const base = useMemo(() => {
     return fato.filter((r) => {
       const uf = getRaw(r, ["cd_uf", "uf"]).trim().toUpperCase();
       if (uf !== "SC") return false;
       const pe = getRaw(r, ["in_pronto_execucao", "pronto_execucao"]).trim().toUpperCase();
       if (pe !== "SIM") return false;
+      const estadoKey = norm(fixEstado(r.ds_estado || ""));
+      if (!STATUS_ABERTO.has(estadoKey)) return false;
       return true;
     });
-  }, [fato]);
+  }, [fato, STATUS_ABERTO]);
 
   // Aplica filtros das listas suspensas + busca (cards refletem isso)
   const filteredBase = useMemo(() => {
@@ -215,6 +224,16 @@ const ConcentracaoReparos = () => {
     return m;
   }, [filteredBase]);
 
+  const cidadeCount = useMemo(() => {
+    const m = new Map<string, number>();
+    filteredBase.forEach((r) => {
+      const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      if (!c) return;
+      m.set(c, (m.get(c) || 0) + 1);
+    });
+    return m;
+  }, [filteredBase]);
+
   const bairrosConcentrados = useMemo(
     () => Array.from(bairroCount.entries()).filter(([, n]) => n > 1),
     [bairroCount]
@@ -223,12 +242,13 @@ const ConcentracaoReparos = () => {
     () => Array.from(cdoCount.entries()).filter(([, n]) => n > 1),
     [cdoCount]
   );
-
-  // Total REP-FTTH aberto (exclui cancelado) — refletindo filtros
-  const totalAberto = useMemo(
-    () => filteredBase.filter((r) => !/cancel/i.test(fixText(r.ds_estado || ""))).length,
-    [filteredBase]
+  const cidadesConcentradas = useMemo(
+    () => Array.from(cidadeCount.entries()).filter(([, n]) => n > 20),
+    [cidadeCount]
   );
+
+  // Total REP-FTTH em aberto — refletindo filtros (status já restrito na base)
+  const totalAberto = useMemo(() => filteredBase.length, [filteredBase]);
 
   // Status NAF "Com Potência" — refletindo filtros
   const comPotenciaCount = useMemo(
@@ -279,6 +299,10 @@ const ConcentracaoReparos = () => {
           const c = getRaw(r, ["cdo"]).toUpperCase();
           if ((cdoCount.get(c) || 0) < 2) return false;
         }
+        if (cidadeOnlyConc) {
+          const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+          if ((cidadeCount.get(c) || 0) <= 20) return false;
+        }
         if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         return true;
@@ -309,7 +333,7 @@ const ConcentracaoReparos = () => {
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
       });
-  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
 
   // Ordenação
   const sortedRows = useMemo(() => {
@@ -387,7 +411,7 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
         <Card>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -438,6 +462,19 @@ const ConcentracaoReparos = () => {
           </CardContent>
         </Card>
 
+        <Card className={`cursor-pointer transition ${cidadeOnlyConc ? "ring-2 ring-primary" : ""}`}
+          onClick={() => setCidadeOnlyConc((v) => !v)}>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5" /> Cidades Concentradas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-purple-600">{cidadesConcentradas.length}</div>
+            <p className="text-[10px] text-muted-foreground">Cidades com mais de 20 REP-FTTH</p>
+          </CardContent>
+        </Card>
+
         <Card className={`cursor-pointer transition ${comPotenciaOnly ? "ring-2 ring-primary" : ""}`}
           onClick={() => setComPotenciaOnly((v) => !v)}>
           <CardHeader className="p-3 pb-1">
@@ -472,9 +509,9 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
+        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search) ? (
           <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
+            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false); setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch(""); }}>
             Limpar
           </Button>
         ) : null}
