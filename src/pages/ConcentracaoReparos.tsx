@@ -444,9 +444,10 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Tabela */}
-      <div className="flex-1 overflow-auto rounded-md border">
+      <div className="flex-1 min-h-0 rounded-md border overflow-x-auto overflow-y-hidden">
+        <div className="h-full overflow-y-auto">
         <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
-          <TableHeader className="sticky top-0 bg-background z-10">
+          <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
             <TableRow>
               {[
                 { k: "sa", l: "SA" },
@@ -514,6 +515,7 @@ const ConcentracaoReparos = () => {
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   );
