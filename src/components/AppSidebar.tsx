@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   BarChart3, Home, LogOut, User, Shield, Activity, KeyRound,
   CalendarDays, ClipboardList, ClipboardCheck, Boxes, Package,
-  Truck, Lock, Unlock, ChevronDown, Lightbulb, CheckCircle2, FileSpreadsheet
+  Truck, Lock, Unlock, ChevronDown, Lightbulb, CheckCircle2, FileSpreadsheet, Wrench
 } from "lucide-react";
 import {
   Collapsible,
@@ -125,6 +125,7 @@ const AppSidebar = () => {
     { show: hasModule("reagenda"), path: "/reagenda", icon: CalendarDays, label: "Reagendamento" },
     { show: hasModule("vistoria_campo"), path: "/vistoria-campo", icon: ClipboardCheck, label: "Vistoria de Campo" },
     { show: hasModule("atividades_encerramento"), path: "/atividades-encerramento", icon: CheckCircle2, label: "Acompanhamento Atividades" },
+    { show: hasModule("concentracao_reparos"), path: "/concentracao-reparos", icon: Wrench, label: "Concentração de Reparos" },
     { show: hasModule("planilhas"), path: "/planilhas", icon: FileSpreadsheet, label: "Planilhas Online" },
   ];
 
