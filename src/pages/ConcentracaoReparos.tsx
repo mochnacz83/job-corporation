@@ -245,8 +245,10 @@ const ConcentracaoReparos = () => {
     const m = new Map<string, number>();
     filteredBase.forEach((r) => {
       const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
+      const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!b) return;
-      m.set(b, (m.get(b) || 0) + 1);
+      const key = `${mun}||${b}`;
+      m.set(key, (m.get(key) || 0) + 1);
     });
     return m;
   }, [filteredBase]);
@@ -279,7 +281,8 @@ const ConcentracaoReparos = () => {
     return filteredBase.filter((r) => {
       if (!skip.bairro && bairroOnlyConc) {
         const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-        if ((bairroCount.get(b) || 0) < 2) return false;
+        const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        if ((bairroCount.get(`${mun}||${b}`) || 0) < 2) return false;
       }
       if (!skip.cdo && cdoOnlyConc) {
         const c = getRaw(r, ["cdo"]).toUpperCase();
@@ -309,8 +312,10 @@ const ConcentracaoReparos = () => {
     const m = new Map<string, number>();
     applyCardToggles({ bairro: true }).forEach((r) => {
       const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
+      const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!b) return;
-      m.set(b, (m.get(b) || 0) + 1);
+      const key = `${mun}||${b}`;
+      m.set(key, (m.get(key) || 0) + 1);
     });
     return Array.from(m.entries()).filter(([, n]) => n > 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -416,7 +421,7 @@ const ConcentracaoReparos = () => {
         const compDesc = fixText(getRaw(r, ["ds_complemento_desc"]));
         const rua = [logradouro, numero, compTipo, compDesc].filter(Boolean).join(", ");
         const bairro = fixText(getRaw(r, ["ds_bairro"]));
-        const bairroKey = bairro.toUpperCase();
+        const bairroKey = `${municipio.toUpperCase()}||${bairro.toUpperCase()}`;
         const bairroAfet = bairroCount.get(bairroKey) || 0;
         const cabo1 = getRaw(r, ["cabo_primario"]);
         const cabo2 = getRaw(r, ["cabo_secundario"]);
