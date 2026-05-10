@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList, ClipboardCheck, Boxes, CheckCircle2, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList, ClipboardCheck, Boxes, CheckCircle2, FileSpreadsheet, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PowerBILink {
@@ -40,6 +40,7 @@ const AVAILABLE_MODULES = [
     { id: "vistoria_campo", label: "Vistoria de Campo", icon: ClipboardCheck },
     { id: "inventario", label: "Mini Inventário", icon: Boxes },
     { id: "atividades_encerramento", label: "Acompanhamento de Atividades", icon: CheckCircle2 },
+    { id: "concentracao_reparos", label: "Concentração de Reparos", icon: Wrench },
     { id: "planilhas", label: "Planilhas Online", icon: FileSpreadsheet },
 ];
 
