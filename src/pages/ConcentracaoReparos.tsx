@@ -250,6 +250,10 @@ const ConcentracaoReparos = () => {
       if (setorFilter.length && !setorFilter.includes(setor)) return false;
       const sn = getRaw(r, ["status_naf"]);
       if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (statusPotFilter.length) {
+        const sp = computeStatusPot(sn, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        if (!statusPotFilter.includes(sp)) return false;
+      }
       const estacao = getRaw(r, ["cd_estacao"]);
       if (estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
@@ -262,7 +266,7 @@ const ConcentracaoReparos = () => {
       }
       return true;
     });
-  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, estacaoFilter, cdoFilter, bairroFilter, search]);
+  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, statusPotFilter, estacaoFilter, cdoFilter, bairroFilter, search]);
 
   // Mapas de concentração base (sobre filteredBase) - usados para identificar
   // bairros/cdos/cidades concentradas independentemente dos toggles dos cards
@@ -391,7 +395,7 @@ const ConcentracaoReparos = () => {
   // listas suspensas + busca), exceto o próprio filtro. Isso garante que
   // ao filtrar por uma cidade, as outras listas mostrem apenas valores
   // existentes para essa cidade, e vice-versa.
-  type DropKey = "estado" | "municipio" | "setor" | "statusNaf" | "estacao" | "cdo" | "bairro";
+  type DropKey = "estado" | "municipio" | "setor" | "statusNaf" | "statusPot" | "estacao" | "cdo" | "bairro";
   const buildPool = (skip: DropKey) => {
     const q = search.trim().toLowerCase();
     const dropFiltered = base.filter((r) => {
@@ -403,6 +407,10 @@ const ConcentracaoReparos = () => {
       if (skip !== "setor" && setorFilter.length && !setorFilter.includes(setor)) return false;
       const sn = getRaw(r, ["status_naf"]);
       if (skip !== "statusNaf" && statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (skip !== "statusPot" && statusPotFilter.length) {
+        const sp = computeStatusPot(sn, getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+        if (!statusPotFilter.includes(sp)) return false;
+      }
       const estacao = getRaw(r, ["cd_estacao"]);
       if (skip !== "estacao" && estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
@@ -438,7 +446,7 @@ const ConcentracaoReparos = () => {
 
   const optionsDeps = [
     base, estadoFilter, municipioFilter, setorFilter, statusNafFilter,
-    estacaoFilter, cdoFilter, bairroFilter, search,
+    statusPotFilter, estacaoFilter, cdoFilter, bairroFilter, search,
     bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly,
     bairroCount, cdoCount, cidadeCount,
   ];
@@ -467,6 +475,16 @@ const ConcentracaoReparos = () => {
   const statusNafOptions = useMemo(() => {
     const s = new Set<string>();
     buildPool("statusNaf").forEach((r) => { const v = getRaw(r, ["status_naf"]); if (v) s.add(v); });
+    return Array.from(s).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, optionsDeps);
+
+  const statusPotOptions = useMemo(() => {
+    const s = new Set<string>();
+    buildPool("statusPot").forEach((r) => {
+      const v = computeStatusPot(getRaw(r, ["status_naf"]), getRaw(r, ["potencia_na_olt"]), getRaw(r, ["potencia_na_ont"]));
+      if (v) s.add(v);
+    });
     return Array.from(s).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, optionsDeps);
