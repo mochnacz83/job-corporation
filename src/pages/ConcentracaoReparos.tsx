@@ -264,6 +264,35 @@ const ConcentracaoReparos = () => {
       });
   }, [base, search, estadoFilter, municipioFilter, setorFilter, statusNafFilter, bairroOnlyConc, cdoOnlyConc, bairroCount, cdoCount]);
 
+  const exportXlsx = () => {
+    const data = rows.map((r) => ({
+      SA: r.sa,
+      Atividade: r.atividade,
+      Status_SA: r.estado,
+      Abertura: r.abertura,
+      Gpon: r.gpon,
+      "Município": r.municipio,
+      "Estação": r.estacao,
+      Setor: r.setor,
+      Rua: r.rua,
+      Bairro: r.bairro,
+      "Afet. Bairro": r.bairroAfet,
+      Cabo_Primario: r.cabo1,
+      Cabo_Secundario: r.cabo2,
+      olt: r.olt,
+      cdo: r.cdo,
+      "Afet. CDO": r.cdoAfet,
+      "Status Naf": r.statusNaf,
+      Ptcia_OLT: r.potOlt,
+      Ptcia_ONT: r.potOnt,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Concentracao");
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    XLSX.writeFile(wb, `concentracao_reparos_${ts}.xlsx`);
+  };
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden p-3 gap-3">
       <div className="flex items-center justify-between">
