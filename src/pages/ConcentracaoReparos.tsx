@@ -738,8 +738,9 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Tabela: um único container com scroll vertical+horizontal,
-          cabeçalho sticky no topo, barra horizontal sempre no rodapé visível */}
-      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative">
+          cabeçalho sticky no topo. Barra de rolagem fica oculta e só aparece
+          ao passar o mouse sobre a tabela (classe scroll-hover). */}
+      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative scroll-hover">
         <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
           <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
@@ -761,6 +762,7 @@ const ConcentracaoReparos = () => {
                 { k: "cdo", l: "cdo" },
                 { k: "cdoAfet", l: "Afet. CDO", align: "center" as const },
                 { k: "statusNaf", l: "Status Naf" },
+                { k: "statusPot", l: "Status Potências" },
                 { k: "potOlt", l: "Ptcia_OLT", align: "right" as const },
                 { k: "potOnt", l: "Ptcia_ONT", align: "right" as const },
               ].map((c) => (
@@ -776,7 +778,7 @@ const ConcentracaoReparos = () => {
           </TableHeader>
           <TableBody>
             {sortedRows.length === 0 && (
-              <TableRow><TableCell colSpan={19} className="text-center text-muted-foreground text-xs py-6">
+              <TableRow><TableCell colSpan={20} className="text-center text-muted-foreground text-xs py-6">
                 {loading ? "Carregando..." : "Nenhum registro"}
               </TableCell></TableRow>
             )}
@@ -803,6 +805,19 @@ const ConcentracaoReparos = () => {
                   {r.cdoAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.cdoAfet}</Badge> : <span className="text-muted-foreground">-</span>}
                 </TableCell>
                 <TableCell className="p-2">{r.statusNaf}</TableCell>
+                <TableCell className="p-2">
+                  {r.statusPot === "Sem Potência" ? (
+                    <Badge variant="secondary" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                  ) : r.statusPot === "Potência OK" ? (
+                    <Badge className="text-[10px] px-1.5 bg-emerald-600 hover:bg-emerald-600">{r.statusPot}</Badge>
+                  ) : r.statusPot === "Sinal_Atenuado" ? (
+                    <Badge variant="destructive" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                  ) : r.statusPot === "OLT_Atenuado" || r.statusPot === "ONT_Atenuada" ? (
+                    <Badge className="text-[10px] px-1.5 bg-amber-600 hover:bg-amber-600">{r.statusPot}</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">{r.statusPot || "-"}</span>
+                  )}
+                </TableCell>
                 <TableCell className="p-2 text-right font-mono">{r.potOlt}</TableCell>
                 <TableCell className="p-2 text-right font-mono">{r.potOnt}</TableCell>
               </TableRow>
