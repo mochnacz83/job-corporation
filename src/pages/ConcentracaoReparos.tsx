@@ -118,6 +118,7 @@ const ConcentracaoReparos = () => {
   const [bairroOnlyConc, setBairroOnlyConc] = useState(false);
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
+  const [semPotenciaOnly, setSemPotenciaOnly] = useState(false);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
@@ -223,6 +224,12 @@ const ConcentracaoReparos = () => {
     [filteredBase]
   );
 
+  // Status NAF "Sem Potência" — refletindo filtros
+  const semPotenciaCount = useMemo(
+    () => filteredBase.filter((r) => /sem\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    [filteredBase]
+  );
+
   // Opções de filtros
   const estadoOptions = useMemo(() => {
     const s = new Set<string>();
@@ -261,6 +268,7 @@ const ConcentracaoReparos = () => {
           if ((cdoCount.get(c) || 0) < 2) return false;
         }
         if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+        if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         return true;
       })
       .map((r) => {
@@ -289,7 +297,7 @@ const ConcentracaoReparos = () => {
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
       });
-  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, bairroCount, cdoCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount]);
 
   // Ordenação
   const sortedRows = useMemo(() => {
