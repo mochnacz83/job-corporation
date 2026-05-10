@@ -9,7 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench } from "lucide-react";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -119,6 +119,21 @@ const ConcentracaoReparos = () => {
   const [statusNafFilter, setStatusNafFilter] = useState<string[]>([]);
   const [bairroOnlyConc, setBairroOnlyConc] = useState(false);
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
+  const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = (k: string) => {
+    if (sortKey !== k) { setSortKey(k); setSortDir("asc"); }
+    else if (sortDir === "asc") setSortDir("desc");
+    else { setSortKey(null); setSortDir("asc"); }
+  };
+  const SortIcon = ({ k }: { k: string }) => {
+    if (sortKey !== k) return <ArrowUpDown className="w-3 h-3 inline ml-1 opacity-40" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="w-3 h-3 inline ml-1" />
+      : <ArrowDown className="w-3 h-3 inline ml-1" />;
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -148,26 +163,46 @@ const ConcentracaoReparos = () => {
     });
   }, [fato]);
 
-  // Mapas de concentração por bairro e cdo (na base)
+  // Aplica filtros das listas suspensas + busca (cards refletem isso)
+  const filteredBase = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return base.filter((r) => {
+      const estado = fixEstado(r.ds_estado || "");
+      if (estadoFilter.length && !estadoFilter.includes(estado)) return false;
+      const mun = fixText(getRaw(r, ["ds_municipio"]));
+      if (municipioFilter.length && !municipioFilter.includes(mun)) return false;
+      const setor = getRaw(r, ["cd_setor"]);
+      if (setorFilter.length && !setorFilter.includes(setor)) return false;
+      const sn = getRaw(r, ["status_naf"]);
+      if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
+      if (q) {
+        const blob = JSON.stringify(r.raw || {}).toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [base, estadoFilter, municipioFilter, setorFilter, statusNafFilter, search]);
+
+  // Mapas de concentração (recalculados dentro do escopo filtrado)
   const bairroCount = useMemo(() => {
     const m = new Map<string, number>();
-    base.forEach((r) => {
+    filteredBase.forEach((r) => {
       const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
       if (!b) return;
       m.set(b, (m.get(b) || 0) + 1);
     });
     return m;
-  }, [base]);
+  }, [filteredBase]);
 
   const cdoCount = useMemo(() => {
     const m = new Map<string, number>();
-    base.forEach((r) => {
+    filteredBase.forEach((r) => {
       const c = getRaw(r, ["cdo"]).toUpperCase();
       if (!c) return;
       m.set(c, (m.get(c) || 0) + 1);
     });
     return m;
-  }, [base]);
+  }, [filteredBase]);
 
   const bairrosConcentrados = useMemo(
     () => Array.from(bairroCount.entries()).filter(([, n]) => n > 1),
@@ -178,10 +213,16 @@ const ConcentracaoReparos = () => {
     [cdoCount]
   );
 
-  // Total REP-FTTH aberto (exclui cancelado)
+  // Total REP-FTTH aberto (exclui cancelado) — refletindo filtros
   const totalAberto = useMemo(
-    () => base.filter((r) => !/cancel/i.test(fixText(r.ds_estado || ""))).length,
-    [base]
+    () => filteredBase.filter((r) => !/cancel/i.test(fixText(r.ds_estado || ""))).length,
+    [filteredBase]
+  );
+
+  // Status NAF "Com Potência" — refletindo filtros
+  const comPotenciaCount = useMemo(
+    () => filteredBase.filter((r) => /com\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
+    [filteredBase]
   );
 
   // Opções de filtros
@@ -209,19 +250,10 @@ const ConcentracaoReparos = () => {
     return Array.from(s).sort();
   }, [base]);
 
-  // Linhas para tabela com filtros aplicados
+  // Linhas para tabela com filtros aplicados (toggles dos cards)
   const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return base
+    return filteredBase
       .filter((r) => {
-        const estado = fixEstado(r.ds_estado || "");
-        if (estadoFilter.length && !estadoFilter.includes(estado)) return false;
-        const mun = fixText(getRaw(r, ["ds_municipio"]));
-        if (municipioFilter.length && !municipioFilter.includes(mun)) return false;
-        const setor = getRaw(r, ["cd_setor"]);
-        if (setorFilter.length && !setorFilter.includes(setor)) return false;
-        const sn = getRaw(r, ["status_naf"]);
-        if (statusNafFilter.length && !statusNafFilter.includes(sn)) return false;
         if (bairroOnlyConc) {
           const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
           if ((bairroCount.get(b) || 0) < 2) return false;
@@ -230,10 +262,7 @@ const ConcentracaoReparos = () => {
           const c = getRaw(r, ["cdo"]).toUpperCase();
           if ((cdoCount.get(c) || 0) < 2) return false;
         }
-        if (q) {
-          const blob = JSON.stringify(r.raw || {}).toLowerCase();
-          if (!blob.includes(q)) return false;
-        }
+        if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
         return true;
       })
       .map((r) => {
@@ -262,10 +291,30 @@ const ConcentracaoReparos = () => {
         const potOnt = fmtPot(getRaw(r, ["potencia_na_ont"]));
         return { id: r.id, sa, atividade: "REP-FTTH", estado, abertura, gpon, municipio, estacao, setor, rua, bairro, bairroAfet, cabo1, cabo2, olt, cdo, cdoAfet, statusNaf, potOlt, potOnt };
       });
-  }, [base, search, estadoFilter, municipioFilter, setorFilter, statusNafFilter, bairroOnlyConc, cdoOnlyConc, bairroCount, cdoCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, bairroCount, cdoCount]);
+
+  // Ordenação
+  const sortedRows = useMemo(() => {
+    if (!sortKey) return rows;
+    const arr = [...rows];
+    arr.sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortKey];
+      const bv = (b as Record<string, unknown>)[sortKey];
+      const an = typeof av === "number" ? av : parseFloat(String(av ?? "").replace(",", "."));
+      const bn = typeof bv === "number" ? bv : parseFloat(String(bv ?? "").replace(",", "."));
+      let cmp: number;
+      if (!isNaN(an) && !isNaN(bn) && String(av).match(/^[\d.,\s-]+$/) && String(bv).match(/^[\d.,\s-]+$/)) {
+        cmp = an - bn;
+      } else {
+        cmp = String(av ?? "").localeCompare(String(bv ?? ""), "pt-BR", { numeric: true });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [rows, sortKey, sortDir]);
 
   const exportXlsx = () => {
-    const data = rows.map((r) => ({
+    const data = sortedRows.map((r) => ({
       SA: r.sa,
       Atividade: r.atividade,
       Status_SA: r.estado,
@@ -313,7 +362,7 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -363,6 +412,19 @@ const ConcentracaoReparos = () => {
             <p className="text-[10px] text-muted-foreground">CDOs com mais de 1 REP-FTTH</p>
           </CardContent>
         </Card>
+
+        <Card className={`cursor-pointer transition ${comPotenciaOnly ? "ring-2 ring-primary" : ""}`}
+          onClick={() => setComPotenciaOnly((v) => !v)}>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5" /> Status NAF Com Potência
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-emerald-600">{comPotenciaCount}</div>
+            <p className="text-[10px] text-muted-foreground">Apenas status_naf "Com Potência"</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}
@@ -372,13 +434,13 @@ const ConcentracaoReparos = () => {
         <MultiFilter label="Município" options={municipioOptions} value={municipioFilter} onChange={setMunicipioFilter} />
         <MultiFilter label="Setor" options={setorOptions} value={setorFilter} onChange={setSetorFilter} />
         <MultiFilter label="Status NAF" options={statusNafOptions} value={statusNafFilter} onChange={setStatusNafFilter} />
-        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || search) ? (
+        {(estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || bairroOnlyConc || cdoOnlyConc || comPotenciaOnly || search) ? (
           <Button variant="ghost" size="sm" className="h-8 text-xs"
-            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setSearch(""); }}>
+            onClick={() => { setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setBairroOnlyConc(false); setCdoOnlyConc(false); setComPotenciaOnly(false); setSearch(""); }}>
             Limpar
           </Button>
         ) : null}
-        <Badge variant="secondary" className="ml-auto text-xs">{rows.length} registros</Badge>
+        <Badge variant="secondary" className="ml-auto text-xs">{sortedRows.length} registros</Badge>
       </div>
 
       {/* Tabela */}
@@ -386,34 +448,44 @@ const ConcentracaoReparos = () => {
         <Table className="min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
-              <TableHead className="text-[11px]">SA</TableHead>
-              <TableHead className="text-[11px]">Atividade</TableHead>
-              <TableHead className="text-[11px]">Status_SA</TableHead>
-              <TableHead className="text-[11px]">Abertura</TableHead>
-              <TableHead className="text-[11px]">Gpon</TableHead>
-              <TableHead className="text-[11px]">Município</TableHead>
-              <TableHead className="text-[11px]">Estação</TableHead>
-              <TableHead className="text-[11px]">Setor</TableHead>
-              <TableHead className="text-[11px]">Rua</TableHead>
-              <TableHead className="text-[11px]">Bairro</TableHead>
-              <TableHead className="text-[11px] text-center">Afet. Bairro</TableHead>
-              <TableHead className="text-[11px]">Cabo_Primario</TableHead>
-              <TableHead className="text-[11px]">Cabo_Secundario</TableHead>
-              <TableHead className="text-[11px]">olt</TableHead>
-              <TableHead className="text-[11px]">cdo</TableHead>
-              <TableHead className="text-[11px] text-center">Afet. CDO</TableHead>
-              <TableHead className="text-[11px]">Status Naf</TableHead>
-              <TableHead className="text-[11px] text-right">Ptcia_OLT</TableHead>
-              <TableHead className="text-[11px] text-right">Ptcia_ONT</TableHead>
+              {[
+                { k: "sa", l: "SA" },
+                { k: "atividade", l: "Atividade" },
+                { k: "estado", l: "Status_SA" },
+                { k: "abertura", l: "Abertura" },
+                { k: "gpon", l: "Gpon" },
+                { k: "municipio", l: "Município" },
+                { k: "estacao", l: "Estação" },
+                { k: "setor", l: "Setor" },
+                { k: "rua", l: "Rua" },
+                { k: "bairro", l: "Bairro" },
+                { k: "bairroAfet", l: "Afet. Bairro", align: "center" as const },
+                { k: "cabo1", l: "Cabo_Primario" },
+                { k: "cabo2", l: "Cabo_Secundario" },
+                { k: "olt", l: "olt" },
+                { k: "cdo", l: "cdo" },
+                { k: "cdoAfet", l: "Afet. CDO", align: "center" as const },
+                { k: "statusNaf", l: "Status Naf" },
+                { k: "potOlt", l: "Ptcia_OLT", align: "right" as const },
+                { k: "potOnt", l: "Ptcia_ONT", align: "right" as const },
+              ].map((c) => (
+                <TableHead
+                  key={c.k}
+                  onClick={() => toggleSort(c.k)}
+                  className={`text-[11px] cursor-pointer select-none hover:bg-muted/50 ${c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : ""}`}
+                >
+                  {c.l}<SortIcon k={c.k} />
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && (
+            {sortedRows.length === 0 && (
               <TableRow><TableCell colSpan={19} className="text-center text-muted-foreground text-xs py-6">
                 {loading ? "Carregando..." : "Nenhum registro"}
               </TableCell></TableRow>
             )}
-            {rows.map((r) => (
+            {sortedRows.map((r) => (
               <TableRow key={r.id} className="text-[11px]">
                 <TableCell className="p-2 font-mono">{r.sa}</TableCell>
                 <TableCell className="p-2">{r.atividade}</TableCell>
