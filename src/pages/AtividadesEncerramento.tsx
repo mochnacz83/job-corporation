@@ -184,7 +184,9 @@ const AtividadesEncerramento = () => {
   const [cardFilter, setCardFilter] = useState<CardFilter>("ALL");
   const [activeTab, setActiveTab] = useState<string>("resumo");
   const [search, setSearch] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [atividadesTabSearch, setAtividadesTabSearch] = useState("");
+  const [atividadesSortConfig, setAtividadesSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
   const [atividadesResultadoFilter, setAtividadesResultadoFilter] = useState<"ALL" | "SUCESSO" | "INSUCESSO">("ALL");
   const [atividadesMacroFilter, setAtividadesMacroFilter] = useState<string[]>([]);
   const [atividadesProntoExecucaoFilter, setAtividadesProntoExecucaoFilter] = useState<string[]>([]);
@@ -227,8 +229,9 @@ const AtividadesEncerramento = () => {
   };
 
   const isSC = (r: FatoRow): boolean => {
-    const uf = getRawStr(r, ["cd_uf", "uf", "sg_uf"]).trim().toUpperCase();
-    return uf === "" || uf === "SC";
+    const uf = getRawStr(r, ["cd_uf", "uf", "sg_uf", "estado", "ds_estado_sigla"]).trim().toUpperCase();
+    // Se o estado estiver vazio, nulo ou for SC, permitimos.
+    return !uf || uf === "" || uf === "SC" || uf === "S/C";
   };
 
   // Atividade considerada "agendada para o dia": dh_inicio_agendamento cai na data selecionada
@@ -552,13 +555,27 @@ const AtividadesEncerramento = () => {
     return m;
   }, [presenca]);
 
+  const presencaByNome = useMemo(() => {
+    const m = new Map<string, PresencaRow>();
+    presenca.forEach((p) => {
+      if (p.funcionario) {
+        const key = (p.funcionario || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+        if (key) m.set(key, p);
+      }
+    });
+    return m;
+  }, [presenca]);
+
   // Helper para obter info de presença de um registro fato
   const getPresencaInfo = (r: FatoRow): PresencaRow | null => {
     const ttKey = (r.matricula_tt || "").trim().toUpperCase();
     const trKey = (r.matricula_tr || "").trim().toUpperCase();
+    const nomeKey = (r.nome_tecnico || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+    
     return (
       (ttKey && presencaByTT.get(ttKey)) ||
       (trKey && presencaByTR.get(trKey)) ||
+      (nomeKey && presencaByNome.get(nomeKey)) ||
       (ttKey && presencaByTR.get(ttKey)) ||
       (trKey && presencaByTT.get(trKey)) ||
       null
@@ -982,11 +999,32 @@ const AtividadesEncerramento = () => {
           x.coordenador.toLowerCase().includes(q),
       );
     }
-    return arr.sort((a, b) => b.total - a.total);
+
+    if (sortConfig) {
+      arr.sort((a: any, b: any) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        
+        // Trata % Sucesso como número
+        if (sortConfig.key === "pct") {
+          const fechadasA = a.sucesso + a.insucesso;
+          const fechadasB = b.sucesso + b.insucesso;
+          aVal = fechadasA > 0 ? a.sucesso / fechadasA : -1;
+          bVal = fechadasB > 0 ? b.sucesso / fechadasB : -1;
+        }
+
+        if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    } else {
+      arr.sort((a, b) => b.total - a.total);
+    }
+    return arr;
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
     coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
-    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento, sortConfig
   ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
@@ -1371,8 +1409,31 @@ const AtividadesEncerramento = () => {
         (r.matricula_tr || "").toLowerCase().includes(q)
       );
     }
+
+    if (atividadesSortConfig) {
+      arr = [...arr].sort((a: any, b: any) => {
+        let aVal, bVal;
+        
+        // Mapeamento de chaves complexas para o sorting
+        if (atividadesSortConfig.key === "sa") {
+          aVal = getRawStr(a, ["cd_nrba", "nrba", "sa"]);
+          bVal = getRawStr(b, ["cd_nrba", "nrba", "sa"]);
+        } else if (atividadesSortConfig.key === "status_naf") {
+          aVal = getRawStr(a, ["status_naf"]);
+          bVal = getRawStr(b, ["status_naf"]);
+        } else {
+          aVal = a[atividadesSortConfig.key] || "";
+          bVal = b[atividadesSortConfig.key] || "";
+        }
+
+        if (aVal < bVal) return atividadesSortConfig.direction === "asc" ? -1 : 1;
+        if (aVal > bVal) return atividadesSortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
     return arr;
-  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesStatusNafFilter, atividadesResultadoFilter]);
+  }, [filteredFato, atividadesTabSearch, atividadesMacroFilter, atividadesProntoExecucaoFilter, atividadesUnicoSaFilter, atividadesStatusSaFilter, atividadesSetorFilter, atividadesStatusNafFilter, atividadesResultadoFilter, atividadesSortConfig]);
 
   const handleExportAtividades = () => {
     if (atividadesTabFato.length === 0) {
@@ -1828,18 +1889,36 @@ const AtividadesEncerramento = () => {
                 <Table>
                   <TableHeader className="sticky top-0 bg-background z-20 shadow-sm">
                     <TableRow className="bg-background">
-                      <TableHead className="text-[11px]">TT</TableHead>
-                      <TableHead className="text-[11px]">TR</TableHead>
-                      <TableHead className="text-[11px]">Técnico</TableHead>
-                      <TableHead className="text-[11px]">Operadora</TableHead>
-                      <TableHead className="text-[11px]">Supervisor</TableHead>
-                      <TableHead className="text-[11px]">Coordenador</TableHead>
-                      <TableHead className="text-[11px]">Setor</TableHead>
-                      <TableHead className="text-[11px] text-center">Status</TableHead>
-                      <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
-                      <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
-                      <TableHead className="text-[11px] text-center">Total</TableHead>
-                      <TableHead className="text-[11px] text-center">% Sucesso</TableHead>
+                      {([
+                        { k: "tt", l: "TT" },
+                        { k: "tr", l: "TR" },
+                        { k: "nome", l: "Técnico" },
+                        { k: "operadora", l: "Operadora" },
+                        { k: "supervisor", l: "Supervisor" },
+                        { k: "coordenador", l: "Coordenador" },
+                        { k: "setor_atual", l: "Setor" },
+                        { k: "status", l: "Status", c: "text-center" },
+                        { k: "sucesso", l: "Sucesso", c: "text-center text-success" },
+                        { k: "insucesso", l: "Insucesso", c: "text-center text-destructive" },
+                        { k: "total", l: "Total", c: "text-center" },
+                        { k: "pct", l: "% Sucesso", c: "text-center" },
+                      ]).map(col => (
+                        <TableHead 
+                          key={col.k}
+                          className={`text-[11px] cursor-pointer hover:bg-muted/50 transition-colors ${col.c || ""}`}
+                          onClick={() => {
+                            setSortConfig(prev => ({
+                              key: col.k,
+                              direction: prev?.key === col.k && prev.direction === "asc" ? "desc" : "asc"
+                            }));
+                          }}
+                        >
+                          <div className={`flex items-center gap-1 ${col.c?.includes("center") ? "justify-center" : ""}`}>
+                            {col.l}
+                            <ActivityIcon className={`w-2 h-2 opacity-30 ${sortConfig?.key === col.k ? "opacity-100 text-primary" : ""}`} />
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1960,18 +2039,36 @@ const AtividadesEncerramento = () => {
                 <Table className="whitespace-nowrap">
                   <TableHeader className="sticky top-0 bg-background z-10">
                     <TableRow>
-                      <TableHead className="text-[11px]">Técnico</TableHead>
-                      <TableHead className="text-[11px]">SA</TableHead>
-                      <TableHead className="text-[11px]">gpon</TableHead>
-                      <TableHead className="text-[11px]">DocAssociado</TableHead>
-                      <TableHead className="text-[11px]">Cps</TableHead>
-                      <TableHead className="text-[11px]">status_naf</TableHead>
-                      <TableHead className="text-[11px]">data_naf</TableHead>
-                      <TableHead className="text-[11px]">Hr_Fechado</TableHead>
-                      <TableHead className="text-[11px]">potencia_OLT</TableHead>
-                      <TableHead className="text-[11px]">potencia_ONT</TableHead>
-                      <TableHead className="text-[11px]">ds_macro_atividade</TableHead>
-                      <TableHead className="text-[11px]">ds_estado</TableHead>
+                      {([
+                        { k: "nome_tecnico", l: "Técnico" },
+                        { k: "sa", l: "SA" },
+                        { k: "gpon", l: "gpon" },
+                        { k: "docAssociado", l: "DocAssociado" },
+                        { k: "cps", l: "Cps" },
+                        { k: "status_naf", l: "status_naf" },
+                        { k: "data_naf", l: "data_naf" },
+                        { k: "hr_fechado", l: "Hr_Fechado" },
+                        { k: "potencia_olt", l: "potencia_OLT" },
+                        { k: "potencia_ont", l: "potencia_ONT" },
+                        { k: "ds_macro_atividade", l: "ds_macro_atividade" },
+                        { k: "ds_estado", l: "ds_estado" },
+                      ]).map(col => (
+                        <TableHead 
+                          key={col.k}
+                          className="text-[11px] cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => {
+                            setAtividadesSortConfig(prev => ({
+                              key: col.k,
+                              direction: prev?.key === col.k && prev.direction === "asc" ? "desc" : "asc"
+                            }));
+                          }}
+                        >
+                          <div className="flex items-center gap-1">
+                            {col.l}
+                            <ActivityIcon className={`w-2 h-2 opacity-30 ${atividadesSortConfig?.key === col.k ? "opacity-100 text-primary" : ""}`} />
+                          </div>
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
