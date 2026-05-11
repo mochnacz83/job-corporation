@@ -23,6 +23,7 @@ import {
   Pie,
   Cell,
   Legend,
+  LabelList,
 } from "recharts";
 
 type FatoRow = {
@@ -929,7 +930,9 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(270 60% 55%)" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" fill="hsl(270 60% 55%)" radius={[0, 4, 4, 0]}>
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -945,7 +948,9 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(25 90% 55%)" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" fill="hsl(25 90% 55%)" radius={[0, 4, 4, 0]}>
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -977,7 +982,9 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]}>
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
