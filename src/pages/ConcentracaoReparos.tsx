@@ -162,6 +162,8 @@ const ConcentracaoReparos = () => {
   const [cdoOnlyConc, setCdoOnlyConc] = useState(false);
   const [comPotenciaOnly, setComPotenciaOnly] = useState(false);
   const [semPotenciaOnly, setSemPotenciaOnly] = useState(false);
+  const [timOnly, setTimOnly] = useState(false);
+  const [nioOnly, setNioOnly] = useState(false);
   const [cidadeOnlyConc, setCidadeOnlyConc] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -210,7 +212,7 @@ const ConcentracaoReparos = () => {
     setEstadoFilter([]); setMunicipioFilter([]); setSetorFilter([]); setStatusNafFilter([]); setStatusPotFilter([]);
     setEstacaoFilter([]); setCdoFilter([]); setBairroFilter([]);
     setBairroOnlyConc(false); setCdoOnlyConc(false); setCidadeOnlyConc(false);
-    setComPotenciaOnly(false); setSemPotenciaOnly(false); setSearch("");
+    setComPotenciaOnly(false); setSemPotenciaOnly(false); setTimOnly(false); setNioOnly(false); setSearch("");
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -321,7 +323,7 @@ const ConcentracaoReparos = () => {
   // Aplica os toggles dos cards sobre filteredBase, com possibilidade de
   // pular determinado toggle (para o card daquele toggle continuar mostrando
   // sua contagem mesmo quando ativo).
-  type SkipKeys = { bairro?: boolean; cdo?: boolean; cidade?: boolean; comPot?: boolean; semPot?: boolean };
+  type SkipKeys = { bairro?: boolean; cdo?: boolean; cidade?: boolean; comPot?: boolean; semPot?: boolean; tim?: boolean; nio?: boolean };
   const applyCardToggles = (skip: SkipKeys = {}) => {
     return filteredBase.filter((r) => {
       if (!skip.bairro && bairroOnlyConc) {
@@ -339,6 +341,9 @@ const ConcentracaoReparos = () => {
       }
       if (!skip.comPot && comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
       if (!skip.semPot && semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      if (!skip.tim && timOnly && cp !== "TIM") return false;
+      if (!skip.nio && nioOnly && cp !== "NIO") return false;
       return true;
     });
   };
@@ -347,7 +352,7 @@ const ConcentracaoReparos = () => {
   const fullyFiltered = useMemo(
     () => applyCardToggles(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]
   );
 
   // Cards de concentração: cada card usa o conjunto filtrado pelos demais
@@ -364,7 +369,7 @@ const ConcentracaoReparos = () => {
     });
     return Array.from(m.entries()).filter(([, n]) => n > 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredBase, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+  }, [filteredBase, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]);
 
   const cdosConcentradas = useMemo(() => {
     const m = new Map<string, number>();
@@ -375,7 +380,7 @@ const ConcentracaoReparos = () => {
     });
     return Array.from(m.entries()).filter(([, n]) => n > 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredBase, bairroOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+  }, [filteredBase, bairroOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]);
 
   const cidadesConcentradas = useMemo(() => {
     const m = new Map<string, number>();
@@ -386,7 +391,7 @@ const ConcentracaoReparos = () => {
     });
     return Array.from(m.entries()).filter(([, n]) => n > 20);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]);
 
   // Total REP-FTTH em aberto — reflete TODOS os filtros (suspensos + cards)
   const totalAberto = useMemo(() => fullyFiltered.length, [fullyFiltered]);
@@ -396,7 +401,7 @@ const ConcentracaoReparos = () => {
     () => applyCardToggles({ comPot: true, semPot: true })
       .filter((r) => /com\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, bairroCount, cdoCount, cidadeCount]
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]
   );
 
   // Status NAF "Sem Potência" — idem
@@ -404,8 +409,24 @@ const ConcentracaoReparos = () => {
     () => applyCardToggles({ comPot: true, semPot: true })
       .filter((r) => /sem\s*pot/i.test(getRaw(r, ["status_naf"]))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, bairroCount, cdoCount, cidadeCount]
+    [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]
   );
+
+  const timCount = useMemo(() => {
+    return applyCardToggles({ tim: true, nio: true }).filter(r => {
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      return cp === "TIM";
+    }).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
+
+  const nioCount = useMemo(() => {
+    return applyCardToggles({ tim: true, nio: true }).filter(r => {
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      return cp === "NIO";
+    }).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredBase, bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, bairroCount, cdoCount, cidadeCount]);
 
   // Opções de filtros — refletem todos os filtros ativos (cards + demais
   // listas suspensas + busca), exceto o próprio filtro. Isso garante que
@@ -456,6 +477,9 @@ const ConcentracaoReparos = () => {
       }
       if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
       if (semPotenciaOnly && !/sem\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      if (timOnly && cp !== "TIM") return false;
+      if (nioOnly && cp !== "NIO") return false;
       return true;
     });
   };
@@ -464,22 +488,8 @@ const ConcentracaoReparos = () => {
     base, estadoFilter, municipioFilter, setorFilter, statusNafFilter,
     statusPotFilter, estacaoFilter, cdoFilter, bairroFilter, search,
     bairroOnlyConc, cdoOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly,
-    bairroCount, cdoCount, cidadeCount,
+    timOnly, nioOnly, bairroCount, cdoCount, cidadeCount,
   ];
-
-  const timCount = useMemo(() => {
-    return fullyFiltered.filter(r => {
-      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
-      return cp === "TIM";
-    }).length;
-  }, [fullyFiltered]);
-
-  const nioCount = useMemo(() => {
-    return fullyFiltered.filter(r => {
-      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
-      return cp === "NIO";
-    }).length;
-  }, [fullyFiltered]);
 
   const chartDataDay = useMemo(() => {
     const counts: Record<string, { day: string; TIM: number; NIO: number; Total: number }> = {};
@@ -831,7 +841,8 @@ const ConcentracaoReparos = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`cursor-pointer transition ${timOnly ? "ring-2 ring-primary" : ""}`}
+          onClick={() => { setTimOnly((v) => !v); setNioOnly(false); }}>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">TIM (Abertos)</CardTitle>
           </CardHeader>
@@ -841,7 +852,8 @@ const ConcentracaoReparos = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={`cursor-pointer transition ${nioOnly ? "ring-2 ring-primary" : ""}`}
+          onClick={() => { setNioOnly((v) => !v); setTimOnly(false); }}>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground">NIO (Abertos)</CardTitle>
           </CardHeader>
@@ -869,7 +881,7 @@ const ConcentracaoReparos = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div className="ml-auto flex items-center gap-2">
             {(() => {
-              const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || search;
+              const hasAny = estadoFilter.length || municipioFilter.length || setorFilter.length || statusNafFilter.length || statusPotFilter.length || estacaoFilter.length || cdoFilter.length || bairroFilter.length || bairroOnlyConc || cdoOnlyConc || cidadeOnlyConc || comPotenciaOnly || semPotenciaOnly || timOnly || nioOnly || search;
               return (
                 <Button
                   variant={hasAny ? "default" : "outline"}
@@ -1010,9 +1022,9 @@ const ConcentracaoReparos = () => {
 // Painel "Dinâmica" — gráficos derivados dos cards/filtros ativos
 // ============================================================
 type DinamicaProps = {
-  cidades: { name: string; value: number }[];
-  bairros: { name: string; value: number }[];
-  cdos: { name: string; value: number }[];
+  cidades: [string, number][];
+  bairros: [string, number][];
+  cdos: [string, number][];
   comPotencia: number;
   semPotencia: number;
   totalAberto: number;
@@ -1023,9 +1035,13 @@ type DinamicaProps = {
 };
 
 const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour, selectedDay, setSelectedDay }: DinamicaProps) => {
-  const topCidades = cidades;
-  const topBairros = bairros;
-  const topCdos = cdos;
+  const topCidades = cidades.slice(0, 15).map(([name, value]) => ({ name, value }));
+  const topBairros = bairros.slice(0, 15).map(([key, value]) => {
+    const [mun, bairro] = key.split("||");
+    return { name: `${bairro} (${mun})`, value };
+  });
+  const topCdos = cdos.slice(0, 15).map(([name, value]) => ({ name, value }));
+  
   const potData = [
     { name: "Com Potência", value: comPotencia },
     { name: "Sem Potência", value: semPotencia },
