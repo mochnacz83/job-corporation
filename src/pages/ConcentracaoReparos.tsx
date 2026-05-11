@@ -878,3 +878,110 @@ const ConcentracaoReparos = () => {
 };
 
 export default ConcentracaoReparos;
+
+// ============================================================
+// Painel "Dinâmica" — gráficos derivados dos cards/filtros ativos
+// ============================================================
+type DinamicaProps = {
+  cidades: [string, number][];
+  bairros: [string, number][];
+  cdos: [string, number][];
+  comPotencia: number;
+  semPotencia: number;
+  totalAberto: number;
+};
+
+const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto }: DinamicaProps) => {
+  const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15)
+    .map(([name, value]) => ({ name, value }));
+  const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15)
+    .map(([key, value]) => {
+      const [mun, bairro] = key.split("||");
+      return { name: `${bairro} (${mun})`, value };
+    });
+  const topCdos = [...cdos].sort((a, b) => b[1] - a[1]).slice(0, 15)
+    .map(([name, value]) => ({ name, value }));
+  const potData = [
+    { name: "Com Potência", value: comPotencia },
+    { name: "Sem Potência", value: semPotencia },
+  ];
+  const POT_COLORS = ["hsl(160 70% 40%)", "hsl(35 90% 50%)"];
+
+  const ChartCard = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
+    <Card>
+      <CardHeader className="p-3 pb-1">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
+      </CardHeader>
+      <CardContent className="p-3 pt-1 h-[320px]">{children}</CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <ChartCard title="Cidades com maior concentração de REP-FTTH" subtitle="Top 15 — > 20 reparos">
+        {topCidades.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topCidades} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Bar dataKey="value" fill="hsl(270 60% 55%)" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Bairros com maior concentração" subtitle="Top 15 — > 1 reparo (cidade + bairro)">
+        {topBairros.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topBairros} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Bar dataKey="value" fill="hsl(25 90% 55%)" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Com Potência × Sem Potência" subtitle={`Total em aberto considerado: ${totalAberto}`}>
+        {comPotencia + semPotencia === 0 ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Pie data={potData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(e) => `${e.name}: ${e.value}`}>
+                {potData.map((_, i) => <Cell key={i} fill={POT_COLORS[i]} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="CDOs Concentradas" subtitle="Top 15 — > 1 reparo">
+        {topCdos.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topCdos} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+    </div>
+  );
+};
