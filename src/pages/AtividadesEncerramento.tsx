@@ -736,23 +736,50 @@ const AtividadesEncerramento = () => {
       const effStat = statRaw === "" ? "Ativo" : statRaw;
       if (!matchFilter(effStat, statusFilter)) return;
 
-      // Ignora linhas BUFFER/EXTERNO
       const nome = (p.funcionario || "").toUpperCase();
       if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
-      // Só considera técnicos ATIVOS (status vazio na planilha Dimensão)
       if (statRaw) return;
+
       const tt = (p.tt || "").trim().toUpperCase();
       const tr = (p.tr || "").trim().toUpperCase();
-      // Identificador prioritário: TT; se não houver, usa TR
-      const key = tt || tr;
-      if (!key) return;
-      // Se o técnico (por TT ou TR) já confirmou presença, não entra em "Sem Presença"
+      
+      // Se já confirmou presença, não entra no grupo "Sem Presença"
       if (tt && ttsPresencaOK.has(tt)) return;
       if (tr && ttsPresencaOK.has(tr)) return;
-      s.add(key);
+
+      if (tt) s.add(tt);
+      if (tr) s.add(tr);
     });
     return s;
   }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+
+  const ttsComSucesso = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      if (estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso")) {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (tt) s.add(tt);
+        if (tr) s.add(tr);
+      }
+    });
+    return s;
+  }, [fato]);
+
+  const ttsComInsucesso = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      if (estado.includes("conclu") && estado.includes("sem sucesso")) {
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (tt) s.add(tt);
+        if (tr) s.add(tr);
+      }
+    });
+    return s;
+  }, [fato]);
 
   // Conjunto de TTs/TRs que fecharam ALGUMA atividade no dia (sucesso OU insucesso),
   // independente da macro. Usado para identificar "Sem Encerramento" (P0 — Produção Zero).
@@ -786,15 +813,15 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(effStat, statusFilter)) return;
       const nome = (p.funcionario || "").toUpperCase();
       if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
-      // Apenas técnicos ATIVOS (status vazio) entram em P0
       if (statRaw) return;
+      
       const tt = (p.tt || "").trim().toUpperCase();
       const tr = (p.tr || "").trim().toUpperCase();
-      const key = tt || tr;
-      if (!key) return;
       if (tt && ttsComFechamento.has(tt)) return;
       if (tr && ttsComFechamento.has(tr)) return;
-      s.add(key);
+      
+      if (tt) s.add(tt);
+      if (tr) s.add(tr);
     });
     return s;
   }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
@@ -842,15 +869,17 @@ const AtividadesEncerramento = () => {
         const tr = (r.matricula_tr || "").trim().toUpperCase();
         if (!(tt && ttsSemEncerramento.has(tt)) && !(tr && ttsSemEncerramento.has(tr))) return false;
       } else if (cardFilter === "SUCESSO") {
-        const estado = norm(r.ds_estado);
-        if (!(estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso"))) return false;
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsComSucesso.has(tt)) && !(tr && ttsComSucesso.has(tr))) return false;
       } else if (cardFilter === "INSUCESSO") {
-        const estado = norm(r.ds_estado);
-        if (!(estado.includes("conclu") && estado.includes("sem sucesso"))) return false;
+        const tt = (r.matricula_tt || "").trim().toUpperCase();
+        const tr = (r.matricula_tr || "").trim().toUpperCase();
+        if (!(tt && ttsComInsucesso.has(tt)) && !(tr && ttsComInsucesso.has(tr))) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -1050,7 +1079,7 @@ const AtividadesEncerramento = () => {
       else if (estado.includes("conclu") && estado.includes("sucesso")) sucesso++;
     });
     return { sucesso, insucesso };
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR, presencaByNome]);
 
   const totals = useMemo(() => {
     return aggregated.reduce(
