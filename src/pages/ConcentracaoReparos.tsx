@@ -11,6 +11,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ResponsiveContainer,
   BarChart,
@@ -57,8 +58,8 @@ const fixText = (s: string): string => {
     .replace(/Ã³/g, "ó").replace(/Ãº/g, "ú").replace(/Ã§/g, "ç").replace(/Ãµ/g, "õ")
     .replace(/Ã¢/g, "â").replace(/Ãª/g, "ê").replace(/Ã´/g, "ô").replace(/Ã /g, "à")
     .replace(/Ã‰/g, "É").replace(/Ã‡/g, "Ç").replace(/Ã“/g, "Ó").replace(/Ã”/g, "Ô")
-    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã").replace(/Ã�/g, "Í")
-    .replace(/Ã�/g, "Á").replace(/Ã š/g, "Ú").replace(/NULL/gi, "").trim();
+    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã").replace(/Ã/g, "Í")
+    .replace(/Ã/g, "Á").replace(/Ã š/g, "Ú").replace(/NULL/gi, "").trim();
 };
 
 const fixEstado = (s: string): string => {
@@ -523,6 +524,8 @@ const ConcentracaoReparos = () => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
+    const currentHour = now.getHours();
+    const todayStr = now.getDate().toString().padStart(2, '0');
 
     fullyFiltered.forEach(r => {
       const dateStr = getRaw(r, ["dh_abertura_ba"]);
@@ -536,7 +539,6 @@ const ConcentracaoReparos = () => {
         m = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
         if (m) d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
       }
-
       if (d && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
         const dayKey = d.getDate().toString().padStart(2, '0');
         if (selectedDay && dayKey !== selectedDay) return;
@@ -544,6 +546,8 @@ const ConcentracaoReparos = () => {
         let hourStr = "";
         let hm = dateStr.match(/(\d{2}):\d{2}:\d{2}/);
         if (hm) {
+          const hInt = parseInt(hm[1]);
+          if (selectedDay === todayStr && hInt > currentHour) return;
           hourStr = hm[1] + ":00";
         }
 
@@ -555,6 +559,15 @@ const ConcentracaoReparos = () => {
         }
       }
     });
+
+    if (selectedDay === todayStr) {
+      Object.keys(counts).forEach(h => {
+        const hInt = parseInt(h.split(':')[0]);
+        if (hInt > currentHour) {
+          delete counts[h];
+        }
+      });
+    }
 
     return Object.values(counts);
   }, [fullyFiltered, selectedDay]);
@@ -775,7 +788,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-red-600">{cdosConcentradas.length}</div>
-            <p className="text-[10px] text-muted-foreground">CDOs com mais de 1 REP-FTTH</p>
+            <p className="text-[10px] text-muted-foreground">CDOs with more than 1 REP-FTTH</p>
           </CardContent>
         </Card>
 
@@ -887,93 +900,90 @@ const ConcentracaoReparos = () => {
         </TabsList>
 
         <TabsContent value="tabela" className="flex-1 min-h-0 mt-2">
-          {/* Tabela: um único container com scroll vertical+horizontal,
-              cabeçalho sticky no topo. Barra de rolagem fica oculta e só
-              aparece ao passar o mouse sobre a tabela (classe scroll-hover). */}
           <div className="h-full rounded-md border overflow-auto relative scroll-hover">
-        <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
-          <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
-            <TableRow>
-              {[
-                { k: "sa", l: "SA" },
-                { k: "atividade", l: "Atividade" },
-                { k: "estado", l: "Status_SA" },
-                { k: "abertura", l: "Abertura" },
-                { k: "gpon", l: "Gpon" },
-                { k: "municipio", l: "Município" },
-                { k: "estacao", l: "Estação" },
-                { k: "setor", l: "Setor" },
-                { k: "rua", l: "Rua" },
-                { k: "bairro", l: "Bairro" },
-                { k: "bairroAfet", l: "Afet. Bairro", align: "center" as const },
-                { k: "cabo1", l: "Cabo_Primario" },
-                { k: "cabo2", l: "Cabo_Secundario" },
-                { k: "olt", l: "olt" },
-                { k: "cdo", l: "cdo" },
-                { k: "cdoAfet", l: "Afet. CDO", align: "center" as const },
-                { k: "statusNaf", l: "Status Naf" },
-                { k: "statusPot", l: "Status Potências" },
-                { k: "potOlt", l: "Ptcia_OLT", align: "right" as const },
-                { k: "potOnt", l: "Ptcia_ONT", align: "right" as const },
-              ].map((c) => (
-                <TableHead
-                  key={c.k}
-                  onClick={() => toggleSort(c.k)}
-                  className={`text-[11px] cursor-pointer select-none hover:bg-muted/50 ${c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : ""}`}
-                >
-                  {c.l}<SortIcon k={c.k} />
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedRows.length === 0 && (
-              <TableRow><TableCell colSpan={20} className="text-center text-muted-foreground text-xs py-6">
-                {loading ? "Carregando..." : "Nenhum registro"}
-              </TableCell></TableRow>
-            )}
-            {sortedRows.map((r) => (
-              <TableRow key={r.id} className="text-[11px]">
-                <TableCell className="p-2 font-mono">{r.sa}</TableCell>
-                <TableCell className="p-2">{r.atividade}</TableCell>
-                <TableCell className="p-2">{r.estado}</TableCell>
-                <TableCell className="p-2 whitespace-nowrap">{r.abertura}</TableCell>
-                <TableCell className="p-2 font-mono">{r.gpon}</TableCell>
-                <TableCell className="p-2">{r.municipio}</TableCell>
-                <TableCell className="p-2">{r.estacao}</TableCell>
-                <TableCell className="p-2">{r.setor}</TableCell>
-                <TableCell className="p-2" title={r.rua}>{r.rua}</TableCell>
-                <TableCell className="p-2">{r.bairro}</TableCell>
-                <TableCell className="p-2 text-center">
-                  {r.bairroAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.bairroAfet}</Badge> : <span className="text-muted-foreground">-</span>}
-                </TableCell>
-                <TableCell className="p-2">{r.cabo1}</TableCell>
-                <TableCell className="p-2">{r.cabo2}</TableCell>
-                <TableCell className="p-2">{r.olt}</TableCell>
-                <TableCell className="p-2">{r.cdo}</TableCell>
-                <TableCell className="p-2 text-center">
-                  {r.cdoAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.cdoAfet}</Badge> : <span className="text-muted-foreground">-</span>}
-                </TableCell>
-                <TableCell className="p-2">{r.statusNaf}</TableCell>
-                <TableCell className="p-2">
-                  {r.statusPot === "Sem Potência" ? (
-                    <Badge variant="secondary" className="text-[10px] px-1.5">{r.statusPot}</Badge>
-                  ) : r.statusPot === "Potência OK" ? (
-                    <Badge className="text-[10px] px-1.5 bg-emerald-600 hover:bg-emerald-600">{r.statusPot}</Badge>
-                  ) : r.statusPot === "Sinal_Atenuado" ? (
-                    <Badge variant="destructive" className="text-[10px] px-1.5">{r.statusPot}</Badge>
-                  ) : r.statusPot === "OLT_Atenuado" || r.statusPot === "ONT_Atenuada" ? (
-                    <Badge className="text-[10px] px-1.5 bg-amber-600 hover:bg-amber-600">{r.statusPot}</Badge>
-                  ) : (
-                    <span className="text-muted-foreground">{r.statusPot || "-"}</span>
-                  )}
-                </TableCell>
-                <TableCell className="p-2 text-right font-mono">{r.potOlt}</TableCell>
-                <TableCell className="p-2 text-right font-mono">{r.potOnt}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </table>
+            <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
+              <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
+                <TableRow>
+                  {[
+                    { k: "sa", l: "SA" },
+                    { k: "atividade", l: "Atividade" },
+                    { k: "estado", l: "Status_SA" },
+                    { k: "abertura", l: "Abertura" },
+                    { k: "gpon", l: "Gpon" },
+                    { k: "municipio", l: "Município" },
+                    { k: "estacao", l: "Estação" },
+                    { k: "setor", l: "Setor" },
+                    { k: "rua", l: "Rua" },
+                    { k: "bairro", l: "Bairro" },
+                    { k: "bairroAfet", l: "Afet. Bairro", align: "center" as const },
+                    { k: "cabo1", l: "Cabo_Primario" },
+                    { k: "cabo2", l: "Cabo_Secundario" },
+                    { k: "olt", l: "olt" },
+                    { k: "cdo", l: "cdo" },
+                    { k: "cdoAfet", l: "Afet. CDO", align: "center" as const },
+                    { k: "statusNaf", l: "Status Naf" },
+                    { k: "statusPot", l: "Status Potências" },
+                    { k: "potOlt", l: "Ptcia_OLT", align: "right" as const },
+                    { k: "potOnt", l: "Ptcia_ONT", align: "right" as const },
+                  ].map((c) => (
+                    <TableHead
+                      key={c.k}
+                      onClick={() => toggleSort(c.k)}
+                      className={`text-[11px] cursor-pointer select-none hover:bg-muted/50 ${c.align === "center" ? "text-center" : c.align === "right" ? "text-right" : ""}`}
+                    >
+                      {c.l}<SortIcon k={c.k} />
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedRows.length === 0 && (
+                  <TableRow><TableCell colSpan={20} className="text-center text-muted-foreground text-xs py-6">
+                    {loading ? "Carregando..." : "Nenhum registro"}
+                  </TableCell></TableRow>
+                )}
+                {sortedRows.map((r) => (
+                  <TableRow key={r.id} className="text-[11px]">
+                    <TableCell className="p-2 font-mono">{r.sa}</TableCell>
+                    <TableCell className="p-2">{r.atividade}</TableCell>
+                    <TableCell className="p-2">{r.estado}</TableCell>
+                    <TableCell className="p-2 whitespace-nowrap">{r.abertura}</TableCell>
+                    <TableCell className="p-2 font-mono">{r.gpon}</TableCell>
+                    <TableCell className="p-2">{r.municipio}</TableCell>
+                    <TableCell className="p-2">{r.estacao}</TableCell>
+                    <TableCell className="p-2">{r.setor}</TableCell>
+                    <TableCell className="p-2" title={r.rua}>{r.rua}</TableCell>
+                    <TableCell className="p-2">{r.bairro}</TableCell>
+                    <TableCell className="p-2 text-center">
+                      {r.bairroAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.bairroAfet}</Badge> : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell className="p-2">{r.cabo1}</TableCell>
+                    <TableCell className="p-2">{r.cabo2}</TableCell>
+                    <TableCell className="p-2">{r.olt}</TableCell>
+                    <TableCell className="p-2">{r.cdo}</TableCell>
+                    <TableCell className="p-2 text-center">
+                      {r.cdoAfet > 1 ? <Badge variant="destructive" className="text-[10px] px-1.5">{r.cdoAfet}</Badge> : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell className="p-2">{r.statusNaf}</TableCell>
+                    <TableCell className="p-2">
+                      {r.statusPot === "Sem Potência" ? (
+                        <Badge variant="secondary" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                      ) : r.statusPot === "Potência OK" ? (
+                        <Badge className="text-[10px] px-1.5 bg-emerald-600 hover:bg-emerald-600">{r.statusPot}</Badge>
+                      ) : r.statusPot === "Sinal_Atenuado" ? (
+                        <Badge variant="destructive" className="text-[10px] px-1.5">{r.statusPot}</Badge>
+                      ) : r.statusPot === "OLT_Atenuado" || r.statusPot === "ONT_Atenuada" ? (
+                        <Badge className="text-[10px] px-1.5 bg-amber-600 hover:bg-amber-600">{r.statusPot}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">{r.statusPot || "-"}</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="p-2 text-right font-mono">{r.potOlt}</TableCell>
+                    <TableCell className="p-2 text-right font-mono">{r.potOnt}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </table>
           </div>
         </TabsContent>
 
@@ -996,15 +1006,13 @@ const ConcentracaoReparos = () => {
   );
 };
 
-export default ConcentracaoReparos;
-
 // ============================================================
 // Painel "Dinâmica" — gráficos derivados dos cards/filtros ativos
 // ============================================================
 type DinamicaProps = {
-  cidades: [string, number][];
-  bairros: [string, number][];
-  cdos: [string, number][];
+  cidades: { name: string; value: number }[];
+  bairros: { name: string; value: number }[];
+  cdos: { name: string; value: number }[];
   comPotencia: number;
   semPotencia: number;
   totalAberto: number;
@@ -1015,33 +1023,30 @@ type DinamicaProps = {
 };
 
 const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour, selectedDay, setSelectedDay }: DinamicaProps) => {
-  const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15)
-    .map(([name, value]) => ({ name, value }));
-  const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15)
-    .map(([key, value]) => {
-      const [mun, bairro] = key.split("||");
-      return { name: `${bairro} (${mun})`, value };
-    });
-  const topCdos = [...cdos].sort((a, b) => b[1] - a[1]).slice(0, 15)
-    .map(([name, value]) => ({ name, value }));
+  const topCidades = cidades;
+  const topBairros = bairros;
+  const topCdos = cdos;
   const potData = [
     { name: "Com Potência", value: comPotencia },
     { name: "Sem Potência", value: semPotencia },
   ];
   const POT_COLORS = ["hsl(160 70% 40%)", "hsl(35 90% 50%)"];
 
-  const ChartCard = ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
+  const ChartCard = ({ title, subtitle, children, headerRight }: { title: string; subtitle?: string; children: React.ReactNode; headerRight?: React.ReactNode }) => (
     <Card>
-      <CardHeader className="p-3 pb-1">
-        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-        {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
+      <CardHeader className="p-3 pb-1 flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+          {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
+        </div>
+        {headerRight && <div>{headerRight}</div>}
       </CardHeader>
       <CardContent className="p-3 pt-1 h-[320px]">{children}</CardContent>
     </Card>
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pb-6">
       <ChartCard title="Cidades com maior concentração de REP-FTTH" subtitle="Top 15 — > 20 reparos">
         {topCidades.length === 0 ? (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
@@ -1131,7 +1136,9 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
                 stackId="a" 
                 cursor="pointer"
                 onClick={(data) => setSelectedDay(data.day)}
-              />
+              >
+                <LabelList dataKey="TIM" position="inside" fontSize={9} fill="#fff" formatter={(v: number) => v > 0 ? v : ""} />
+              </Bar>
               <Bar 
                 dataKey="NIO" 
                 fill="#14b8a6" 
@@ -1141,6 +1148,7 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
                 cursor="pointer"
                 onClick={(data) => setSelectedDay(data.day)}
               >
+                <LabelList dataKey="NIO" position="inside" fontSize={9} fill="#fff" formatter={(v: number) => v > 0 ? v : ""} />
                 <LabelList dataKey="Total" position="top" fontSize={10} fill="hsl(var(--foreground))" offset={5} />
               </Bar>
             </BarChart>
@@ -1151,6 +1159,18 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
       <ChartCard 
         title={`Aberturas por Hora ${selectedDay ? `(Dia ${selectedDay})` : '(Geral)'}`} 
         subtitle="Média de aberturas por faixa horária"
+        headerRight={
+          <Select value={selectedDay || ""} onValueChange={setSelectedDay}>
+            <SelectTrigger className="h-7 w-[90px] text-[10px]">
+              <SelectValue placeholder="Dia" />
+            </SelectTrigger>
+            <SelectContent>
+              {chartDataDay.map(d => (
+                <SelectItem key={d.day} value={d.day} className="text-[10px]">Dia {d.day}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
       >
         {chartDataHour.every(h => h.Total === 0) ? (
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados para este dia</div>
@@ -1164,8 +1184,11 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
                 contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", border: "none", borderRadius: "8px", fontSize: "12px", color: "#fff" }}
               />
               <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+              <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a">
+                <LabelList dataKey="TIM" position="inside" fontSize={9} fill="#fff" formatter={(v: number) => v > 0 ? v : ""} />
+              </Bar>
               <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a">
+                <LabelList dataKey="NIO" position="inside" fontSize={9} fill="#fff" formatter={(v: number) => v > 0 ? v : ""} />
                 <LabelList dataKey="Total" position="top" fontSize={10} fill="hsl(var(--foreground))" offset={5} />
               </Bar>
             </BarChart>
