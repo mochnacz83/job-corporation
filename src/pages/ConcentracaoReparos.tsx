@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench, FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown, Building2, Filter } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench, FileSpreadsheet, Zap, ArrowUp, ArrowDown, ArrowUpDown, Building2, Filter, Clock, Activity } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -465,6 +465,81 @@ const ConcentracaoReparos = () => {
     bairroCount, cdoCount, cidadeCount,
   ];
 
+  const timCount = useMemo(() => {
+    return fullyFiltered.filter(r => {
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      return cp === "TIM";
+    }).length;
+  }, [fullyFiltered]);
+
+  const nioCount = useMemo(() => {
+    return fullyFiltered.filter(r => {
+      const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+      return cp === "NIO";
+    }).length;
+  }, [fullyFiltered]);
+
+  const chartDataDay = useMemo(() => {
+    const counts: Record<string, { day: string; TIM: number; NIO: number; Total: number }> = {};
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    fullyFiltered.forEach(r => {
+      const dateStr = getRaw(r, ["dh_abertura_ba"]);
+      if (!dateStr) return;
+      
+      let d: Date | null = null;
+      let m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) {
+        d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      } else {
+        m = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+      }
+
+      if (d && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        const dayKey = d.getDate().toString().padStart(2, '0');
+        if (!counts[dayKey]) counts[dayKey] = { day: dayKey, TIM: 0, NIO: 0, Total: 0 };
+        
+        const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+        if (cp === "TIM") counts[dayKey].TIM++;
+        else if (cp === "NIO") counts[dayKey].NIO++;
+        counts[dayKey].Total++;
+      }
+    });
+
+    return Object.values(counts).sort((a, b) => a.day.localeCompare(b.day));
+  }, [fullyFiltered]);
+
+  const chartDataHour = useMemo(() => {
+    const counts: Record<string, { hour: string; TIM: number; NIO: number; Total: number }> = {};
+    for (let i = 0; i < 24; i++) {
+      const h = i.toString().padStart(2, '0') + ":00";
+      counts[h] = { hour: h, TIM: 0, NIO: 0, Total: 0 };
+    }
+
+    fullyFiltered.forEach(r => {
+      const dateStr = getRaw(r, ["dh_abertura_ba"]);
+      if (!dateStr) return;
+      
+      let hourStr = "";
+      let m = dateStr.match(/(\d{2}):\d{2}:\d{2}/);
+      if (m) {
+        hourStr = m[1] + ":00";
+      }
+
+      if (hourStr && counts[hourStr]) {
+        const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+        if (cp === "TIM") counts[hourStr].TIM++;
+        else if (cp === "NIO") counts[hourStr].NIO++;
+        counts[hourStr].Total++;
+      }
+    });
+
+    return Object.values(counts);
+  }, [fullyFiltered]);
+  
   const estadoOptions = useMemo(() => {
     const s = new Set<string>();
     buildPool("estado").forEach((r) => { const v = fixEstado(r.ds_estado || ""); if (v) s.add(v); });
@@ -634,7 +709,7 @@ const ConcentracaoReparos = () => {
       </div>
 
       {/* Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
         <Card>
           <CardHeader className="p-3 pb-1">
             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -721,6 +796,26 @@ const ConcentracaoReparos = () => {
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-amber-600">{semPotenciaCount}</div>
             <p className="text-[10px] text-muted-foreground">Apenas status_naf "Sem Potência"</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground">TIM (Abertos)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-blue-600">{timCount}</div>
+            <p className="text-[10px] text-muted-foreground">Fatos com CP = TIM</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="p-3 pb-1">
+            <CardTitle className="text-xs font-medium text-muted-foreground">NIO (Abertos)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <div className="text-2xl font-bold text-teal-600">{nioCount}</div>
+            <p className="text-[10px] text-muted-foreground">Fatos com CP = NIO</p>
           </CardContent>
         </Card>
       </div>
@@ -871,6 +966,8 @@ const ConcentracaoReparos = () => {
             comPotencia={comPotenciaCount}
             semPotencia={semPotenciaCount}
             totalAberto={totalAberto}
+            chartDataDay={chartDataDay}
+            chartDataHour={chartDataHour}
           />
         </TabsContent>
       </Tabs>
@@ -890,9 +987,11 @@ type DinamicaProps = {
   comPotencia: number;
   semPotencia: number;
   totalAberto: number;
+  chartDataDay: any[];
+  chartDataHour: any[];
 };
 
-const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto }: DinamicaProps) => {
+const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour }: DinamicaProps) => {
   const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15)
     .map(([name, value]) => ({ name, value }));
   const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15)
@@ -982,6 +1081,47 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
               <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]}>
                 <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
               </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Aberturas por Dia (Mês Atual)" subtitle="Segmentado por TIM e NIO">
+        {chartDataDay.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartDataDay} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <XAxis dataKey="day" fontSize={10} axisLine={false} tickLine={false} />
+              <YAxis fontSize={10} axisLine={false} tickLine={false} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", border: "none", borderRadius: "8px", fontSize: "12px", color: "#fff" }}
+                itemStyle={{ padding: "2px 0" }}
+              />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+              <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Aberturas por Hora" subtitle="Média de aberturas por faixa horária">
+        {chartDataHour.every(h => h.Total === 0) ? (
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartDataHour} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+              <XAxis dataKey="hour" fontSize={10} axisLine={false} tickLine={false} interval={2} />
+              <YAxis fontSize={10} axisLine={false} tickLine={false} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: "rgba(0,0,0,0.8)", border: "none", borderRadius: "8px", fontSize: "12px", color: "#fff" }}
+              />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+              <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
             </BarChart>
           </ResponsiveContainer>
         )}
