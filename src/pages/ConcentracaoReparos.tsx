@@ -798,7 +798,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-red-600">{cdosConcentradas.length}</div>
-            <p className="text-[10px] text-muted-foreground">CDOs with more than 1 REP-FTTH</p>
+            <p className="text-[10px] text-muted-foreground">CDOs com mais de 1 REP-FTTH</p>
           </CardContent>
         </Card>
 
