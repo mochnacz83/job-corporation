@@ -1035,12 +1035,12 @@ type DinamicaProps = {
 };
 
 const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour, selectedDay, setSelectedDay }: DinamicaProps) => {
-  const topCidades = cidades.slice(0, 15).map(([name, value]) => ({ name, value }));
-  const topBairros = bairros.slice(0, 15).map(([key, value]) => {
+  const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
+  const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, value]) => {
     const [mun, bairro] = key.split("||");
     return { name: `${bairro} (${mun})`, value };
   });
-  const topCdos = cdos.slice(0, 15).map(([name, value]) => ({ name, value }));
+  const topCdos = [...cdos].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
   
   const potData = [
     { name: "Com Potência", value: comPotencia },
