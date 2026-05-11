@@ -1038,7 +1038,7 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
   const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
   const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, value]) => {
     const [mun, bairro] = key.split("||");
-    return { name: `${bairro} (${mun})`, value };
+    return { name: `${mun}||${bairro}`, value };
   });
   const topCdos = [...cdos].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
   
@@ -1069,7 +1069,7 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topCidades} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <XAxis type="number" hide={true} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Bar dataKey="value" fill="hsl(270 60% 55%)" radius={[0, 4, 4, 0]}>
@@ -1085,9 +1085,27 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topBairros} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <XAxis type="number" tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
+            <BarChart data={topBairros} layout="vertical" margin={{ left: 30, right: 20, top: 5, bottom: 5 }}>
+              <XAxis type="number" hide={true} />
+              <YAxis 
+                type="category" 
+                dataKey="name" 
+                width={180} 
+                tick={(props: any) => {
+                  const { x, y, payload } = props;
+                  const parts = payload.value.split("||");
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text x={-5} y={-2} fontSize={10} textAnchor="end" fontWeight="600" fill="hsl(var(--foreground))">
+                        {parts[1]}
+                      </text>
+                      <text x={-5} y={10} fontSize={8} textAnchor="end" opacity={0.6} fill="hsl(var(--foreground))">
+                        {parts[0]}
+                      </text>
+                    </g>
+                  );
+                }} 
+              />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Bar dataKey="value" fill="hsl(25 90% 55%)" radius={[0, 4, 4, 0]}>
                 <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
@@ -1119,7 +1137,7 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topCdos} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <XAxis type="number" hide={true} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]}>
