@@ -765,10 +765,17 @@ const ConcentracaoReparos = () => {
         </div>
       </div>
 
-      {/* Tabela: um único container com scroll vertical+horizontal,
-          cabeçalho sticky no topo. Barra de rolagem fica oculta e só aparece
-          ao passar o mouse sobre a tabela (classe scroll-hover). */}
-      <div className="flex-1 min-h-0 rounded-md border overflow-auto relative scroll-hover">
+      <Tabs defaultValue="tabela" className="flex-1 min-h-0 flex flex-col">
+        <TabsList className="self-start h-9">
+          <TabsTrigger value="tabela" className="text-xs">Tabela</TabsTrigger>
+          <TabsTrigger value="dinamica" className="text-xs">Dinâmica</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tabela" className="flex-1 min-h-0 mt-2">
+          {/* Tabela: um único container com scroll vertical+horizontal,
+              cabeçalho sticky no topo. Barra de rolagem fica oculta e só
+              aparece ao passar o mouse sobre a tabela (classe scroll-hover). */}
+          <div className="h-full rounded-md border overflow-auto relative scroll-hover">
         <table className="w-full caption-bottom text-sm min-w-max [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap border-collapse">
           <TableHeader className="sticky top-0 z-20 bg-background shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow>
@@ -852,7 +859,20 @@ const ConcentracaoReparos = () => {
             ))}
           </TableBody>
         </table>
-      </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="dinamica" className="flex-1 min-h-0 mt-2 overflow-auto scroll-hover">
+          <DinamicaPanel
+            cidades={cidadesConcentradas}
+            bairros={bairrosConcentrados}
+            cdos={cdosConcentradas}
+            comPotencia={comPotenciaCount}
+            semPotencia={semPotenciaCount}
+            totalAberto={totalAberto}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
