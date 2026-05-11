@@ -785,7 +785,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-orange-600">{bairrosConcentrados.length}</div>
-            <p className="text-[10px] text-muted-foreground">Bairros com mais de 1 REP-FTTH</p>
+            <p className="text-[10px] text-muted-foreground">Bairros c/ {">"} 1 reparo</p>
           </CardContent>
         </Card>
 
@@ -798,7 +798,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-red-600">{cdosConcentradas.length}</div>
-            <p className="text-[10px] text-muted-foreground">CDOs com mais de 1 REP-FTTH</p>
+            <p className="text-[10px] text-muted-foreground">CDOs c/ {">"} 1 reparo</p>
           </CardContent>
         </Card>
 
@@ -811,7 +811,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-purple-600">{cidadesConcentradas.length}</div>
-            <p className="text-[10px] text-muted-foreground">Cidades com mais de 20 REP-FTTH</p>
+            <p className="text-[10px] text-muted-foreground">Cidades c/ {">"} 20 reparos</p>
           </CardContent>
         </Card>
 
@@ -824,7 +824,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-emerald-600">{comPotenciaCount}</div>
-            <p className="text-[10px] text-muted-foreground">Apenas status_naf "Com Potência"</p>
+            <p className="text-[10px] text-muted-foreground">Naf com potência</p>
           </CardContent>
         </Card>
 
@@ -837,7 +837,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-amber-600">{semPotenciaCount}</div>
-            <p className="text-[10px] text-muted-foreground">Apenas status_naf "Sem Potência"</p>
+            <p className="text-[10px] text-muted-foreground">Naf sem potência</p>
           </CardContent>
         </Card>
 
@@ -848,7 +848,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-blue-600">{timCount}</div>
-            <p className="text-[10px] text-muted-foreground">Fatos com CP = TIM</p>
+            <p className="text-[10px] text-muted-foreground">Operadora TIM</p>
           </CardContent>
         </Card>
 
@@ -859,7 +859,7 @@ const ConcentracaoReparos = () => {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <div className="text-2xl font-bold text-teal-600">{nioCount}</div>
-            <p className="text-[10px] text-muted-foreground">Fatos com CP = NIO</p>
+            <p className="text-[10px] text-muted-foreground">Operadora NIO</p>
           </CardContent>
         </Card>
       </div>
