@@ -165,6 +165,7 @@ const ConcentracaoReparos = () => {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [selectedDay, setSelectedDay] = useState<string | null>(new Date().getDate().toString().padStart(2, '0'));
 
   const toggleSort = (k: string) => {
     if (sortKey !== k) { setSortKey(k); setSortDir("asc"); }
@@ -519,26 +520,44 @@ const ConcentracaoReparos = () => {
       counts[h] = { hour: h, TIM: 0, NIO: 0, Total: 0 };
     }
 
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
     fullyFiltered.forEach(r => {
       const dateStr = getRaw(r, ["dh_abertura_ba"]);
       if (!dateStr) return;
       
-      let hourStr = "";
-      let m = dateStr.match(/(\d{2}):\d{2}:\d{2}/);
+      let d: Date | null = null;
+      let m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
       if (m) {
-        hourStr = m[1] + ":00";
+        d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+      } else {
+        m = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if (m) d = new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
       }
 
-      if (hourStr && counts[hourStr]) {
-        const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
-        if (cp === "TIM") counts[hourStr].TIM++;
-        else if (cp === "NIO") counts[hourStr].NIO++;
-        counts[hourStr].Total++;
+      if (d && d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        const dayKey = d.getDate().toString().padStart(2, '0');
+        if (selectedDay && dayKey !== selectedDay) return;
+
+        let hourStr = "";
+        let hm = dateStr.match(/(\d{2}):\d{2}:\d{2}/);
+        if (hm) {
+          hourStr = hm[1] + ":00";
+        }
+
+        if (hourStr && counts[hourStr]) {
+          const cp = getRaw(r, ["cp", "cd_cp"]).trim().toUpperCase();
+          if (cp === "TIM") counts[hourStr].TIM++;
+          else if (cp === "NIO") counts[hourStr].NIO++;
+          counts[hourStr].Total++;
+        }
       }
     });
 
     return Object.values(counts);
-  }, [fullyFiltered]);
+  }, [fullyFiltered, selectedDay]);
   
   const estadoOptions = useMemo(() => {
     const s = new Set<string>();
@@ -968,6 +987,8 @@ const ConcentracaoReparos = () => {
             totalAberto={totalAberto}
             chartDataDay={chartDataDay}
             chartDataHour={chartDataHour}
+            selectedDay={selectedDay}
+            setSelectedDay={setSelectedDay}
           />
         </TabsContent>
       </Tabs>
@@ -989,9 +1010,11 @@ type DinamicaProps = {
   totalAberto: number;
   chartDataDay: any[];
   chartDataHour: any[];
+  selectedDay: string | null;
+  setSelectedDay: (d: string | null) => void;
 };
 
-const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour }: DinamicaProps) => {
+const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour, selectedDay, setSelectedDay }: DinamicaProps) => {
   const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15)
     .map(([name, value]) => ({ name, value }));
   const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15)
@@ -1100,16 +1123,37 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
                 itemStyle={{ padding: "2px 0" }}
               />
               <Legend verticalAlign="top" height={36} iconType="circle" />
-              <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
-              <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+              <Bar 
+                dataKey="TIM" 
+                fill="#3b82f6" 
+                radius={[4, 4, 0, 0]} 
+                barSize={15} 
+                stackId="a" 
+                cursor="pointer"
+                onClick={(data) => setSelectedDay(data.day)}
+              />
+              <Bar 
+                dataKey="NIO" 
+                fill="#14b8a6" 
+                radius={[4, 4, 0, 0]} 
+                barSize={15} 
+                stackId="a"
+                cursor="pointer"
+                onClick={(data) => setSelectedDay(data.day)}
+              >
+                <LabelList dataKey="Total" position="top" fontSize={10} fill="hsl(var(--foreground))" offset={5} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
       </ChartCard>
 
-      <ChartCard title="Aberturas por Hora" subtitle="Média de aberturas por faixa horária">
+      <ChartCard 
+        title={`Aberturas por Hora ${selectedDay ? `(Dia ${selectedDay})` : '(Geral)'}`} 
+        subtitle="Média de aberturas por faixa horária"
+      >
         {chartDataHour.every(h => h.Total === 0) ? (
-          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
+          <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados para este dia</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartDataHour} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -1121,7 +1165,9 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
               />
               <Legend verticalAlign="top" height={36} iconType="circle" />
               <Bar dataKey="TIM" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
-              <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a" />
+              <Bar dataKey="NIO" fill="#14b8a6" radius={[4, 4, 0, 0]} barSize={15} stackId="a">
+                <LabelList dataKey="Total" position="top" fontSize={10} fill="hsl(var(--foreground))" offset={5} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -1129,3 +1175,5 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
     </div>
   );
 };
+
+export default ConcentracaoReparos;
