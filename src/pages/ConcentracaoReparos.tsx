@@ -10,6 +10,20 @@ import { Loader2, RefreshCw, AlertTriangle, Layers, MapPin, Wrench, FileSpreadsh
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from "recharts";
 
 type FatoRow = {
   id: string;
