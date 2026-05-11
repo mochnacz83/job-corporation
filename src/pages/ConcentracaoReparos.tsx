@@ -926,7 +926,6 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topCidades} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
@@ -944,7 +943,6 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topBairros} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
@@ -978,7 +976,6 @@ const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, total
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={topCdos} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis type="number" tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
