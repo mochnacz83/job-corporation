@@ -17,7 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -833,7 +833,7 @@ const AtividadesEncerramento = () => {
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -1417,6 +1417,51 @@ const AtividadesEncerramento = () => {
     XLSX.writeFile(wb, `Atividades_Filtradas_${date}.xlsx`);
   };
 
+  const handleExportResumo = () => {
+    if (aggregated.length === 0) {
+      toast({ title: "Nenhum dado para exportar", variant: "destructive" });
+      return;
+    }
+    const dataToExport = aggregated.map(r => ({
+      "TT": r.tt,
+      "TR": r.tr,
+      "Técnico": r.nome,
+      "Operadora": r.operadora,
+      "Supervisor": r.supervisor,
+      "Coordenador": r.coordenador,
+      "Setor": r.setor_atual,
+      "Status": r.status,
+      "Sucesso": r.sucesso,
+      "Insucesso": r.insucesso,
+      "Total": r.total,
+      "% Sucesso": r.total > 0 ? ((r.sucesso / (r.sucesso + r.insucesso)) * 100).toFixed(1) + "%" : "—"
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resumo");
+    XLSX.writeFile(wb, `Resumo_Atividades_${date}.xlsx`);
+  };
+
+  const handleExportFSL = () => {
+    if (aggregated.length === 0) {
+      toast({ title: "Nenhum técnico filtrado", variant: "destructive" });
+      return;
+    }
+    const names = aggregated.map(r => r.nome).filter(n => n && n !== "—").join(", ");
+    
+    // Criar um blob de texto e baixar como .txt ou gerar um Excel de uma célula
+    const blob = new Blob([names], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Tecnicos_FSL_${date}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: "Lista para FSL gerada", description: "O arquivo .txt foi baixado." });
+  };
+
   // ===== Histórico (60 dias) - agregações =====
   const isOkClose = (estado: string | null) => {
     const e = (estado || "").toLowerCase();
@@ -1753,6 +1798,29 @@ const AtividadesEncerramento = () => {
                   onChange={(e) => setSearch(e.target.value)}
                   className={`w-[260px] h-8 text-xs ${search ? "border-primary/50 bg-primary/5" : ""}`}
                 />
+
+                <div className="flex items-center gap-1 ml-auto">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-[11px] gap-1"
+                    onClick={handleExportResumo}
+                    title="Exportar resumo atual para Excel"
+                  >
+                    <Download className="w-3 h-3" />
+                    Excel
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-[11px] gap-1"
+                    onClick={handleExportFSL}
+                    title="Gerar lista de nomes concatenados para o FSL"
+                  >
+                    <FileSpreadsheet className="w-3 h-3" />
+                    Lista FSL
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
