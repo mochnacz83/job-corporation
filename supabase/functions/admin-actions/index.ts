@@ -506,6 +506,78 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'recover-ghost-users') {
+      // Find auth.users without a corresponding profile and create a 'pendente'
+      // profile from their auth metadata, so the admin can validate them.
+      console.log(`[RECOVER] Starting ghost recovery initiated by ${caller?.id ?? 'unknown'}`);
+
+      const { data: { users }, error: listError } = await serviceClient.auth.admin.listUsers();
+      if (listError) throw listError;
+
+      const { data: profiles, error: profilesError } = await serviceClient
+        .from('profiles')
+        .select('user_id');
+      if (profilesError) throw profilesError;
+
+      const profileIds = new Set((profiles || []).map((p: any) => p.user_id));
+      const ghosts = users.filter((u: any) => !profileIds.has(u.id));
+
+      console.log(`[RECOVER] Found ${ghosts.length} ghost auth users to recover.`);
+
+      let recoveredCount = 0;
+      const recovered: any[] = [];
+      const skipped: any[] = [];
+
+      for (const ghost of ghosts) {
+        const meta = ghost.user_metadata || {};
+        const matricula = (meta.matricula || '').toString().trim()
+          || (ghost.email ? ghost.email.split('@')[0].toUpperCase() : '');
+        const nome = (meta.nome || '').toString().trim() || '(Sem nome informado)';
+
+        if (!matricula) {
+          skipped.push({ id: ghost.id, reason: 'no matricula' });
+          continue;
+        }
+
+        const mappedData = {
+          user_id: ghost.id,
+          nome,
+          matricula,
+          email: meta.email_contato || ghost.email || '',
+          empresa: meta.empresa || '',
+          telefone: meta.telefone || '',
+          cargo: meta.reg_cargo || meta.cargo || '',
+          area: meta.reg_area || meta.area || '',
+          status: 'pendente',
+          must_change_password: false,
+        };
+
+        const { error: upsertError } = await serviceClient
+          .from('profiles')
+          .upsert(mappedData, { onConflict: 'user_id' });
+
+        if (upsertError) {
+          console.error(`[RECOVER] Failed for ${ghost.id}:`, upsertError.message);
+          skipped.push({ id: ghost.id, reason: upsertError.message });
+        } else {
+          recoveredCount++;
+          recovered.push({ id: ghost.id, matricula, nome });
+        }
+      }
+
+      console.log(`[RECOVER] Recovered ${recoveredCount} of ${ghosts.length}.`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        recoveredCount,
+        totalFound: ghosts.length,
+        recovered,
+        skipped,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'kick-user') {
       if (!userId) {
         return new Response(JSON.stringify({ error: 'userId required' }), {
