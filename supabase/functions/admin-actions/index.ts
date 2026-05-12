@@ -83,7 +83,7 @@ serve(async (req) => {
     const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
     const { action, userId, newStatus, newPassword, profileData } = await req.json();
 
-    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user'];
+    const adminActions = ['reset-password', 'resend-password', 'delete-user', 'update-status', 'cleanup-ghosts', 'kick-user', 'recover-ghost-users'];
     // complete-signup & finalize-signup must be public because new users have no
     // valid session yet (email_not_confirmed). Both internally use service_role
     // and look up the user via auth.admin.getUserById / verify userId matches.
