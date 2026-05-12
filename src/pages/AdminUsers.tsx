@@ -548,6 +548,10 @@ const AdminUsers = () => {
                 <CardTitle>Usuários Cadastrados</CardTitle>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleRecoverGhosts} disabled={recoveringGhosts} className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                  {recoveringGhosts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+                  Recuperar Cadastros
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleCleanupGhosts} disabled={cleaningGhosts} className="text-orange-600 border-orange-200 hover:bg-orange-50">
                   {cleaningGhosts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserMinus className="w-4 h-4 mr-2" />}
                   Limpar Fantasmas
