@@ -461,6 +461,25 @@ const AdminUsers = () => {
     }
   };
 
+  const handleRecoverGhosts = async () => {
+    setRecoveringGhosts(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "recover-ghost-users" },
+      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      toast({
+        title: "Recuperação concluída",
+        description: `${data.recoveredCount} cadastro(s) recuperado(s) de ${data.totalFound} encontrado(s). Eles aparecem agora como Pendente.`,
+      });
+      await loadUsers();
+    } catch (err: any) {
+      toast({ title: "Erro ao recuperar", description: err.message, variant: "destructive" });
+    } finally {
+      setRecoveringGhosts(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo":
