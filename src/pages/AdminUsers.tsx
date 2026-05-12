@@ -102,6 +102,7 @@ const AdminUsers = () => {
   const [editForm, setEditForm] = useState({ nome: "", cargo: "", area: "", email: "", empresa: "", telefone: "" });
   const [saving, setSaving] = useState(false);
   const [cleaningGhosts, setCleaningGhosts] = useState(false);
+  const [recoveringGhosts, setRecoveringGhosts] = useState(false);
 
   // WhatsApp share dialog after reset
   const [waDialogOpen, setWaDialogOpen] = useState(false);
@@ -129,6 +130,21 @@ const AdminUsers = () => {
     }
 
     setIsAdmin(true);
+    // Auto-recover any auth user that signed up but never got a profile,
+    // so the admin can validate them. Silent — non-blocking on failure.
+    try {
+      const { data: recData } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "recover-ghost-users" },
+      });
+      if (recData?.recoveredCount > 0) {
+        toast({
+          title: `${recData.recoveredCount} cadastro(s) recuperado(s)`,
+          description: "Novos usuários que ficaram sem perfil agora aparecem como Pendente.",
+        });
+      }
+    } catch (err) {
+      console.warn("[AdminUsers] auto-recover failed (non-blocking):", err);
+    }
     await loadUsers();
     setLoading(false);
   };
@@ -445,6 +461,25 @@ const AdminUsers = () => {
     }
   };
 
+  const handleRecoverGhosts = async () => {
+    setRecoveringGhosts(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("admin-actions", {
+        body: { action: "recover-ghost-users" },
+      });
+      if (fnError || data?.error) throw new Error(data?.error || fnError?.message);
+      toast({
+        title: "Recuperação concluída",
+        description: `${data.recoveredCount} cadastro(s) recuperado(s) de ${data.totalFound} encontrado(s). Eles aparecem agora como Pendente.`,
+      });
+      await loadUsers();
+    } catch (err: any) {
+      toast({ title: "Erro ao recuperar", description: err.message, variant: "destructive" });
+    } finally {
+      setRecoveringGhosts(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ativo":
@@ -513,6 +548,10 @@ const AdminUsers = () => {
                 <CardTitle>Usuários Cadastrados</CardTitle>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleRecoverGhosts} disabled={recoveringGhosts} className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                  {recoveringGhosts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+                  Recuperar Cadastros
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleCleanupGhosts} disabled={cleaningGhosts} className="text-orange-600 border-orange-200 hover:bg-orange-50">
                   {cleaningGhosts ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserMinus className="w-4 h-4 mr-2" />}
                   Limpar Fantasmas
