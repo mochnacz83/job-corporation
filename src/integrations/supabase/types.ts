@@ -421,6 +421,7 @@ export type Database = {
           nome_material: string
           quantidade: number
           serial: string | null
+          serial_retirado: string | null
           unidade: string
         }
         Insert: {
@@ -431,6 +432,7 @@ export type Database = {
           nome_material: string
           quantidade?: number
           serial?: string | null
+          serial_retirado?: string | null
           unidade?: string
         }
         Update: {
@@ -441,6 +443,7 @@ export type Database = {
           nome_material?: string
           quantidade?: number
           serial?: string | null
+          serial_retirado?: string | null
           unidade?: string
         }
         Relationships: [
@@ -475,6 +478,7 @@ export type Database = {
           foto_url: string | null
           id: string
           last_exported_at: string | null
+          linked_aplicacao_id: string | null
           local_retirada: string | null
           matricula_tt: string | null
           nome_tecnico: string
@@ -508,6 +512,7 @@ export type Database = {
           foto_url?: string | null
           id?: string
           last_exported_at?: string | null
+          linked_aplicacao_id?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico: string
@@ -541,6 +546,7 @@ export type Database = {
           foto_url?: string | null
           id?: string
           last_exported_at?: string | null
+          linked_aplicacao_id?: string | null
           local_retirada?: string | null
           matricula_tt?: string | null
           nome_tecnico?: string
