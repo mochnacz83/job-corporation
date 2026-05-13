@@ -2096,10 +2096,10 @@ const MaterialColeta = () => {
             </Card>
 
             {/* RETIRADA/REVERSA Checkpoints */}
-            {isReversa && (
+            {(isReversa || isReparoAplicarBaixar) && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
+                  <CardTitle className="text-base text-primary">{isReparoAplicarBaixar ? "Checkpoints - Local de Retirada (Reversa do material baixado)" : "Checkpoints - Local de Retirada"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-1.5">
@@ -2328,12 +2328,12 @@ const MaterialColeta = () => {
             )}
 
             {/* ── REVERSA: Photo, Signatures, Frase ── */}
-            {isReversa && (
+            {(isReversa || isReparoAplicarBaixar) && (
               <>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                       <ImageIcon className="w-5 h-5 text-primary" /> Registro Fotográfico dos Materiais *
+                       <ImageIcon className="w-5 h-5 text-primary" /> {isReparoAplicarBaixar ? "Registro Fotográfico dos Materiais Retirados (Reversa) *" : "Registro Fotográfico dos Materiais *"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
