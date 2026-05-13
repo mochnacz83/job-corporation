@@ -86,7 +86,11 @@ const norm = (s: string | null | undefined) =>
   (s || "").toString().trim().toLowerCase();
 
 const normTecnico = (s: string | null | undefined) =>
-  (s || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+  (s || "").toString().trim().toUpperCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\b(DE|DO|DA|DOS|DAS)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 type CardFilter =
   | "ALL"
@@ -773,6 +777,32 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
+  // Conjunto de nomes de técnicos com atividade EM ANDAMENTO
+  const ttsEmAndamento = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return;
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
+
+  // Conjunto de nomes de técnicos com atividade AGENDADA PARA O DIA
+  const ttsAgendaDia = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      if (!isAgendadaParaDia(r)) return;
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presencaByTT, presencaByTR, presencaByNome, date]);
+
   // Técnicos SEM ENCERRAMENTO (P0 — Produção Zero)
   const ttsSemEncerramento = useMemo(() => {
     const s = new Set<string>();
@@ -814,18 +844,17 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(stat, statusFilter)) return false;
 
       if (cardFilter === "EM_ANDAMENTO") {
-        if (!ESTADOS_EM_ANDAMENTO.includes(norm(r.ds_estado))) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsEmAndamento.has(nameKey)) return false;
       } else if (cardFilter === "AGENDA_DIA") {
-        if (!isAgendadaParaDia(r)) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsAgendaDia.has(nameKey)) return false;
       } else if (cardFilter === "PRESENCA_OK") {
-        const macro = (r.ds_macro_atividade || "").trim().toUpperCase();
-        const estado = norm(r.ds_estado);
-        const isOK =
-          estado.includes("conclu") &&
-          estado.includes("sucesso") &&
-          !estado.includes("sem sucesso") &&
-          MACROS_PRESENCA_OK.includes(macro);
-        if (!isOK) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsPresencaOK.has(nameKey)) return false;
       } else if (cardFilter === "ATIVOS") {
         const info = getPresencaInfo(r);
         const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
@@ -918,6 +947,10 @@ const AtividadesEncerramento = () => {
         if (ttsSemPresenca.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "SEM_ENCERRAMENTO") {
         if (ttsSemEncerramento.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "EM_ANDAMENTO") {
+        if (ttsEmAndamento.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "AGENDA_DIA") {
+        if (ttsAgendaDia.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ATIVOS") {
         if (ttsAtivos.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
@@ -1110,7 +1143,7 @@ const AtividadesEncerramento = () => {
       totalSemPresenca,
       totalSemEncerramento,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
