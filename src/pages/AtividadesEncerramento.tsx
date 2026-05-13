@@ -85,6 +85,9 @@ const MACRO_PRESENCA_EXCLUIR = "RET-FTTH";
 const norm = (s: string | null | undefined) =>
   (s || "").toString().trim().toLowerCase();
 
+const normTecnico = (s: string | null | undefined) =>
+  (s || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+
 type CardFilter =
   | "ALL"
   | "ATIVOS"
@@ -628,7 +631,7 @@ const AtividadesEncerramento = () => {
   }, [presenca, fato, coordenadorFilter, supervisorFilter, presencaByTT, presencaByTR]);
 
 
-  // Conjunto de TTs ativos na presença (status em branco/vazio)
+  // Conjunto de nomes de técnicos ativos na presença (status em branco/vazio)
   const ttsAtivos = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
@@ -640,31 +643,26 @@ const AtividadesEncerramento = () => {
       const effStat = stat === "" ? "Ativo" : stat;
       if (!matchFilter(effStat, statusFilter)) return;
 
-      if (!stat && p.tt) s.add(p.tt.trim().toUpperCase());
+      const nameKey = normTecnico(p.funcionario);
+      if (!stat && nameKey) s.add(nameKey);
     });
     return s;
   }, [presenca, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
-  // Conjunto de TTs/TRs cujo Status na planilha Dimensão (tecnicos_presenca)
-  // é "Técnico de Dados". Esses técnicos NÃO contabilizam em "Técnicos Ativos"
-  // nem em "Sem Presença" — ficam fora do saldo. Porém, se fecharem alguma
-  // atividade Concluída Com Sucesso (regra da Presença Confirmada), entram
-  // normalmente em ttsPresencaOK, como qualquer outro técnico.
+  // Conjunto de nomes de técnicos cujo Status na planilha Dimensão (tecnicos_presenca)
+  // é "Técnico de Dados".
   const ttsTecnicoDeDados = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
       const stat = (p.status || "").trim().toLowerCase();
       if (stat !== "técnico de dados" && stat !== "tecnico de dados") return;
-      const tt = (p.tt || "").trim().toUpperCase();
-      const tr = (p.tr || "").trim().toUpperCase();
-      if (tt) s.add(tt);
-      if (tr) s.add(tr);
+      const nameKey = normTecnico(p.funcionario);
+      if (nameKey) s.add(nameKey);
     });
     return s;
   }, [presenca]);
 
-  // Conjunto de TTs que fecharam ao menos 1 atividade OK (presença efetiva)
-  // Conta INST/MUD/SRV/REP-FTTH com sucesso. RET-FTTH NÃO conta.
+  // Conjunto de nomes de técnicos que fecharam ao menos 1 atividade OK (presença efetiva)
   const ttsPresencaOK = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
@@ -685,16 +683,12 @@ const AtividadesEncerramento = () => {
         MACROS_PRESENCA_OK.includes(macro) &&
         macro !== MACRO_PRESENCA_EXCLUIR
       ) {
-        const pTT = info ? (info.tt || "").trim().toUpperCase() : "";
-        const pTR = info ? (info.tr || "").trim().toUpperCase() : "";
-        const fTT = (r.matricula_tt || "").trim().toUpperCase();
-        const fTR = (r.matricula_tr || "").trim().toUpperCase();
-        const key = pTT || pTR || fTT || fTR;
-        if (key) s.add(key);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (nameKey) s.add(nameKey);
       }
     });
     return s;
-  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR, presencaByNome]);
 
   const ttsComAtividade = useMemo(() => {
     const s = new Set<string>();
@@ -707,24 +701,13 @@ const AtividadesEncerramento = () => {
       const stat = info ? ((info.status || "").trim() === "" ? "Ativo" : info.status) : "Ativo";
       if (!matchFilter(stat, statusFilter)) return;
 
-      const pTT = info ? (info.tt || "").trim().toUpperCase() : "";
-      const pTR = info ? (info.tr || "").trim().toUpperCase() : "";
-      const fTT = (r.matricula_tt || "").trim().toUpperCase();
-      const fTR = (r.matricula_tr || "").trim().toUpperCase();
-      const key = pTT || pTR || fTT || fTR;
-      if (key) s.add(key);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
     });
     return s;
-  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR]);
+  }, [fato, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, presencaByTT, presencaByTR, presencaByNome]);
 
-  // Técnicos SEM PRESENÇA confirmada (inverso exato do cartão "Presença Confirmada"):
-  // Parte da base de técnicos ATIVOS na planilha Dimensão (Presença) — ou seja, com a
-  // coluna Status em branco ("Células Vazias"). Quem tem qualquer outro Status
-  // (ex.: "Técnico de Dados", afastado, etc.) NÃO entra nesse saldo.
-  // Em seguida remove os que estão em ttsPresencaOK (já confirmaram presença).
-  // Resultado: começa no total de Técnicos Ativos e só baixa conforme técnicos
-  // fecharem INST/MUD/SRV/REP-FTTH com sucesso. Técnicos com status alterado que
-  // fecharem atividade entram em Presença Confirmada normalmente, mas nunca em Sem Presença.
+  // Técnicos SEM PRESENÇA confirmada
   const ttsSemPresenca = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
@@ -736,19 +719,14 @@ const AtividadesEncerramento = () => {
       const effStat = statRaw === "" ? "Ativo" : statRaw;
       if (!matchFilter(effStat, statusFilter)) return;
 
-      const nome = (p.funcionario || "").toUpperCase();
-      if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
+      const nameKey = normTecnico(p.funcionario);
+      if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
       if (statRaw) return;
 
-      const tt = (p.tt || "").trim().toUpperCase();
-      const tr = (p.tr || "").trim().toUpperCase();
-      
       // Se já confirmou presença, não entra no grupo "Sem Presença"
-      if (tt && ttsPresencaOK.has(tt)) return;
-      if (tr && ttsPresencaOK.has(tr)) return;
+      if (ttsPresencaOK.has(nameKey)) return;
 
-      if (tt) s.add(tt);
-      if (tr) s.add(tr);
+      s.add(nameKey);
     });
     return s;
   }, [presenca, ttsPresencaOK, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
@@ -758,50 +736,44 @@ const AtividadesEncerramento = () => {
     fato.forEach((r) => {
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sucesso") && !estado.includes("sem sucesso")) {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (tt) s.add(tt);
-        if (tr) s.add(tr);
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (nameKey) s.add(nameKey);
       }
     });
     return s;
-  }, [fato]);
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
   const ttsComInsucesso = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
       const estado = norm(r.ds_estado);
       if (estado.includes("conclu") && estado.includes("sem sucesso")) {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (tt) s.add(tt);
-        if (tr) s.add(tr);
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (nameKey) s.add(nameKey);
       }
     });
     return s;
-  }, [fato]);
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
-  // Conjunto de TTs/TRs que fecharam ALGUMA atividade no dia (sucesso OU insucesso),
-  // independente da macro. Usado para identificar "Sem Encerramento" (P0 — Produção Zero).
+  // Conjunto de nomes de técnicos que fecharam ALGUMA atividade no dia
   const ttsComFechamento = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
       if (!isSC(r)) return;
       const estado = norm(r.ds_estado);
-      const isFechada = estado.includes("conclu"); // cobre "concluído com sucesso" e "concluído sem sucesso"
+      const isFechada = estado.includes("conclu");
       if (!isFechada) return;
-      const tt = (r.matricula_tt || "").trim().toUpperCase();
-      const tr = (r.matricula_tr || "").trim().toUpperCase();
-      if (tt) s.add(tt);
-      if (tr) s.add(tr);
+      
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
     });
     return s;
-  }, [fato]);
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
-  // Técnicos SEM ENCERRAMENTO (P0 — Produção Zero): técnicos ATIVOS na planilha
-  // Dimensão (status em branco) que NÃO fecharam nenhuma atividade no dia.
-  // Mesma base que "Sem Presença", mas considera qualquer encerramento (sucesso
-  // ou insucesso, qualquer macro), não somente as macros de presença OK.
+  // Técnicos SEM ENCERRAMENTO (P0 — Produção Zero)
   const ttsSemEncerramento = useMemo(() => {
     const s = new Set<string>();
     presenca.forEach((p) => {
@@ -811,17 +783,14 @@ const AtividadesEncerramento = () => {
       const statRaw = (p.status || "").trim();
       const effStat = statRaw === "" ? "Ativo" : statRaw;
       if (!matchFilter(effStat, statusFilter)) return;
-      const nome = (p.funcionario || "").toUpperCase();
-      if (nome.includes("BUFFER") || nome.includes("EXTERNO")) return;
+      
+      const nameKey = normTecnico(p.funcionario);
+      if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
       if (statRaw) return;
       
-      const tt = (p.tt || "").trim().toUpperCase();
-      const tr = (p.tr || "").trim().toUpperCase();
-      if (tt && ttsComFechamento.has(tt)) return;
-      if (tr && ttsComFechamento.has(tr)) return;
+      if (ttsComFechamento.has(nameKey)) return;
       
-      if (tt) s.add(tt);
-      if (tr) s.add(tr);
+      s.add(nameKey);
     });
     return s;
   }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
@@ -858,24 +827,25 @@ const AtividadesEncerramento = () => {
           MACROS_PRESENCA_OK.includes(macro);
         if (!isOK) return false;
       } else if (cardFilter === "ATIVOS") {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        if (!tt || !ttsAtivos.has(tt)) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsAtivos.has(nameKey)) return false;
       } else if (cardFilter === "SEM_PRESENCA") {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (!(tt && ttsSemPresenca.has(tt)) && !(tr && ttsSemPresenca.has(tr))) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsSemPresenca.has(nameKey)) return false;
       } else if (cardFilter === "SEM_ENCERRAMENTO") {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (!(tt && ttsSemEncerramento.has(tt)) && !(tr && ttsSemEncerramento.has(tr))) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsSemEncerramento.has(nameKey)) return false;
       } else if (cardFilter === "SUCESSO") {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (!(tt && ttsComSucesso.has(tt)) && !(tr && ttsComSucesso.has(tr))) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsComSucesso.has(nameKey)) return false;
       } else if (cardFilter === "INSUCESSO") {
-        const tt = (r.matricula_tt || "").trim().toUpperCase();
-        const tr = (r.matricula_tr || "").trim().toUpperCase();
-        if (!(tt && ttsComInsucesso.has(tt)) && !(tr && ttsComInsucesso.has(tr))) return false;
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsComInsucesso.has(nameKey)) return false;
       }
       return true;
     });
@@ -901,10 +871,8 @@ const AtividadesEncerramento = () => {
       }
     >();
 
-    const normStr = (s: string) => (s || "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
-
     const initTecnico = (p: PresencaRow) => {
-      const nomeKey = normStr(p.funcionario);
+      const nomeKey = normTecnico(p.funcionario);
       if (!nomeKey) return; // não exibir técnicos sem nome
       const ttKey = (p.tt || "").trim().toUpperCase();
       const trKey = (p.tr || "").trim().toUpperCase();
@@ -943,17 +911,17 @@ const AtividadesEncerramento = () => {
       const stat = (p.status || "").trim() === "" ? "Ativo" : p.status;
       if (!matchFilter(stat, statusFilter)) return;
 
-      const tt = (p.tt || "").trim().toUpperCase();
-      const tr = (p.tr || "").trim().toUpperCase();
+      const nameKey = normTecnico(p.funcionario);
+      if (!nameKey) return;
 
       if (cardFilter === "SEM_PRESENCA") {
-        if ((tt && ttsSemPresenca.has(tt)) || (tr && ttsSemPresenca.has(tr))) initTecnico(p);
+        if (ttsSemPresenca.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "SEM_ENCERRAMENTO") {
-        if ((tt && ttsSemEncerramento.has(tt)) || (tr && ttsSemEncerramento.has(tr))) initTecnico(p);
+        if (ttsSemEncerramento.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ATIVOS") {
-        if ((tt && ttsAtivos.has(tt)) || (tr && ttsAtivos.has(tr))) initTecnico(p);
+        if (ttsAtivos.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
-        if ((tt && ttsPresencaOK.has(tt)) || (tr && ttsPresencaOK.has(tr))) initTecnico(p);
+        if (ttsPresencaOK.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ALL") {
         initTecnico(p);
       }
@@ -979,7 +947,7 @@ const AtividadesEncerramento = () => {
       const finalTT = pTT || ttKey;
       const finalTR = pTR || trKey;
 
-      const normFinalNome = normStr(finalNome);
+      const normFinalNome = normTecnico(finalNome);
 
       const key = normFinalNome !== "SEM_TECNICO" ? normFinalNome : (finalTT || finalTR || "SEM_TECNICO");
 
