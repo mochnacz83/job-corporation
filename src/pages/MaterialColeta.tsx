@@ -2217,7 +2217,7 @@ const MaterialColeta = () => {
                           </div>
                           {mat.seriais.length === 0 && (
                             <div className="space-y-1">
-                              <Label className="text-xs">Serial</Label>
+                              <Label className="text-xs">{isReparoAplicarBaixar ? "Serial Aplicado *" : "Serial"}</Label>
                               <div className="flex gap-1">
                                 <Input
                                   value={mat.serial}
@@ -2226,7 +2226,7 @@ const MaterialColeta = () => {
                                     updateMaterial(mat.id, "serial", v);
                                     checkSerialLive(`${mat.id}:main`, v);
                                   }}
-                                  placeholder="SERIAL"
+                                  placeholder={isReparoAplicarBaixar ? "SERIAL APLICADO" : "SERIAL"}
                                   className={`flex-1 uppercase ${serialErrors[`${mat.id}:main`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                 />
                                 <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial", code); checkSerialLive(`${mat.id}:main`, code); })}>
@@ -2239,6 +2239,31 @@ const MaterialColeta = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* REPARO + APLICAR/BAIXAR — Serial Retirado (modo single) */}
+                        {isReparoAplicarBaixar && mat.seriais.length === 0 && (
+                          <div className="border border-amber-300 rounded-md p-3 bg-amber-50/40 space-y-1">
+                            <Label className="text-xs font-semibold text-amber-900">Serial Retirado * (será encaminhado para Reversa)</Label>
+                            <div className="flex gap-1">
+                              <Input
+                                value={mat.serial_retirado || ""}
+                                onChange={(e) => {
+                                  const v = toUpper(e.target.value);
+                                  updateMaterial(mat.id, "serial_retirado" as keyof MaterialItem, v);
+                                  checkSerialLive(`${mat.id}:ret`, v);
+                                }}
+                                placeholder="SERIAL RETIRADO"
+                                className={`flex-1 uppercase ${serialErrors[`${mat.id}:ret`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                              />
+                              <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial_retirado" as keyof MaterialItem, code); checkSerialLive(`${mat.id}:ret`, code); })}>
+                                <ScanBarcode className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {serialErrors[`${mat.id}:ret`] && (
+                              <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:ret`]}</p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Ask seriais dialog inline */}
                         {mat.askSeriais && Number(mat.quantidade) > 1 && (
@@ -2254,7 +2279,7 @@ const MaterialColeta = () => {
                         {/* Multiple serial fields */}
                         {mat.seriais.length > 0 && !mat.askSeriais && (
                           <div className="space-y-2 border-t pt-2">
-                            <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
+                            <Label className="text-xs font-medium">{isReparoAplicarBaixar ? `Seriais individuais — Aplicado + Retirado (${mat.seriais.length})` : `Seriais individuais (${mat.seriais.length})`}</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                               {mat.seriais.map((s, i) => (
                                 <div key={i} className="space-y-1">
@@ -2262,7 +2287,7 @@ const MaterialColeta = () => {
                                     <Input
                                       value={s}
                                       onChange={(e) => { updateSerial(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:${i}`, e.target.value); }}
-                                      placeholder={`SERIAL ${i + 1} *`}
+                                      placeholder={isReparoAplicarBaixar ? `SERIAL APLICADO ${i + 1} *` : `SERIAL ${i + 1} *`}
                                       className={`flex-1 uppercase ${serialErrors[`${mat.id}:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                     />
                                     <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerial(mat.id, i, code); checkSerialLive(`${mat.id}:${i}`, code); })}>
@@ -2271,6 +2296,24 @@ const MaterialColeta = () => {
                                   </div>
                                   {serialErrors[`${mat.id}:${i}`] && (
                                     <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:${i}`]}</p>
+                                  )}
+                                  {isReparoAplicarBaixar && (
+                                    <>
+                                      <div className="flex gap-1">
+                                        <Input
+                                          value={(mat.seriais_retirados || [])[i] || ""}
+                                          onChange={(e) => { updateSerialRetirado(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:ret:${i}`, e.target.value); }}
+                                          placeholder={`SERIAL RETIRADO ${i + 1} *`}
+                                          className={`flex-1 uppercase border-amber-400 ${serialErrors[`${mat.id}:ret:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                        />
+                                        <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerialRetirado(mat.id, i, code); checkSerialLive(`${mat.id}:ret:${i}`, code); })}>
+                                          <ScanBarcode className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                      {serialErrors[`${mat.id}:ret:${i}`] && (
+                                        <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:ret:${i}`]}</p>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               ))}
