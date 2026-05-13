@@ -283,6 +283,10 @@ const MaterialColeta = () => {
 
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
+  // Caso especial: REPARO + APLICAR/BAIXAR exige duplo serial (Aplicado + Retirado)
+  // e gera DOIS registros: a coleta de aplicação + uma coleta de reversa vinculada.
+  const isReparoAplicarBaixar = atividade === "REPARO" && tipoAplicacao === "APLICAR/BAIXAR";
+  const needsReversaDocs = isReversa || isReparoAplicarBaixar;
 
   // Force REVERSA if activity is RETIRADA and current type is APLICAR/BAIXAR
   useEffect(() => {
@@ -339,13 +343,13 @@ const MaterialColeta = () => {
   };
 
   useEffect(() => {
-    if (isReversa) {
+    if (needsReversaDocs) {
       setTimeout(() => {
         initCanvas(sigColabCanvasRef.current);
         initCanvas(sigAlmoxCanvasRef.current);
       }, 100);
     }
-  }, [isReversa]);
+  }, [needsReversaDocs]);
 
   const startDraw = (canvas: HTMLCanvasElement | null, e: React.TouchEvent | React.MouseEvent, setDrawing: (v: boolean) => void) => {
     if (!canvas) return;
