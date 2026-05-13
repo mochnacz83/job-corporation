@@ -601,14 +601,15 @@ const MaterialColeta = () => {
 
         const numQty = Number(qty);
         if (numQty > 1 && !m.askSeriais) {
-          return { ...m, quantidade: numQty, askSeriais: true, seriais: Array(numQty).fill("") };
+          return { ...m, quantidade: numQty, askSeriais: true, seriais: Array(numQty).fill(""), seriais_retirados: Array(numQty).fill("") };
         }
         if (numQty <= 1) {
-          return { ...m, quantidade: numQty, askSeriais: false, seriais: [] };
+          return { ...m, quantidade: numQty, askSeriais: false, seriais: [], seriais_retirados: [] };
         }
         // qty changed but already asked
         const newSeriais = Array(numQty).fill("").map((_, i) => m.seriais[i] || "");
-        return { ...m, quantidade: numQty, seriais: newSeriais };
+        const newSeriaisRet = Array(numQty).fill("").map((_, i) => (m.seriais_retirados || [])[i] || "");
+        return { ...m, quantidade: numQty, seriais: newSeriais, seriais_retirados: newSeriaisRet };
       })
     );
   };
@@ -619,9 +620,9 @@ const MaterialColeta = () => {
         if (m.id !== id) return m;
         if (yes) {
           const qty = typeof m.quantidade === "number" ? m.quantidade : Number(m.quantidade) || 0;
-          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => "") };
+          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => ""), seriais_retirados: Array.from({ length: qty }, () => "") };
         }
-        return { ...m, askSeriais: false, seriais: [] };
+        return { ...m, askSeriais: false, seriais: [], seriais_retirados: [] };
       })
     );
   };
@@ -633,6 +634,17 @@ const MaterialColeta = () => {
         const newSeriais = [...m.seriais];
         newSeriais[index] = toUpper(value);
         return { ...m, seriais: newSeriais };
+      })
+    );
+  };
+
+  const updateSerialRetirado = (matId: string, index: number, value: string) => {
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== matId) return m;
+        const arr = [...(m.seriais_retirados || [])];
+        arr[index] = toUpper(value);
+        return { ...m, seriais_retirados: arr };
       })
     );
   };
