@@ -29,6 +29,9 @@ interface MaterialItem {
   serial: string;
   seriais: string[];
   askSeriais: boolean;
+  // Para REPARO + APLICAR/BAIXAR: serial do material RETIRADO (paralelo ao aplicado)
+  serial_retirado?: string;
+  seriais_retirados?: string[];
 }
 
 interface Tecnico {
@@ -128,6 +131,8 @@ const newMaterial = (): MaterialItem => ({
   serial: "",
   seriais: [],
   askSeriais: false,
+  serial_retirado: "",
+  seriais_retirados: [],
 });
 
 const MaterialColeta = () => {
