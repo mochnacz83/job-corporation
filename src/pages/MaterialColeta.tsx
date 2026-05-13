@@ -1105,6 +1105,35 @@ const MaterialColeta = () => {
           }
         }
       }
+      // REPARO + APLICAR/BAIXAR: serial retirado é OBRIGATÓRIO em cada slot
+      if (isReparoAplicarBaixar) {
+        if (m.seriais.length > 0) {
+          for (let i = 0; i < m.seriais.length; i++) {
+            const sret = (m.seriais_retirados || [])[i];
+            if (!sret) {
+              toast.error(`Informe o Serial Retirado ${i + 1} do material ${m.codigo_material}`);
+              return;
+            }
+            if (sret.trim().toUpperCase() === (m.seriais[i] || "").trim().toUpperCase()) {
+              toast.error(`Serial Aplicado e Retirado não podem ser iguais (${sret}).`);
+              return;
+            }
+          }
+        } else {
+          if (!m.serial) {
+            toast.error(`Informe o Serial Aplicado do material ${m.codigo_material}`);
+            return;
+          }
+          if (!m.serial_retirado) {
+            toast.error(`Informe o Serial Retirado do material ${m.codigo_material}`);
+            return;
+          }
+          if ((m.serial || "").trim().toUpperCase() === (m.serial_retirado || "").trim().toUpperCase()) {
+            toast.error(`Serial Aplicado e Retirado não podem ser iguais (${m.serial}).`);
+            return;
+          }
+        }
+      }
     }
 
     // Validate seriais uniqueness — within form and against database
@@ -1120,14 +1149,14 @@ const MaterialColeta = () => {
       if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
     }
 
-    if (isReversa) {
+    if (isReversa || isReparoAplicarBaixar) {
       const colabSig = getCanvasDataUrl(sigColabCanvasRef.current);
       if (!colabSig || colabSig === "data:,") {
-        toast.error("Assinatura do colaborador é obrigatória para Reversa");
+        toast.error(isReparoAplicarBaixar ? "Assinatura do colaborador é obrigatória para a Reversa do material retirado" : "Assinatura do colaborador é obrigatória para Reversa");
         return;
       }
       if (!fotoFile) {
-        toast.error("Foto dos materiais é obrigatória para Reversa");
+        toast.error(isReparoAplicarBaixar ? "Foto dos materiais retirados é obrigatória para a Reversa" : "Foto dos materiais é obrigatória para Reversa");
         return;
       }
     }
@@ -1137,7 +1166,7 @@ const MaterialColeta = () => {
       let fotoUrl: string | null = null;
       let fotoDataUrl: string | null = fotoPreview;
 
-      if (isReversa && fotoFile) {
+      if ((isReversa || isReparoAplicarBaixar) && fotoFile) {
         const ext = fotoFile.name.split(".").pop();
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from("material-fotos").upload(path, fotoFile);
@@ -1146,8 +1175,8 @@ const MaterialColeta = () => {
         fotoUrl = urlData.publicUrl;
       }
 
-      const colabSig = isReversa && !isCanvasEmpty(sigColabCanvasRef.current) ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
-      const almoxSig = isReversa && !isCanvasEmpty(sigAlmoxCanvasRef.current) ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
+      const colabSig = (isReversa || isReparoAplicarBaixar) && !isCanvasEmpty(sigColabCanvasRef.current) ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
+      const almoxSig = (isReversa || isReparoAplicarBaixar) && !isCanvasEmpty(sigAlmoxCanvasRef.current) ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
 
       const { data: coleta, error: coletaError } = await supabase
         .from("material_coletas")
@@ -1163,12 +1192,14 @@ const MaterialColeta = () => {
           circuito: circuito || null,
           ba: ba || null,
           data_execucao: dataExecucao,
-          assinatura_colaborador: colabSig || null,
-          assinatura_almoxarifado: almoxSig || null,
-          foto_url: fotoUrl,
-          local_retirada: localRetirada,
-          classificacao_cenario: classificacaoCenario,
-          circuito_compartilhado: circuitoCompartilhado,
+          // Para REPARO+APLICAR/BAIXAR a coleta A é a APLICAÇÃO pura (sem foto/assinaturas/local).
+          // Esses dados ficam na coleta B (REVERSA vinculada) criada logo abaixo.
+          assinatura_colaborador: isReparoAplicarBaixar ? null : (colabSig || null),
+          assinatura_almoxarifado: isReparoAplicarBaixar ? null : (almoxSig || null),
+          foto_url: isReparoAplicarBaixar ? null : fotoUrl,
+          local_retirada: isReparoAplicarBaixar ? null : localRetirada,
+          classificacao_cenario: isReparoAplicarBaixar ? null : classificacaoCenario,
+          circuito_compartilhado: isReparoAplicarBaixar ? null : circuitoCompartilhado,
           opcoes_adicionais: opcoesAdicionais,
         } as any)
         .select("id")
@@ -1181,7 +1212,7 @@ const MaterialColeta = () => {
       if (!isSemMaterial) {
         materiais.forEach((m) => {
           if (m.seriais.length > 0) {
-            m.seriais.forEach((s) => {
+            m.seriais.forEach((s, i) => {
               items.push({
                 coleta_id: (coleta as any).id,
                 codigo_material: m.codigo_material,
@@ -1189,6 +1220,7 @@ const MaterialColeta = () => {
                 quantidade: 1,
                 unidade: m.unidade,
                 serial: s || null,
+                serial_retirado: isReparoAplicarBaixar ? ((m.seriais_retirados || [])[i] || null) : null,
               });
             });
           } else {
@@ -1199,6 +1231,7 @@ const MaterialColeta = () => {
               quantidade: m.quantidade,
               unidade: m.unidade,
               serial: m.serial || null,
+              serial_retirado: isReparoAplicarBaixar ? (m.serial_retirado || null) : null,
             });
           }
         });
@@ -1209,10 +1242,87 @@ const MaterialColeta = () => {
         }
       }
 
-      toast.success("Salvo com sucesso!");
-      trackAction(isReversa ? `Cadastrou material de reversa (BA: ${ba})` : `Cadastrou material de aplicação (BA: ${ba})`);
+      // ─── REPARO + APLICAR/BAIXAR ─── Cria a coleta B (REVERSA vinculada)
+      let reversaColetaId: string | null = null;
+      if (isReparoAplicarBaixar) {
+        const { data: coletaB, error: coletaBErr } = await supabase
+          .from("material_coletas")
+          .insert({
+            user_id: user.id,
+            matricula_tt: matriculaTt || null,
+            nome_tecnico: nomeTecnico,
+            cidade: cidade || null,
+            sigla_cidade: siglaCidade || null,
+            uf: uf || null,
+            atividade,
+            tipo_aplicacao: "REVERSA",
+            circuito: circuito || null,
+            ba: ba || null,
+            data_execucao: dataExecucao,
+            assinatura_colaborador: colabSig || null,
+            assinatura_almoxarifado: almoxSig || null,
+            foto_url: fotoUrl,
+            local_retirada: localRetirada,
+            classificacao_cenario: classificacaoCenario,
+            circuito_compartilhado: circuitoCompartilhado,
+            opcoes_adicionais: opcoesAdicionais,
+            linked_aplicacao_id: (coleta as any).id,
+          } as any)
+          .select("id")
+          .single();
+        if (coletaBErr) throw coletaBErr;
+        reversaColetaId = (coletaB as any).id;
 
-      if (isReversa) {
+        // Itens da reversa: serial = serial_retirado, um por slot
+        const reversaItems: any[] = [];
+        materiais.forEach((m) => {
+          if (m.seriais.length > 0) {
+            (m.seriais_retirados || []).forEach((sret) => {
+              if (!sret) return;
+              reversaItems.push({
+                coleta_id: reversaColetaId,
+                codigo_material: m.codigo_material,
+                nome_material: m.nome_material,
+                quantidade: 1,
+                unidade: m.unidade,
+                serial: sret,
+              });
+            });
+          } else if (m.serial_retirado) {
+            reversaItems.push({
+              coleta_id: reversaColetaId,
+              codigo_material: m.codigo_material,
+              nome_material: m.nome_material,
+              quantidade: m.quantidade,
+              unidade: m.unidade,
+              serial: m.serial_retirado,
+            });
+          }
+        });
+        if (reversaItems.length > 0) {
+          const { error: itemsBErr } = await supabase.from("material_coleta_items").insert(reversaItems as any);
+          if (itemsBErr) throw itemsBErr;
+        }
+      }
+
+      toast.success("Salvo com sucesso!");
+      if (isReparoAplicarBaixar) {
+        trackAction(`Cadastrou REPARO APLICAR/BAIXAR + reversa vinculada (BA: ${ba})`);
+      } else {
+        trackAction(isReversa ? `Cadastrou material de reversa (BA: ${ba})` : `Cadastrou material de aplicação (BA: ${ba})`);
+      }
+
+      if (isReversa || isReparoAplicarBaixar) {
+        // Para REPARO+APLICAR/BAIXAR, o PDF gerado é o da REVERSA com os seriais retirados.
+        const materiaisParaPDF: MaterialItem[] = isReparoAplicarBaixar
+          ? materiais.map((m) => ({
+              ...m,
+              serial: m.serial_retirado || "",
+              seriais: (m.seriais_retirados && m.seriais_retirados.length > 0)
+                ? [...m.seriais_retirados]
+                : [],
+            }))
+          : materiais;
         generatePDF({
           matriculaTt,
           nomeTecnico,
@@ -1224,7 +1334,7 @@ const MaterialColeta = () => {
           ba,
           circuito,
           dataExecucao,
-          materiais,
+          materiais: materiaisParaPDF,
           assinaturaColaborador: colabSig || "",
           assinaturaAlmoxarifado: almoxSig || "",
           fotoDataUrl,
@@ -1232,7 +1342,7 @@ const MaterialColeta = () => {
           classificacao_cenario: classificacaoCenario,
           circuito_compartilhado: circuitoCompartilhado,
           opcoes_adicionais: opcoesAdicionais,
-          tipo_aplicacao: tipoAplicacao,
+          tipo_aplicacao: isReparoAplicarBaixar ? "REVERSA" : tipoAplicacao,
         });
 
         // Upload PDF to storage and save URL
