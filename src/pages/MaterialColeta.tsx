@@ -29,6 +29,9 @@ interface MaterialItem {
   serial: string;
   seriais: string[];
   askSeriais: boolean;
+  // Para REPARO + APLICAR/BAIXAR: serial do material RETIRADO (paralelo ao aplicado)
+  serial_retirado?: string;
+  seriais_retirados?: string[];
 }
 
 interface Tecnico {
@@ -128,6 +131,8 @@ const newMaterial = (): MaterialItem => ({
   serial: "",
   seriais: [],
   askSeriais: false,
+  serial_retirado: "",
+  seriais_retirados: [],
 });
 
 const MaterialColeta = () => {
@@ -278,6 +283,10 @@ const MaterialColeta = () => {
 
   const isReversa = (atividade === "RETIRADA" || tipoAplicacao === "REVERSA") && tipoAplicacao !== "SEM MATERIAL";
   const isSemMaterial = tipoAplicacao === "SEM MATERIAL";
+  // Caso especial: REPARO + APLICAR/BAIXAR exige duplo serial (Aplicado + Retirado)
+  // e gera DOIS registros: a coleta de aplicação + uma coleta de reversa vinculada.
+  const isReparoAplicarBaixar = atividade === "REPARO" && tipoAplicacao === "APLICAR/BAIXAR";
+  const needsReversaDocs = isReversa || isReparoAplicarBaixar;
 
   // Force REVERSA if activity is RETIRADA and current type is APLICAR/BAIXAR
   useEffect(() => {
@@ -334,13 +343,13 @@ const MaterialColeta = () => {
   };
 
   useEffect(() => {
-    if (isReversa) {
+    if (needsReversaDocs) {
       setTimeout(() => {
         initCanvas(sigColabCanvasRef.current);
         initCanvas(sigAlmoxCanvasRef.current);
       }, 100);
     }
-  }, [isReversa]);
+  }, [needsReversaDocs]);
 
   const startDraw = (canvas: HTMLCanvasElement | null, e: React.TouchEvent | React.MouseEvent, setDrawing: (v: boolean) => void) => {
     if (!canvas) return;
@@ -592,14 +601,15 @@ const MaterialColeta = () => {
 
         const numQty = Number(qty);
         if (numQty > 1 && !m.askSeriais) {
-          return { ...m, quantidade: numQty, askSeriais: true, seriais: Array(numQty).fill("") };
+          return { ...m, quantidade: numQty, askSeriais: true, seriais: Array(numQty).fill(""), seriais_retirados: Array(numQty).fill("") };
         }
         if (numQty <= 1) {
-          return { ...m, quantidade: numQty, askSeriais: false, seriais: [] };
+          return { ...m, quantidade: numQty, askSeriais: false, seriais: [], seriais_retirados: [] };
         }
         // qty changed but already asked
         const newSeriais = Array(numQty).fill("").map((_, i) => m.seriais[i] || "");
-        return { ...m, quantidade: numQty, seriais: newSeriais };
+        const newSeriaisRet = Array(numQty).fill("").map((_, i) => (m.seriais_retirados || [])[i] || "");
+        return { ...m, quantidade: numQty, seriais: newSeriais, seriais_retirados: newSeriaisRet };
       })
     );
   };
@@ -610,9 +620,9 @@ const MaterialColeta = () => {
         if (m.id !== id) return m;
         if (yes) {
           const qty = typeof m.quantidade === "number" ? m.quantidade : Number(m.quantidade) || 0;
-          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => "") };
+          return { ...m, askSeriais: false, seriais: Array.from({ length: qty }, () => ""), seriais_retirados: Array.from({ length: qty }, () => "") };
         }
-        return { ...m, askSeriais: false, seriais: [] };
+        return { ...m, askSeriais: false, seriais: [], seriais_retirados: [] };
       })
     );
   };
@@ -624,6 +634,17 @@ const MaterialColeta = () => {
         const newSeriais = [...m.seriais];
         newSeriais[index] = toUpper(value);
         return { ...m, seriais: newSeriais };
+      })
+    );
+  };
+
+  const updateSerialRetirado = (matId: string, index: number, value: string) => {
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== matId) return m;
+        const arr = [...(m.seriais_retirados || [])];
+        arr[index] = toUpper(value);
+        return { ...m, seriais_retirados: arr };
       })
     );
   };
@@ -653,6 +674,13 @@ const MaterialColeta = () => {
         m.seriais.forEach((s) => { if (!isIgnorable(s)) allSeriais.push(normalize(s)); });
       } else if (m.serial && !isIgnorable(m.serial)) {
         allSeriais.push(normalize(m.serial));
+      }
+      // Inclui também os seriais retirados (REPARO + APLICAR/BAIXAR), pois eles
+      // viram serial principal da coleta de reversa vinculada e precisam ser únicos.
+      if (m.seriais_retirados && m.seriais_retirados.length > 0) {
+        m.seriais_retirados.forEach((s) => { if (s && !isIgnorable(s)) allSeriais.push(normalize(s)); });
+      } else if (m.serial_retirado && !isIgnorable(m.serial_retirado)) {
+        allSeriais.push(normalize(m.serial_retirado));
       }
     }
     if (allSeriais.length === 0) return { ok: true };
@@ -1077,6 +1105,35 @@ const MaterialColeta = () => {
           }
         }
       }
+      // REPARO + APLICAR/BAIXAR: serial retirado é OBRIGATÓRIO em cada slot
+      if (isReparoAplicarBaixar) {
+        if (m.seriais.length > 0) {
+          for (let i = 0; i < m.seriais.length; i++) {
+            const sret = (m.seriais_retirados || [])[i];
+            if (!sret) {
+              toast.error(`Informe o Serial Retirado ${i + 1} do material ${m.codigo_material}`);
+              return;
+            }
+            if (sret.trim().toUpperCase() === (m.seriais[i] || "").trim().toUpperCase()) {
+              toast.error(`Serial Aplicado e Retirado não podem ser iguais (${sret}).`);
+              return;
+            }
+          }
+        } else {
+          if (!m.serial) {
+            toast.error(`Informe o Serial Aplicado do material ${m.codigo_material}`);
+            return;
+          }
+          if (!m.serial_retirado) {
+            toast.error(`Informe o Serial Retirado do material ${m.codigo_material}`);
+            return;
+          }
+          if ((m.serial || "").trim().toUpperCase() === (m.serial_retirado || "").trim().toUpperCase()) {
+            toast.error(`Serial Aplicado e Retirado não podem ser iguais (${m.serial}).`);
+            return;
+          }
+        }
+      }
     }
 
     // Validate seriais uniqueness — within form and against database
@@ -1092,14 +1149,14 @@ const MaterialColeta = () => {
       if (!dupCheck.ok) { toast.error(dupCheck.message!); return; }
     }
 
-    if (isReversa) {
+    if (isReversa || isReparoAplicarBaixar) {
       const colabSig = getCanvasDataUrl(sigColabCanvasRef.current);
       if (!colabSig || colabSig === "data:,") {
-        toast.error("Assinatura do colaborador é obrigatória para Reversa");
+        toast.error(isReparoAplicarBaixar ? "Assinatura do colaborador é obrigatória para a Reversa do material retirado" : "Assinatura do colaborador é obrigatória para Reversa");
         return;
       }
       if (!fotoFile) {
-        toast.error("Foto dos materiais é obrigatória para Reversa");
+        toast.error(isReparoAplicarBaixar ? "Foto dos materiais retirados é obrigatória para a Reversa" : "Foto dos materiais é obrigatória para Reversa");
         return;
       }
     }
@@ -1109,7 +1166,7 @@ const MaterialColeta = () => {
       let fotoUrl: string | null = null;
       let fotoDataUrl: string | null = fotoPreview;
 
-      if (isReversa && fotoFile) {
+      if ((isReversa || isReparoAplicarBaixar) && fotoFile) {
         const ext = fotoFile.name.split(".").pop();
         const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from("material-fotos").upload(path, fotoFile);
@@ -1118,8 +1175,8 @@ const MaterialColeta = () => {
         fotoUrl = urlData.publicUrl;
       }
 
-      const colabSig = isReversa && !isCanvasEmpty(sigColabCanvasRef.current) ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
-      const almoxSig = isReversa && !isCanvasEmpty(sigAlmoxCanvasRef.current) ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
+      const colabSig = (isReversa || isReparoAplicarBaixar) && !isCanvasEmpty(sigColabCanvasRef.current) ? getCanvasDataUrl(sigColabCanvasRef.current) : null;
+      const almoxSig = (isReversa || isReparoAplicarBaixar) && !isCanvasEmpty(sigAlmoxCanvasRef.current) ? getCanvasDataUrl(sigAlmoxCanvasRef.current) : null;
 
       const { data: coleta, error: coletaError } = await supabase
         .from("material_coletas")
@@ -1135,12 +1192,14 @@ const MaterialColeta = () => {
           circuito: circuito || null,
           ba: ba || null,
           data_execucao: dataExecucao,
-          assinatura_colaborador: colabSig || null,
-          assinatura_almoxarifado: almoxSig || null,
-          foto_url: fotoUrl,
-          local_retirada: localRetirada,
-          classificacao_cenario: classificacaoCenario,
-          circuito_compartilhado: circuitoCompartilhado,
+          // Para REPARO+APLICAR/BAIXAR a coleta A é a APLICAÇÃO pura (sem foto/assinaturas/local).
+          // Esses dados ficam na coleta B (REVERSA vinculada) criada logo abaixo.
+          assinatura_colaborador: isReparoAplicarBaixar ? null : (colabSig || null),
+          assinatura_almoxarifado: isReparoAplicarBaixar ? null : (almoxSig || null),
+          foto_url: isReparoAplicarBaixar ? null : fotoUrl,
+          local_retirada: isReparoAplicarBaixar ? null : localRetirada,
+          classificacao_cenario: isReparoAplicarBaixar ? null : classificacaoCenario,
+          circuito_compartilhado: isReparoAplicarBaixar ? null : circuitoCompartilhado,
           opcoes_adicionais: opcoesAdicionais,
         } as any)
         .select("id")
@@ -1153,7 +1212,7 @@ const MaterialColeta = () => {
       if (!isSemMaterial) {
         materiais.forEach((m) => {
           if (m.seriais.length > 0) {
-            m.seriais.forEach((s) => {
+            m.seriais.forEach((s, i) => {
               items.push({
                 coleta_id: (coleta as any).id,
                 codigo_material: m.codigo_material,
@@ -1161,6 +1220,7 @@ const MaterialColeta = () => {
                 quantidade: 1,
                 unidade: m.unidade,
                 serial: s || null,
+                serial_retirado: isReparoAplicarBaixar ? ((m.seriais_retirados || [])[i] || null) : null,
               });
             });
           } else {
@@ -1171,6 +1231,7 @@ const MaterialColeta = () => {
               quantidade: m.quantidade,
               unidade: m.unidade,
               serial: m.serial || null,
+              serial_retirado: isReparoAplicarBaixar ? (m.serial_retirado || null) : null,
             });
           }
         });
@@ -1181,10 +1242,87 @@ const MaterialColeta = () => {
         }
       }
 
-      toast.success("Salvo com sucesso!");
-      trackAction(isReversa ? `Cadastrou material de reversa (BA: ${ba})` : `Cadastrou material de aplicação (BA: ${ba})`);
+      // ─── REPARO + APLICAR/BAIXAR ─── Cria a coleta B (REVERSA vinculada)
+      let reversaColetaId: string | null = null;
+      if (isReparoAplicarBaixar) {
+        const { data: coletaB, error: coletaBErr } = await supabase
+          .from("material_coletas")
+          .insert({
+            user_id: user.id,
+            matricula_tt: matriculaTt || null,
+            nome_tecnico: nomeTecnico,
+            cidade: cidade || null,
+            sigla_cidade: siglaCidade || null,
+            uf: uf || null,
+            atividade,
+            tipo_aplicacao: "REVERSA",
+            circuito: circuito || null,
+            ba: ba || null,
+            data_execucao: dataExecucao,
+            assinatura_colaborador: colabSig || null,
+            assinatura_almoxarifado: almoxSig || null,
+            foto_url: fotoUrl,
+            local_retirada: localRetirada,
+            classificacao_cenario: classificacaoCenario,
+            circuito_compartilhado: circuitoCompartilhado,
+            opcoes_adicionais: opcoesAdicionais,
+            linked_aplicacao_id: (coleta as any).id,
+          } as any)
+          .select("id")
+          .single();
+        if (coletaBErr) throw coletaBErr;
+        reversaColetaId = (coletaB as any).id;
 
-      if (isReversa) {
+        // Itens da reversa: serial = serial_retirado, um por slot
+        const reversaItems: any[] = [];
+        materiais.forEach((m) => {
+          if (m.seriais.length > 0) {
+            (m.seriais_retirados || []).forEach((sret) => {
+              if (!sret) return;
+              reversaItems.push({
+                coleta_id: reversaColetaId,
+                codigo_material: m.codigo_material,
+                nome_material: m.nome_material,
+                quantidade: 1,
+                unidade: m.unidade,
+                serial: sret,
+              });
+            });
+          } else if (m.serial_retirado) {
+            reversaItems.push({
+              coleta_id: reversaColetaId,
+              codigo_material: m.codigo_material,
+              nome_material: m.nome_material,
+              quantidade: m.quantidade,
+              unidade: m.unidade,
+              serial: m.serial_retirado,
+            });
+          }
+        });
+        if (reversaItems.length > 0) {
+          const { error: itemsBErr } = await supabase.from("material_coleta_items").insert(reversaItems as any);
+          if (itemsBErr) throw itemsBErr;
+        }
+      }
+
+      toast.success("Salvo com sucesso!");
+      if (isReparoAplicarBaixar) {
+        trackAction(`Cadastrou REPARO APLICAR/BAIXAR + reversa vinculada (BA: ${ba})`);
+      } else {
+        trackAction(isReversa ? `Cadastrou material de reversa (BA: ${ba})` : `Cadastrou material de aplicação (BA: ${ba})`);
+      }
+
+      if (isReversa || isReparoAplicarBaixar) {
+        // Para REPARO+APLICAR/BAIXAR, o PDF gerado é o da REVERSA com os seriais retirados.
+        const materiaisParaPDF: MaterialItem[] = isReparoAplicarBaixar
+          ? materiais.map((m) => ({
+              ...m,
+              serial: m.serial_retirado || "",
+              seriais: (m.seriais_retirados && m.seriais_retirados.length > 0)
+                ? [...m.seriais_retirados]
+                : [],
+            }))
+          : materiais;
         generatePDF({
           matriculaTt,
           nomeTecnico,
@@ -1196,7 +1334,7 @@ const MaterialColeta = () => {
           ba,
           circuito,
           dataExecucao,
-          materiais,
+          materiais: materiaisParaPDF,
           assinaturaColaborador: colabSig || "",
           assinaturaAlmoxarifado: almoxSig || "",
           fotoDataUrl,
@@ -1204,7 +1342,7 @@ const MaterialColeta = () => {
           classificacao_cenario: classificacaoCenario,
           circuito_compartilhado: circuitoCompartilhado,
           opcoes_adicionais: opcoesAdicionais,
-          tipo_aplicacao: tipoAplicacao,
+          tipo_aplicacao: isReparoAplicarBaixar ? "REVERSA" : tipoAplicacao,
         });
 
         // Upload PDF to storage and save URL
@@ -2068,10 +2206,10 @@ const MaterialColeta = () => {
             </Card>
 
             {/* RETIRADA/REVERSA Checkpoints */}
-            {isReversa && (
+            {(isReversa || isReparoAplicarBaixar) && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base text-primary">Checkpoints - Local de Retirada</CardTitle>
+                  <CardTitle className="text-base text-primary">{isReparoAplicarBaixar ? "Checkpoints - Local de Retirada (Reversa do material baixado)" : "Checkpoints - Local de Retirada"}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-1.5">
@@ -2189,7 +2327,7 @@ const MaterialColeta = () => {
                           </div>
                           {mat.seriais.length === 0 && (
                             <div className="space-y-1">
-                              <Label className="text-xs">Serial</Label>
+                              <Label className="text-xs">{isReparoAplicarBaixar ? "Serial Aplicado *" : "Serial"}</Label>
                               <div className="flex gap-1">
                                 <Input
                                   value={mat.serial}
@@ -2198,7 +2336,7 @@ const MaterialColeta = () => {
                                     updateMaterial(mat.id, "serial", v);
                                     checkSerialLive(`${mat.id}:main`, v);
                                   }}
-                                  placeholder="SERIAL"
+                                  placeholder={isReparoAplicarBaixar ? "SERIAL APLICADO" : "SERIAL"}
                                   className={`flex-1 uppercase ${serialErrors[`${mat.id}:main`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                 />
                                 <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código de barras / QR Code" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial", code); checkSerialLive(`${mat.id}:main`, code); })}>
@@ -2211,6 +2349,31 @@ const MaterialColeta = () => {
                             </div>
                           )}
                         </div>
+
+                        {/* REPARO + APLICAR/BAIXAR — Serial Retirado (modo single) */}
+                        {isReparoAplicarBaixar && mat.seriais.length === 0 && (
+                          <div className="border border-amber-300 rounded-md p-3 bg-amber-50/40 space-y-1">
+                            <Label className="text-xs font-semibold text-amber-900">Serial Retirado * (será encaminhado para Reversa)</Label>
+                            <div className="flex gap-1">
+                              <Input
+                                value={mat.serial_retirado || ""}
+                                onChange={(e) => {
+                                  const v = toUpper(e.target.value);
+                                  updateMaterial(mat.id, "serial_retirado" as keyof MaterialItem, v);
+                                  checkSerialLive(`${mat.id}:ret`, v);
+                                }}
+                                placeholder="SERIAL RETIRADO"
+                                className={`flex-1 uppercase ${serialErrors[`${mat.id}:ret`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                              />
+                              <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateMaterial(mat.id, "serial_retirado" as keyof MaterialItem, code); checkSerialLive(`${mat.id}:ret`, code); })}>
+                                <ScanBarcode className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            {serialErrors[`${mat.id}:ret`] && (
+                              <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:ret`]}</p>
+                            )}
+                          </div>
+                        )}
 
                         {/* Ask seriais dialog inline */}
                         {mat.askSeriais && Number(mat.quantidade) > 1 && (
@@ -2226,7 +2389,7 @@ const MaterialColeta = () => {
                         {/* Multiple serial fields */}
                         {mat.seriais.length > 0 && !mat.askSeriais && (
                           <div className="space-y-2 border-t pt-2">
-                            <Label className="text-xs font-medium">Seriais individuais ({mat.seriais.length})</Label>
+                            <Label className="text-xs font-medium">{isReparoAplicarBaixar ? `Seriais individuais — Aplicado + Retirado (${mat.seriais.length})` : `Seriais individuais (${mat.seriais.length})`}</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                               {mat.seriais.map((s, i) => (
                                 <div key={i} className="space-y-1">
@@ -2234,7 +2397,7 @@ const MaterialColeta = () => {
                                     <Input
                                       value={s}
                                       onChange={(e) => { updateSerial(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:${i}`, e.target.value); }}
-                                      placeholder={`SERIAL ${i + 1} *`}
+                                      placeholder={isReparoAplicarBaixar ? `SERIAL APLICADO ${i + 1} *` : `SERIAL ${i + 1} *`}
                                       className={`flex-1 uppercase ${serialErrors[`${mat.id}:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
                                     />
                                     <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerial(mat.id, i, code); checkSerialLive(`${mat.id}:${i}`, code); })}>
@@ -2243,6 +2406,24 @@ const MaterialColeta = () => {
                                   </div>
                                   {serialErrors[`${mat.id}:${i}`] && (
                                     <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:${i}`]}</p>
+                                  )}
+                                  {isReparoAplicarBaixar && (
+                                    <>
+                                      <div className="flex gap-1">
+                                        <Input
+                                          value={(mat.seriais_retirados || [])[i] || ""}
+                                          onChange={(e) => { updateSerialRetirado(mat.id, i, e.target.value); checkSerialLive(`${mat.id}:ret:${i}`, e.target.value); }}
+                                          placeholder={`SERIAL RETIRADO ${i + 1} *`}
+                                          className={`flex-1 uppercase border-amber-400 ${serialErrors[`${mat.id}:ret:${i}`] ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                                        />
+                                        <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" title="Ler código" onClick={() => openScanner((code) => { updateSerialRetirado(mat.id, i, code); checkSerialLive(`${mat.id}:ret:${i}`, code); })}>
+                                          <ScanBarcode className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                      {serialErrors[`${mat.id}:ret:${i}`] && (
+                                        <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="w-3 h-3" />{serialErrors[`${mat.id}:ret:${i}`]}</p>
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               ))}
@@ -2257,12 +2438,12 @@ const MaterialColeta = () => {
             )}
 
             {/* ── REVERSA: Photo, Signatures, Frase ── */}
-            {isReversa && (
+            {(isReversa || isReparoAplicarBaixar) && (
               <>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                       <ImageIcon className="w-5 h-5 text-primary" /> Registro Fotográfico dos Materiais *
+                       <ImageIcon className="w-5 h-5 text-primary" /> {isReparoAplicarBaixar ? "Registro Fotográfico dos Materiais Retirados (Reversa) *" : "Registro Fotográfico dos Materiais *"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
