@@ -675,6 +675,13 @@ const MaterialColeta = () => {
       } else if (m.serial && !isIgnorable(m.serial)) {
         allSeriais.push(normalize(m.serial));
       }
+      // Inclui também os seriais retirados (REPARO + APLICAR/BAIXAR), pois eles
+      // viram serial principal da coleta de reversa vinculada e precisam ser únicos.
+      if (m.seriais_retirados && m.seriais_retirados.length > 0) {
+        m.seriais_retirados.forEach((s) => { if (s && !isIgnorable(s)) allSeriais.push(normalize(s)); });
+      } else if (m.serial_retirado && !isIgnorable(m.serial_retirado)) {
+        allSeriais.push(normalize(m.serial_retirado));
+      }
     }
     if (allSeriais.length === 0) return { ok: true };
 
