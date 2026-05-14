@@ -1,0 +1,7 @@
+# Ability Tecnologia — Portal Corporativo
+
+> Plataforma interna da Ability Tecnologia para gestão de atividades de campo, controle de materiais, vistorias, reagendamentos e indicadores operacionais. Acesso restrito a colaboradores autenticados.
+
+## Pages
+
+- [Login](/): Acesso ao portal corporativo (restrito).
