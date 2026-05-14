@@ -391,7 +391,7 @@ const Login = () => {
       <Card className="w-full max-w-md glass-card relative z-10">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="mx-auto w-24 h-24 flex items-center justify-center p-2 mb-2 bg-transparent overflow-hidden">
-            <img src="/ability-logo.png" alt="Ability Tecnologia Logo" className="w-full h-full object-contain" />
+            <img src="/ability-logo.png" alt="Ability Tecnologia Logo" width="96" height="96" fetchpriority="high" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Portal Corporativo</h1>
