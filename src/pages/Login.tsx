@@ -118,6 +118,13 @@ const Login = () => {
           variant: "destructive",
           duration: 12000,
         });
+      } else if (err?.code === "network_error" || err?.message === "NETWORK_ERROR") {
+        toast({
+          title: "Falha de conexão",
+          description: "Não foi possível conectar ao servidor. Verifique sua internet, VPN ou proxy corporativo e tente novamente. Se persistir, tente usar dados móveis.",
+          variant: "destructive",
+          duration: 10000,
+        });
       } else {
         toast({ title: "Erro no login", description: "Matrícula ou senha incorretos.", variant: "destructive" });
       }

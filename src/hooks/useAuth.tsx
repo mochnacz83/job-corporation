@@ -197,30 +197,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const oldEmail = `${matricula.toLowerCase()}@empresa.local`;
     const oldEmailUpper = `${matricula}@empresa.local`;
 
-    // 1) Try the new domain first (where most users live now)
-    const r1 = await supabase.auth.signInWithPassword({ email: newEmail, password });
-    if (!r1.error) return;
+    // Helpers para distinguir falha de rede (proxy/firewall/offline) de credencial errada.
+    const isNetworkErr = (e: any) => {
+      if (!e) return false;
+      const msg = (e.message || e.error_description || "").toString().toLowerCase();
+      return (
+        e.name === "TypeError" ||
+        e.name === "AuthRetryableFetchError" ||
+        msg.includes("failed to fetch") ||
+        msg.includes("networkerror") ||
+        msg.includes("network request failed") ||
+        msg.includes("load failed") ||
+        msg.includes("timeout") ||
+        msg.includes("fetch")
+      );
+    };
 
-    // 2) Fall back to legacy domain (lowercase)
-    const r2 = await supabase.auth.signInWithPassword({ email: oldEmail, password });
-    if (!r2.error) return;
+    const isInvalidCreds = (e: any) => {
+      const code = (e?.code || "").toString().toLowerCase();
+      const msg = (e?.message || "").toString().toLowerCase();
+      return (
+        code === "invalid_credentials" ||
+        msg.includes("invalid login credentials") ||
+        msg.includes("invalid_credentials")
+      );
+    };
 
-    // 3) Fall back to legacy domain preserving original case (some old accounts)
-    if (oldEmailUpper !== oldEmail) {
-      const r3 = await supabase.auth.signInWithPassword({ email: oldEmailUpper, password });
-      if (!r3.error) return;
-    }
-
-    // Collect all errors to detect "email not confirmed" (= account pending admin approval)
-    const errors = [r1.error, r2.error].filter(Boolean) as any[];
-    const isPending = errors.some((e) =>
+    const isPendingErr = (e: any) =>
       e?.code === "email_not_confirmed" ||
-      /email.*not.*confirmed/i.test(e?.message || "")
-    );
-    if (isPending) {
+      /email.*not.*confirmed/i.test(e?.message || "");
+
+    // Tenta com 1 retry curto em caso de erro transiente de rede.
+    const tryLogin = async (email: string) => {
+      try {
+        const r = await supabase.auth.signInWithPassword({ email, password });
+        if (r.error && isNetworkErr(r.error)) {
+          await new Promise((res) => setTimeout(res, 800));
+          return await supabase.auth.signInWithPassword({ email, password });
+        }
+        return r;
+      } catch (err: any) {
+        if (isNetworkErr(err)) {
+          await new Promise((res) => setTimeout(res, 800));
+          try {
+            return await supabase.auth.signInWithPassword({ email, password });
+          } catch (err2: any) {
+            return { data: null as any, error: err2 };
+          }
+        }
+        return { data: null as any, error: err };
+      }
+    };
+
+    // 1) Domínio novo
+    const r1 = await tryLogin(newEmail);
+    if (!r1.error) return;
+    if (isPendingErr(r1.error)) {
       const err: any = new Error("PENDING_APPROVAL");
       err.code = "email_not_confirmed";
       throw err;
+    }
+    // Se foi falha de rede, NÃO tenta os domínios legados (para não consumir tentativas
+    // e disparar rate-limit em IPs corporativos compartilhados). Reporta rede direto.
+    if (isNetworkErr(r1.error)) {
+      const err: any = new Error("NETWORK_ERROR");
+      err.code = "network_error";
+      throw err;
+    }
+
+    // 2) Só tenta legados se o erro foi de credencial inválida (usuário pode estar no domínio antigo)
+    if (isInvalidCreds(r1.error)) {
+      const r2 = await tryLogin(oldEmail);
+      if (!r2.error) return;
+      if (isPendingErr(r2.error)) {
+        const err: any = new Error("PENDING_APPROVAL");
+        err.code = "email_not_confirmed";
+        throw err;
+      }
+      if (isNetworkErr(r2.error)) {
+        const err: any = new Error("NETWORK_ERROR");
+        err.code = "network_error";
+        throw err;
+      }
+
+      if (oldEmailUpper !== oldEmail && isInvalidCreds(r2.error)) {
+        const r3 = await tryLogin(oldEmailUpper);
+        if (!r3.error) return;
+        if (isPendingErr(r3.error)) {
+          const err: any = new Error("PENDING_APPROVAL");
+          err.code = "email_not_confirmed";
+          throw err;
+        }
+        if (isNetworkErr(r3.error)) {
+          const err: any = new Error("NETWORK_ERROR");
+          err.code = "network_error";
+          throw err;
+        }
+      }
     }
 
     throw new Error(r1.error?.message || "Matrícula ou senha incorretos.");
