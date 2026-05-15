@@ -38,6 +38,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Detecta erros de refresh token inválido / ausente vindos do Supabase
+const isInvalidRefreshError = (err: any): boolean => {
+  if (!err) return false;
+  const msg = (err.message || err.error_description || "").toString().toLowerCase();
+  const code = (err.code || err.error || "").toString().toLowerCase();
+  return (
+    code === "refresh_token_not_found" ||
+    code === "invalid_grant" ||
+    code === "bad_jwt" ||
+    msg.includes("refresh token not found") ||
+    msg.includes("invalid refresh token") ||
+    msg.includes("missing sub claim")
+  );
+};
+
+// Limpa qualquer resíduo de sessão Supabase no storage local sem chamar a API
+const clearLocalSupabaseSession = () => {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("sb-") || k.includes("supabase.auth"))) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -90,22 +119,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => {
-          if (mounted) setLoading(false);
-        });
-      } else {
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session }, error }) => {
+        if (!mounted) return;
+        if (error && isInvalidRefreshError(error)) {
+          // Sessão antiga inválida: limpa local sem chamar a API (evita 400 em loop)
+          clearLocalSupabaseSession();
+          try { await supabase.auth.signOut({ scope: "local" } as any); } catch {}
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id).finally(() => {
+            if (mounted) setLoading(false);
+          });
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(async (err) => {
+        if (!mounted) return;
+        if (isInvalidRefreshError(err)) {
+          clearLocalSupabaseSession();
+          try { await supabase.auth.signOut({ scope: "local" } as any); } catch {}
+        }
+        setSession(null);
+        setUser(null);
         setLoading(false);
-      }
-    });
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!mounted) return;
+        // Renovação falhou: limpa storage e leva para /auth de forma silenciosa
+        if (_event === "TOKEN_REFRESHED" && !session) {
+          clearLocalSupabaseSession();
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setAreaPermissions(null);
+          setIsAdmin(false);
+          if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {
+            window.location.replace("/auth");
+          }
+          return;
+        }
+        if (_event === "SIGNED_OUT") {
+          clearLocalSupabaseSession();
+        }
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {

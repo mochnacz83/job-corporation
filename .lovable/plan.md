@@ -1,70 +1,42 @@
-## Objetivo
+## Diagnóstico
 
-Quando **Atividade = REPARO** e **Tipo Aplicação = APLICAR/BAIXAR**, o módulo Controle de Materiais passa a permitir registrar, em cada linha de material, **dois seriais**: o **Serial Aplicado** (material novo instalado) e o **Serial Retirado** (material defeituoso recolhido). Ao salvar, são gerados dois registros independentes:
+O único erro real captado no preview agora é:
 
-1. **Coleta APLICAR/BAIXAR** — entra normalmente no fluxo Gestech (com o serial aplicado).
-2. **Coleta REVERSA** vinculada — gera PDF de reversa próprio com o serial retirado, e fica disponível no relatório como item de logística reversa.
+```
+POST /auth/v1/token?grant_type=refresh_token  → 400
+{"code":"refresh_token_not_found","message":"Invalid Refresh Token: Refresh Token Not Found"}
+```
 
-## Escopo blindado (NÃO mexer)
+Isso significa que o navegador guardou uma sessão antiga (token de atualização que o servidor já invalidou — comum depois de redeploy, troca de senha pelo admin, ou sessão muito antiga). Quando o app tenta renovar essa sessão, recebe 400 e, em seguida, **qualquer chamada autenticada falha** (salvar coleta, abrir Vistoria, exportar, listar usuários, etc.). É exatamente o sintoma de "alguns comandos estão dando erro".
 
-- Lógica e regras de qualquer outro tipo (`ATIVAÇÃO`, `PREVENTIVA`, `RETIRADA`, `SEM MATERIAL`, `REVERSA` standalone) permanece intacta.
-- Validação global de serial único, edit-request workflow, PDFs já existentes, filtros, dedup do Gestech, RLS, assinaturas e fluxo de almoxarifado seguem como estão.
-- Nada muda quando `tipo_aplicacao = APLICAR/BAIXAR` em `ATIVAÇÃO` ou `PREVENTIVA` — comportamento atual preservado.
+Hoje, em `src/hooks/useAuth.tsx`:
+- `getSession()` no boot não trata o caso de refresh inválido — fica com `session = null` mas o cliente Supabase continua tentando renovar em loop.
+- `onAuthStateChange` não trata o evento `TOKEN_REFRESHED` com `session === null` nem força logout/limpeza local quando o refresh falha.
+- Não há redirecionamento para `/auth` quando a sessão cai durante o uso, então telas internas tentam consultar o banco com token morto e mostram erro genérico.
 
-## Mudanças
+## O que vou corrigir (apenas frontend / auth)
 
-### 1. Banco (migração)
+1. **Tratar refresh inválido no boot** em `useAuth.tsx`
+   - Envolver `supabase.auth.getSession()` para detectar erro `refresh_token_not_found` / `Invalid Refresh Token`.
+   - Quando ocorrer: chamar `supabase.auth.signOut({ scope: 'local' })` para limpar o storage local, sem chamar a API (evita novo 400), e seguir como deslogado.
 
-- Adicionar coluna `serial_retirado text NULL` em `material_coleta_items` (não afeta seriais existentes).
-- Adicionar coluna `linked_aplicacao_id uuid NULL` em `material_coletas` para amarrar a reversa gerada à coleta de aplicação que a originou (referência fraca, sem FK para evitar bloqueios).
-- Ajustar a função `enforce_unique_serial` para também checar o `serial_retirado` no mesmo conjunto único (mesmas regras de ignorar vazio/N/A/-).
+2. **Reagir a falha de renovação durante o uso**
+   - No `onAuthStateChange`, quando o evento for `SIGNED_OUT` ou `TOKEN_REFRESHED` com `session === null`, limpar estado e redirecionar para `/auth` (somente se o usuário estiver em rota protegida).
 
-### 2. UI do formulário (`src/pages/MaterialColeta.tsx`)
+3. **Wrapper leve para erros 401/refresh em queries**
+   - Pequeno helper que, ao detectar `refresh_token_not_found` em qualquer resposta, dispara o mesmo signOut local + redirect, em vez de mostrar erro técnico.
 
-- Novo flag derivado: `isReparoAplicarBaixar = atividade === "REPARO" && tipoAplicacao === "APLICAR/BAIXAR"`.
-- Quando `isReparoAplicarBaixar`, em cada linha de material exibir dois campos lado a lado:
-  - **Serial Aplicado** (campo `serial` atual, com scanner)
-  - **Serial Retirado** (novo campo, com scanner)
-  - Validação on-the-fly de unicidade global em ambos.
-- Bloco extra de "Documentação da Reversa" (somente quando `isReparoAplicarBaixar`):
-  - Foto dos materiais retirados (compressão como hoje)
-  - Assinatura do colaborador (canvas)
-  - Assinatura do almoxarifado opcional (mesmo padrão de reversa atual)
-- O bloco original de aplicação (sem assinatura) continua valendo para a parte aplicada.
+4. **Mensagem amigável**
+   - Toast: "Sua sessão expirou. Faça login novamente." (em vez do erro cru atual).
 
-### 3. Salvamento
+5. **Verificação**
+   - Abrir o preview, validar que não aparece mais 400 em loop e que ao expirar a sessão o usuário é levado a `/auth` limpo.
 
-Ao submeter com `isReparoAplicarBaixar`:
+## O que NÃO vou mexer
 
-1. Validar serial aplicado e serial retirado obrigatórios em cada item; foto e assinatura do colaborador obrigatórios para a reversa.
-2. Inserir **coleta A (APLICAR/BAIXAR)** com `material_coleta_items` carregando `serial = serial_aplicado` e `serial_retirado = serial_retirado` (auditoria).
-3. Inserir **coleta B (REVERSA)** com `linked_aplicacao_id = A.id`, copiando técnico/cidade/UF/BA/circuito/data, com itens contendo apenas `serial = serial_retirado` e a foto/assinaturas da reversa.
-4. Gerar PDF padrão de aplicação para A e PDF de reversa para B (reutilizando funções existentes — sem alterar a função de PDF de reversa).
-5. Trackear ambas as ações.
+- Banco, RLS, edge functions, regras de negócio, layout, permissões — nada disso muda.
+- Fluxo de login por matrícula, troca obrigatória de senha e ativação por admin permanecem iguais.
 
-### 4. Relatórios e Gestech
+## Observação
 
-- Coleta A aparece como APLICAR/BAIXAR → continua elegível para exportação Gestech (regra atual).
-- Coleta B aparece como REVERSA → continua excluída do Gestech (já é a regra hoje, sem alteração).
-- Visualização da coleta mostra link "Reversa vinculada" quando `linked_aplicacao_id` existe.
-
-## Detalhes técnicos
-
-- Tipo `MaterialItem` ganha campo opcional `serial_retirado: string`.
-- Tipo `ColetaRecord.material_coleta_items` ganha `serial_retirado: string | null` (somente leitura, para futuras telas).
-- Reuso integral de:
-  - `validateSeriaisUnique` (estendido para incluir `serial_retirado`).
-  - Funções de geração de PDF (`generateReversaPDF` / `generateAplicacaoPDF` existentes).
-  - Upload de foto e assinaturas (mesmas helpers).
-- Tudo o que envolve `tipoAplicacao === "REVERSA"` standalone (criada manualmente) continua funcionando — não alteramos esse caminho.
-
-## Arquivos afetados
-
-- `supabase/migrations/<timestamp>_reparo_aplicar_baixar_dual_serial.sql` (novo)
-- `src/pages/MaterialColeta.tsx` (UI + lógica de submit)
-- `mem://features/material-coleta/form-logic` (atualizar memória com a nova regra)
-
-## Confirmações antes de codar
-
-1. PDF da reversa vinculada deve usar **o mesmo template** da reversa standalone atual (sem mudanças no template), correto?
-2. Se admin futuramente excluir a coleta A (aplicação), a coleta B (reversa) deve ficar **órfã** ou ser excluída em cascata?
+Se o erro que você está vendo for **outro** (ex.: falha específica em "Material Coleta", "Vistoria", upload de planilha, criar usuário), me diga qual módulo + a mensagem que aparece — eu ajusto o plano antes de implementar. O conserto acima resolve a causa visível agora; outros bugs pontuais precisam do sintoma exato para serem reproduzidos.
