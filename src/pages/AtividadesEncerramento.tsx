@@ -851,11 +851,15 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(effStat, statusFilter)) return;
       const nameKey = normTecnico(p.funcionario);
       if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
+      // Apenas técnicos ATIVOS e com PRESENÇA CONFIRMADA (atuando no dia).
+      // Sem isso, listaríamos toda a escala — inclusive folgas/ausentes.
+      if (!ttsAtivos.has(nameKey)) return;
+      if (!ttsPresencaOK.has(nameKey)) return;
       const c = counts.get(nameKey) || 0;
       if (c <= 3) s.add(nameKey);
     });
     return s;
-  }, [fato, presenca, presencaByTT, presencaByTR, presencaByNome, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+  }, [fato, presenca, presencaByTT, presencaByTR, presencaByNome, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, ttsAtivos, ttsPresencaOK]);
 
 
   // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
