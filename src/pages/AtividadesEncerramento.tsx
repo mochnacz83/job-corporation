@@ -990,6 +990,8 @@ const AtividadesEncerramento = () => {
         if (ttsAtivos.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
         if (ttsPresencaOK.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "BAIXA_PROD") {
+        if (ttsBaixaProd.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ALL") {
         initTecnico(p);
       }
