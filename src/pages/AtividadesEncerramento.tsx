@@ -906,10 +906,14 @@ const AtividadesEncerramento = () => {
         const info = getPresencaInfo(r);
         const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
         if (!nameKey || !ttsComInsucesso.has(nameKey)) return false;
+      } else if (cardFilter === "BAIXA_PROD") {
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsBaixaProd.has(nameKey)) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
