@@ -1796,6 +1796,19 @@ const AtividadesEncerramento = () => {
               </CardContent>
             </Card>
 
+            {/* Baixa Produtividade — técnicos com 3 ou menos atividades fechadas no dia */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "BAIXA_PROD" ? "ALL" : "BAIXA_PROD")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "BAIXA_PROD" ? "ring-2 ring-primary" : ""}`}
+              title="Técnicos que fecharam 3 ou menos atividades no dia (sucesso + insucesso)"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Baixa Produtividade</div>
+                <div className="text-2xl font-bold text-warning">{cardMetrics.totalBaixaProd}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">≤ 3 atividades no dia</div>
+              </CardContent>
+            </Card>
+
             {/* Sem Presença */}
             <Card
               onClick={() => setCardFilter(cardFilter === "SEM_PRESENCA" ? "ALL" : "SEM_PRESENCA")}
@@ -1861,19 +1874,6 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
-              </CardContent>
-            </Card>
-
-            {/* Baixa Produtividade — técnicos com 3 ou menos atividades fechadas no dia */}
-            <Card
-              onClick={() => setCardFilter(cardFilter === "BAIXA_PROD" ? "ALL" : "BAIXA_PROD")}
-              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "BAIXA_PROD" ? "ring-2 ring-primary" : ""}`}
-              title="Técnicos que fecharam 3 ou menos atividades no dia (sucesso + insucesso)"
-            >
-              <CardContent className="p-3">
-                <div className="text-[11px] text-muted-foreground">Baixa Produtividade</div>
-                <div className="text-2xl font-bold text-warning">{cardMetrics.totalBaixaProd}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">≤ 3 atividades no dia</div>
               </CardContent>
             </Card>
           </div>
