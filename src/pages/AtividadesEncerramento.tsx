@@ -101,7 +101,8 @@ type CardFilter =
   | "SEM_PRESENCA"
   | "SEM_ENCERRAMENTO"
   | "SUCESSO"
-  | "INSUCESSO";
+  | "INSUCESSO"
+  | "BAIXA_PROD";
 
 const MultiFilter = ({
   label,
@@ -826,6 +827,36 @@ const AtividadesEncerramento = () => {
   }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
 
+  // Técnicos com BAIXA PRODUTIVIDADE no dia: fecharam <= 3 atividades (sucesso + insucesso).
+  // Considera apenas técnicos presentes na escala (presenca) e respeita filtros globais
+  // de coordenador/supervisor/técnico/status. Não depende de cardFilter para evitar recursão.
+  const ttsBaixaProd = useMemo(() => {
+    const counts = new Map<string, number>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      const estado = norm(r.ds_estado);
+      const fechada = estado.includes("conclu"); // sucesso + sem sucesso
+      if (!fechada) return;
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (!nameKey) return;
+      counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+    });
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      const effStat = (p.status || "").trim() === "" ? "Ativo" : p.status;
+      if (!matchFilter(effStat, statusFilter)) return;
+      const nameKey = normTecnico(p.funcionario);
+      if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
+      const c = counts.get(nameKey) || 0;
+      if (c <= 3) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presenca, presencaByTT, presencaByTR, presencaByNome, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+
 
   // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
   const filteredFato = useMemo(() => {
@@ -875,10 +906,14 @@ const AtividadesEncerramento = () => {
         const info = getPresencaInfo(r);
         const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
         if (!nameKey || !ttsComInsucesso.has(nameKey)) return false;
+      } else if (cardFilter === "BAIXA_PROD") {
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsBaixaProd.has(nameKey)) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -955,6 +990,8 @@ const AtividadesEncerramento = () => {
         if (ttsAtivos.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "PRESENCA_OK") {
         if (ttsPresencaOK.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "BAIXA_PROD") {
+        if (ttsBaixaProd.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ALL") {
         initTecnico(p);
       }
@@ -1054,7 +1091,7 @@ const AtividadesEncerramento = () => {
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
     coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
-    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento, sortConfig
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento, ttsBaixaProd, sortConfig
   ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
@@ -1133,6 +1170,7 @@ const AtividadesEncerramento = () => {
     const totalPresencaOK = ttsPresencaOK.size;
     const totalSemPresenca = ttsSemPresenca.size;
     const totalSemEncerramento = ttsSemEncerramento.size;
+    const totalBaixaProd = ttsBaixaProd.size;
 
     return {
       totalTecnicosPresenca,
@@ -1142,8 +1180,9 @@ const AtividadesEncerramento = () => {
       totalPresencaOK,
       totalSemPresenca,
       totalSemEncerramento,
+      totalBaixaProd,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsBaixaProd, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
@@ -1717,7 +1756,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1812,6 +1851,19 @@ const AtividadesEncerramento = () => {
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
               </CardContent>
             </Card>
+
+            {/* Baixa Produtividade — técnicos com 3 ou menos atividades fechadas no dia */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "BAIXA_PROD" ? "ALL" : "BAIXA_PROD")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "BAIXA_PROD" ? "ring-2 ring-primary" : ""}`}
+              title="Técnicos que fecharam 3 ou menos atividades no dia (sucesso + insucesso)"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Baixa Produtividade</div>
+                <div className="text-2xl font-bold text-warning">{cardMetrics.totalBaixaProd}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">≤ 3 atividades no dia</div>
+              </CardContent>
+            </Card>
           </div>
 
           {cardFilter !== "ALL" && (
@@ -1825,6 +1877,7 @@ const AtividadesEncerramento = () => {
                   cardFilter === "EM_ANDAMENTO" ? "Em Andamento" :
                   cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
                   cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
+                  cardFilter === "BAIXA_PROD" ? "Baixa Produtividade (≤3)" :
                   "Agenda do Dia"
                 }
               </Badge>
@@ -2158,134 +2211,10 @@ const AtividadesEncerramento = () => {
         {/* HISTÓRICO (60 dias) */}
         <TabsContent value="historico" className="space-y-3">
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <CardTitle className="text-sm">Histórico (últimos 60 dias)</CardTitle>
-                  <CardDescription className="text-[11px]">
-                    Resumo do dia {fmtDateBR(date)} + comparativo diário e mensal
-                  </CardDescription>
-                </div>
-                <Button size="sm" variant="outline" onClick={loadHistorico} disabled={loadingHist}>
-                  {loadingHist ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                  <span className="ml-1 text-xs">Atualizar</span>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Tabela comparativa */}
-              <div className="overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-[11px]">Período</TableHead>
-                      <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
-                      <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
-                      <TableHead className="text-[11px] text-center">Total</TableHead>
-                      <TableHead className="text-[11px] text-center">Δ vs anterior</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="text-[11px] font-medium">Dia ({fmtDateBR(date)})</TableCell>
-                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.sel.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.sel.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.sel.total}</TableCell>
-                      <TableCell className="text-[11px] text-center">{delta(histCompare.sel.total, histCompare.prev.total)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] text-muted-foreground">Dia anterior ({fmtDateBR(histCompare.prevDate)})</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.prev.total}</TableCell>
-                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] font-medium">Mês ({fmtMonthBR(histCompare.ym)})</TableCell>
-                      <TableCell className="text-[11px] text-center text-success font-semibold">{histCompare.cur.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center text-destructive font-semibold">{histCompare.cur.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center font-semibold">{histCompare.cur.total}</TableCell>
-                      <TableCell className="text-[11px] text-center">{delta(histCompare.cur.total, histCompare.past.total)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-[11px] text-muted-foreground">Mês anterior ({fmtMonthBR(histCompare.prevYm)})</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.sucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.insucesso}</TableCell>
-                      <TableCell className="text-[11px] text-center">{histCompare.past.total}</TableCell>
-                      <TableCell className="text-[11px] text-center text-muted-foreground">—</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Gráficos */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs font-medium mb-1">Evolução diária (últimos 60 dias)</div>
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={histDaily} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="dia" tick={{ fontSize: 10 }} tickFormatter={(d) => d.slice(5)} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RTooltip labelFormatter={(d: string) => fmtDateBR(d)} contentStyle={{ fontSize: 11 }} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Line type="monotone" dataKey="sucesso" stroke="hsl(var(--success))" strokeWidth={2} dot={false} name="Sucesso" />
-                        <Line type="monotone" dataKey="insucesso" stroke="hsl(var(--destructive))" strokeWidth={2} dot={false} name="Insucesso" />
-                        <Line type="monotone" dataKey="total" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} name="Total" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs font-medium mb-1">Comparativo mensal</div>
-                  <div className="h-[220px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={histMonthly} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis dataKey="mes" tick={{ fontSize: 10 }} tickFormatter={fmtMonthBR} />
-                        <YAxis tick={{ fontSize: 10 }} />
-                        <RTooltip labelFormatter={(m: string) => fmtMonthBR(m)} contentStyle={{ fontSize: 11 }} />
-                        <Legend wrapperStyle={{ fontSize: 11 }} />
-                        <Bar dataKey="sucesso" fill="hsl(var(--success))" name="Sucesso" />
-                        <Bar dataKey="insucesso" fill="hsl(var(--destructive))" name="Insucesso" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </div>
-
-              {/* Top 10 técnicos do dia */}
-              <div>
-                <div className="text-xs font-medium mb-1">Top 10 técnicos — {fmtDateBR(date)}</div>
-                <div className="overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-[11px]">#</TableHead>
-                        <TableHead className="text-[11px]">TT</TableHead>
-                        <TableHead className="text-[11px]">Técnico</TableHead>
-                        <TableHead className="text-[11px] text-center text-success">Sucesso</TableHead>
-                        <TableHead className="text-[11px] text-center text-destructive">Insucesso</TableHead>
-                        <TableHead className="text-[11px] text-center">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rankingDia.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-4">Sem atividades neste dia.</TableCell></TableRow>
-                      ) : rankingDia.map((r, i) => (
-                        <TableRow key={`${r.tt}-${r.nome}-${i}`}>
-                          <TableCell className="text-[11px] font-mono">{i + 1}</TableCell>
-                          <TableCell className="text-[11px] font-mono">{r.tt}</TableCell>
-                          <TableCell className="text-[11px]">{r.nome}</TableCell>
-                          <TableCell className="text-[11px] text-center text-success font-semibold">{r.sucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center text-destructive font-semibold">{r.insucesso}</TableCell>
-                          <TableCell className="text-[11px] text-center font-semibold">{r.total}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+            <CardContent className="flex items-center justify-center min-h-[480px]">
+              <div className="text-center space-y-2">
+                <div className="text-2xl font-semibold text-muted-foreground">Em Desenvolvimento</div>
+                <div className="text-xs text-muted-foreground">Esta aba está sendo reconstruída e voltará em breve.</div>
               </div>
             </CardContent>
           </Card>
