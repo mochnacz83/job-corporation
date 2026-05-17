@@ -843,6 +843,7 @@ const AtividadesEncerramento = () => {
       counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
     });
     const s = new Set<string>();
+    const considered = new Set<string>();
     presenca.forEach((p) => {
       if (!matchFilter(p.coordenador, coordenadorFilter)) return;
       if (!matchFilter(p.supervisor, supervisorFilter)) return;
@@ -851,12 +852,19 @@ const AtividadesEncerramento = () => {
       if (!matchFilter(effStat, statusFilter)) return;
       const nameKey = normTecnico(p.funcionario);
       if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
-      // Apenas técnicos ATIVOS e com PRESENÇA CONFIRMADA (atuando no dia).
-      // Sem isso, listaríamos toda a escala — inclusive folgas/ausentes.
+      // Base: técnicos ATIVOS e com PRESENÇA CONFIRMADA (atuando no dia).
       if (!ttsAtivos.has(nameKey)) return;
       if (!ttsPresencaOK.has(nameKey)) return;
+      considered.add(nameKey);
       const c = counts.get(nameKey) || 0;
       if (c <= 3) s.add(nameKey);
+    });
+    // Acréscimo: técnicos que fecharam atividades mas NÃO estão na base de presença
+    // (saíram da presença ou não constam) — também contam para a visão do dia.
+    counts.forEach((c, nameKey) => {
+      if (considered.has(nameKey)) return;
+      if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
+      if (c > 0 && c <= 3) s.add(nameKey);
     });
     return s;
   }, [fato, presenca, presencaByTT, presencaByTR, presencaByNome, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, ttsAtivos, ttsPresencaOK]);
