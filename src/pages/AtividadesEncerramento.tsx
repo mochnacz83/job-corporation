@@ -827,6 +827,36 @@ const AtividadesEncerramento = () => {
   }, [presenca, ttsComFechamento, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
 
 
+  // Técnicos com BAIXA PRODUTIVIDADE no dia: fecharam <= 3 atividades (sucesso + insucesso).
+  // Considera apenas técnicos presentes na escala (presenca) e respeita filtros globais
+  // de coordenador/supervisor/técnico/status. Não depende de cardFilter para evitar recursão.
+  const ttsBaixaProd = useMemo(() => {
+    const counts = new Map<string, number>();
+    fato.forEach((r) => {
+      if (!isSC(r)) return;
+      const estado = norm(r.ds_estado);
+      const fechada = estado.includes("conclu"); // sucesso + sem sucesso
+      if (!fechada) return;
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (!nameKey) return;
+      counts.set(nameKey, (counts.get(nameKey) || 0) + 1);
+    });
+    const s = new Set<string>();
+    presenca.forEach((p) => {
+      if (!matchFilter(p.coordenador, coordenadorFilter)) return;
+      if (!matchFilter(p.supervisor, supervisorFilter)) return;
+      if (!matchFilter(p.funcionario, tecnicoFilter)) return;
+      const effStat = (p.status || "").trim() === "" ? "Ativo" : p.status;
+      if (!matchFilter(effStat, statusFilter)) return;
+      const nameKey = normTecnico(p.funcionario);
+      if (!nameKey || nameKey.includes("BUFFER") || nameKey.includes("EXTERNO")) return;
+      const c = counts.get(nameKey) || 0;
+      if (c <= 3) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presenca, presencaByTT, presencaByTR, presencaByNome, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter]);
+
 
   // filtered fato (estados/macros + supervisor/coordenador + cardFilter)
   const filteredFato = useMemo(() => {
