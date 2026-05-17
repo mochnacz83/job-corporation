@@ -101,7 +101,8 @@ type CardFilter =
   | "SEM_PRESENCA"
   | "SEM_ENCERRAMENTO"
   | "SUCESSO"
-  | "INSUCESSO";
+  | "INSUCESSO"
+  | "BAIXA_PROD";
 
 const MultiFilter = ({
   label,
