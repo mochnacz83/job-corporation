@@ -1756,7 +1756,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1851,6 +1851,19 @@ const AtividadesEncerramento = () => {
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
               </CardContent>
             </Card>
+
+            {/* Baixa Produtividade — técnicos com 3 ou menos atividades fechadas no dia */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "BAIXA_PROD" ? "ALL" : "BAIXA_PROD")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "BAIXA_PROD" ? "ring-2 ring-primary" : ""}`}
+              title="Técnicos que fecharam 3 ou menos atividades no dia (sucesso + insucesso)"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Baixa Produtividade</div>
+                <div className="text-2xl font-bold text-warning">{cardMetrics.totalBaixaProd}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">≤ 3 atividades no dia</div>
+              </CardContent>
+            </Card>
           </div>
 
           {cardFilter !== "ALL" && (
@@ -1864,6 +1877,7 @@ const AtividadesEncerramento = () => {
                   cardFilter === "EM_ANDAMENTO" ? "Em Andamento" :
                   cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
                   cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
+                  cardFilter === "BAIXA_PROD" ? "Baixa Produtividade (≤3)" :
                   "Agenda do Dia"
                 }
               </Badge>
