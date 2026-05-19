@@ -1839,7 +1839,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-10 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1945,6 +1945,18 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
+              </CardContent>
+            </Card>
+
+            {/* Total de técnicos que fecharam qualquer atividade (sem regras de presença/sucesso) */}
+            <Card
+              className="transition-all hover:shadow-md"
+              title="Total de técnicos distintos que encerraram ao menos uma atividade no dia (com ou sem sucesso), sem regra de presença"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Técnicos que Fecharam</div>
+                <div className="text-2xl font-bold text-primary">{cardMetrics.totalFechouQualquer}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Qualquer atividade</div>
               </CardContent>
             </Card>
           </div>
