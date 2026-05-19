@@ -1232,8 +1232,9 @@ const AtividadesEncerramento = () => {
       totalSemPresenca,
       totalSemEncerramento,
       totalBaixaProd,
+      totalFechouQualquer: ttsFechouQualquer.size,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsBaixaProd, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsBaixaProd, ttsFechouQualquer, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
