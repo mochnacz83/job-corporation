@@ -127,7 +127,8 @@ type CardFilter =
   | "SEM_ENCERRAMENTO"
   | "SUCESSO"
   | "INSUCESSO"
-  | "BAIXA_PROD";
+  | "BAIXA_PROD"
+  | "FECHOU_QUALQUER";
 
 const MultiFilter = ({
   label,
@@ -992,10 +993,14 @@ const AtividadesEncerramento = () => {
         const info = getPresencaInfo(r);
         const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
         if (!nameKey || !ttsBaixaProd.has(nameKey)) return false;
+      } else if (cardFilter === "FECHOU_QUALQUER") {
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsFechouQualquer.has(nameKey)) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, ttsFechouQualquer, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -1074,6 +1079,8 @@ const AtividadesEncerramento = () => {
         if (ttsPresencaOK.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "BAIXA_PROD") {
         if (ttsBaixaProd.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "FECHOU_QUALQUER") {
+        if (ttsFechouQualquer.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ALL") {
         initTecnico(p);
       }
@@ -1173,7 +1180,7 @@ const AtividadesEncerramento = () => {
   }, [
     filteredFato, presenca, presencaByTT, presencaByTR, search, cardFilter,
     coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter,
-    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento, ttsBaixaProd, sortConfig
+    ttsSemPresenca, ttsAtivos, ttsPresencaOK, ttsSemEncerramento, ttsBaixaProd, ttsFechouQualquer, sortConfig
   ]);
 
   // Totais de sucesso/insucesso baseados em TODAS as atividades do dia (UF=SC),
@@ -1839,7 +1846,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-10 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1950,7 +1957,8 @@ const AtividadesEncerramento = () => {
 
             {/* Total de técnicos que fecharam qualquer atividade (sem regras de presença/sucesso) */}
             <Card
-              className="transition-all hover:shadow-md"
+              onClick={() => setCardFilter(cardFilter === "FECHOU_QUALQUER" ? "ALL" : "FECHOU_QUALQUER")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "FECHOU_QUALQUER" ? "ring-2 ring-primary" : ""}`}
               title="Total de técnicos distintos que encerraram ao menos uma atividade no dia (com ou sem sucesso), sem regra de presença"
             >
               <CardContent className="p-3">
@@ -1973,6 +1981,7 @@ const AtividadesEncerramento = () => {
                   cardFilter === "SUCESSO" ? "Concluídas c/ Sucesso" :
                   cardFilter === "INSUCESSO" ? "Concluídas s/ Sucesso" :
                   cardFilter === "BAIXA_PROD" ? "Baixa Produtividade (≤3)" :
+                  cardFilter === "FECHOU_QUALQUER" ? "Técnicos que Fecharam" :
                   "Agenda do Dia"
                 }
               </Badge>
