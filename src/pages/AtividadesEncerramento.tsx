@@ -127,7 +127,8 @@ type CardFilter =
   | "SEM_ENCERRAMENTO"
   | "SUCESSO"
   | "INSUCESSO"
-  | "BAIXA_PROD";
+  | "BAIXA_PROD"
+  | "FECHOU_QUALQUER";
 
 const MultiFilter = ({
   label,
@@ -992,10 +993,14 @@ const AtividadesEncerramento = () => {
         const info = getPresencaInfo(r);
         const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
         if (!nameKey || !ttsBaixaProd.has(nameKey)) return false;
+      } else if (cardFilter === "FECHOU_QUALQUER") {
+        const info = getPresencaInfo(r);
+        const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+        if (!nameKey || !ttsFechouQualquer.has(nameKey)) return false;
       }
       return true;
     });
-  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, date]);
+  }, [fato, estadoFilter, macroFilter, supervisorFilter, coordenadorFilter, tecnicoFilter, statusFilter, cardFilter, presencaByTT, presencaByTR, presencaByNome, ttsAtivos, ttsSemPresenca, ttsSemEncerramento, ttsComSucesso, ttsComInsucesso, ttsBaixaProd, ttsFechouQualquer, date]);
 
   // Aggregate per technician (only "Ativo" status counted; mas mostra todos)
   const aggregated = useMemo(() => {
@@ -1074,6 +1079,8 @@ const AtividadesEncerramento = () => {
         if (ttsPresencaOK.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "BAIXA_PROD") {
         if (ttsBaixaProd.has(nameKey)) initTecnico(p);
+      } else if (cardFilter === "FECHOU_QUALQUER") {
+        if (ttsFechouQualquer.has(nameKey)) initTecnico(p);
       } else if (cardFilter === "ALL") {
         initTecnico(p);
       }
