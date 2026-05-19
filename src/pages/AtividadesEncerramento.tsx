@@ -82,6 +82,31 @@ const ESTADOS_EM_ANDAMENTO = [
 const MACROS_PRESENCA_OK = ["INST-FTTH", "MUD-FTTH", "SRV-FTTH", "REP-FTTH"];
 const MACRO_PRESENCA_EXCLUIR = "RET-FTTH";
 
+// Status manualmente atribuíveis no Resumo Diário (sobrepostos a cada carga automática).
+const STATUS_MANUAL_OPTIONS = [
+  "Ativo",
+  "Afastado",
+  "Atestado",
+  "Audiencia",
+  "Consulta Medica",
+  "Desligado",
+  "Duplado",
+  "Em Contratação",
+  "Falta",
+  "Folga",
+  "Licença Paternidade",
+  "Luto Familiar",
+  "Outros",
+  "Renovação de CNH",
+  "RH",
+  "Saude",
+  "Sistemico",
+  "Técnico de Dados",
+  "Treinamento",
+  "Veiculo Avaria",
+  "Veiculo Manutenção",
+];
+
 const norm = (s: string | null | undefined) =>
   (s || "").toString().trim().toLowerCase();
 
