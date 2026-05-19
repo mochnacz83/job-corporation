@@ -82,6 +82,31 @@ const ESTADOS_EM_ANDAMENTO = [
 const MACROS_PRESENCA_OK = ["INST-FTTH", "MUD-FTTH", "SRV-FTTH", "REP-FTTH"];
 const MACRO_PRESENCA_EXCLUIR = "RET-FTTH";
 
+// Status manualmente atribuíveis no Resumo Diário (sobrepostos a cada carga automática).
+const STATUS_MANUAL_OPTIONS = [
+  "Ativo",
+  "Afastado",
+  "Atestado",
+  "Audiencia",
+  "Consulta Medica",
+  "Desligado",
+  "Duplado",
+  "Em Contratação",
+  "Falta",
+  "Folga",
+  "Licença Paternidade",
+  "Luto Familiar",
+  "Outros",
+  "Renovação de CNH",
+  "RH",
+  "Saude",
+  "Sistemico",
+  "Técnico de Dados",
+  "Treinamento",
+  "Veiculo Avaria",
+  "Veiculo Manutenção",
+];
+
 const norm = (s: string | null | undefined) =>
   (s || "").toString().trim().toLowerCase();
 
@@ -439,6 +464,37 @@ const AtividadesEncerramento = () => {
     // This function is kept for signature compatibility but no longer fetches FATO CSV URL.
   };
 
+  // Atualiza manualmente o Status do técnico no Resumo Diário.
+  // O valor é gravado em tecnicos_presenca (Dimensão) e sobreposto na próxima carga automática.
+  // "Ativo" é armazenado como string vazia (convenção existente).
+  const handleManualStatusChange = async (tt: string, novoStatus: string) => {
+    const ttKey = (tt || "").trim();
+    if (!ttKey) {
+      toast({ title: "Não foi possível alterar", description: "Técnico sem matrícula (TT).", variant: "destructive" });
+      return;
+    }
+    const valorBanco = novoStatus === "Ativo" ? "" : novoStatus;
+    // Atualiza otimista localmente
+    setPresenca((prev) =>
+      prev.map((p) =>
+        (p.tt || "").trim().toUpperCase() === ttKey.toUpperCase()
+          ? { ...p, status: valorBanco }
+          : p,
+      ),
+    );
+    const { error } = await supabase
+      .from("tecnicos_presenca")
+      .update({ status: valorBanco })
+      .eq("tt", ttKey);
+    if (error) {
+      toast({ title: "Erro ao salvar status", description: error.message, variant: "destructive" });
+      // Recarrega para reverter
+      loadData();
+    } else {
+      toast({ title: "Status atualizado", description: `${novoStatus}` });
+    }
+  };
+
   // Carrega últimos 60 dias para o resumo histórico (cálculo on-the-fly)
   const loadHistorico = async () => {
     setLoadingHist(true);
@@ -771,6 +827,20 @@ const AtividadesEncerramento = () => {
       const isFechada = estado.includes("conclu");
       if (!isFechada) return;
       
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
+
+  // Técnicos que fecharam QUALQUER atividade no dia (com ou sem sucesso),
+  // sem nenhuma regra de presença ou tipo de macro. Apenas contagem livre.
+  const ttsFechouQualquer = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      if (!estado.includes("conclu")) return;
       const info = getPresencaInfo(r);
       const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
       if (nameKey) s.add(nameKey);
@@ -1193,8 +1263,9 @@ const AtividadesEncerramento = () => {
       totalSemPresenca,
       totalSemEncerramento,
       totalBaixaProd,
+      totalFechouQualquer: ttsFechouQualquer.size,
     };
-  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsBaixaProd, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
+  }, [presenca, fato, ttsAtivos, ttsPresencaOK, ttsSemPresenca, ttsSemEncerramento, ttsBaixaProd, ttsFechouQualquer, ttsEmAndamento, ttsAgendaDia, date, coordenadorFilter, supervisorFilter, tecnicoFilter, statusFilter, estadoFilter, macroFilter, presencaByTT, presencaByTR]);
 
   const handleSync = async () => {
     // Sincronização manual: recarrega dados do dia + histórico + último log de sync.
@@ -1768,7 +1839,7 @@ const AtividadesEncerramento = () => {
               ficam congelados no topo (logo abaixo das abas). Apenas a tabela
               de técnicos rola por baixo. */}
           <div className="sticky top-10 z-30 bg-background pt-2 pb-2 space-y-3 shadow-sm">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-10 gap-3">
             {/* Técnicos: total na presença vs ativos (status em branco) */}
             <Card
               onClick={() => setCardFilter(cardFilter === "ATIVOS" ? "ALL" : "ATIVOS")}
@@ -1874,6 +1945,18 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
+              </CardContent>
+            </Card>
+
+            {/* Total de técnicos que fecharam qualquer atividade (sem regras de presença/sucesso) */}
+            <Card
+              className="transition-all hover:shadow-md"
+              title="Total de técnicos distintos que encerraram ao menos uma atividade no dia (com ou sem sucesso), sem regra de presença"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Técnicos que Fecharam</div>
+                <div className="text-2xl font-bold text-primary">{cardMetrics.totalFechouQualquer}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Qualquer atividade</div>
               </CardContent>
             </Card>
           </div>
@@ -2031,7 +2114,24 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px]">{r.supervisor}</TableCell>
                           <TableCell className="text-[11px]">{r.coordenador}</TableCell>
                           <TableCell className="text-[11px]">{r.setor_atual}</TableCell>
-                          <TableCell className="text-[11px] text-center">{r.status && <Badge variant="outline" className={`text-[10px] ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : ''}`}>{r.status}</Badge>}</TableCell>
+                          <TableCell className="text-[11px] text-center">
+                            <Select
+                              value={r.status || "Ativo"}
+                              onValueChange={(v) => handleManualStatusChange(r.tt, v)}
+                            >
+                              <SelectTrigger
+                                className={`h-7 px-2 text-[10px] w-[140px] mx-auto ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}
+                                title="Clique para alterar o status manualmente"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_MANUAL_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-[11px] text-center font-semibold text-success cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "SUCESSO")}>{r.sucesso}</TableCell>
                           <TableCell className="text-[11px] text-center font-semibold text-destructive cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "INSUCESSO")}>{r.insucesso}</TableCell>
                           <TableCell className="text-[11px] text-center font-semibold cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "ALL")}>{r.total}</TableCell>
