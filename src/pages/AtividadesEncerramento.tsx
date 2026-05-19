@@ -803,6 +803,20 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
+  // Técnicos que fecharam QUALQUER atividade no dia (com ou sem sucesso),
+  // sem nenhuma regra de presença ou tipo de macro. Apenas contagem livre.
+  const ttsFechouQualquer = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const estado = norm(r.ds_estado);
+      if (!estado.includes("conclu")) return;
+      const info = getPresencaInfo(r);
+      const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
+      if (nameKey) s.add(nameKey);
+    });
+    return s;
+  }, [fato, presencaByTT, presencaByTR, presencaByNome]);
+
   // Conjunto de nomes de técnicos com atividade EM ANDAMENTO
   const ttsEmAndamento = useMemo(() => {
     const s = new Set<string>();
