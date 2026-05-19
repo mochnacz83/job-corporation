@@ -464,6 +464,37 @@ const AtividadesEncerramento = () => {
     // This function is kept for signature compatibility but no longer fetches FATO CSV URL.
   };
 
+  // Atualiza manualmente o Status do técnico no Resumo Diário.
+  // O valor é gravado em tecnicos_presenca (Dimensão) e sobreposto na próxima carga automática.
+  // "Ativo" é armazenado como string vazia (convenção existente).
+  const handleManualStatusChange = async (tt: string, novoStatus: string) => {
+    const ttKey = (tt || "").trim();
+    if (!ttKey) {
+      toast({ title: "Não foi possível alterar", description: "Técnico sem matrícula (TT).", variant: "destructive" });
+      return;
+    }
+    const valorBanco = novoStatus === "Ativo" ? "" : novoStatus;
+    // Atualiza otimista localmente
+    setPresenca((prev) =>
+      prev.map((p) =>
+        (p.tt || "").trim().toUpperCase() === ttKey.toUpperCase()
+          ? { ...p, status: valorBanco }
+          : p,
+      ),
+    );
+    const { error } = await supabase
+      .from("tecnicos_presenca")
+      .update({ status: valorBanco })
+      .eq("tt", ttKey);
+    if (error) {
+      toast({ title: "Erro ao salvar status", description: error.message, variant: "destructive" });
+      // Recarrega para reverter
+      loadData();
+    } else {
+      toast({ title: "Status atualizado", description: `${novoStatus}` });
+    }
+  };
+
   // Carrega últimos 60 dias para o resumo histórico (cálculo on-the-fly)
   const loadHistorico = async () => {
     setLoadingHist(true);
