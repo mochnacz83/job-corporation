@@ -2114,7 +2114,24 @@ const AtividadesEncerramento = () => {
                           <TableCell className="text-[11px]">{r.supervisor}</TableCell>
                           <TableCell className="text-[11px]">{r.coordenador}</TableCell>
                           <TableCell className="text-[11px]">{r.setor_atual}</TableCell>
-                          <TableCell className="text-[11px] text-center">{r.status && <Badge variant="outline" className={`text-[10px] ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : ''}`}>{r.status}</Badge>}</TableCell>
+                          <TableCell className="text-[11px] text-center">
+                            <Select
+                              value={r.status || "Ativo"}
+                              onValueChange={(v) => handleManualStatusChange(r.tt, v)}
+                            >
+                              <SelectTrigger
+                                className={`h-7 px-2 text-[10px] w-[140px] mx-auto ${r.status === 'Ativo' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20'}`}
+                                title="Clique para alterar o status manualmente"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_MANUAL_OPTIONS.map((opt) => (
+                                  <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
                           <TableCell className="text-[11px] text-center font-semibold text-success cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "SUCESSO")}>{r.sucesso}</TableCell>
                           <TableCell className="text-[11px] text-center font-semibold text-destructive cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "INSUCESSO")}>{r.insucesso}</TableCell>
                           <TableCell className="text-[11px] text-center font-semibold cursor-pointer hover:underline" onClick={() => handleNumberClick(r, "ALL")}>{r.total}</TableCell>
