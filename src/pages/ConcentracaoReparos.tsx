@@ -1011,6 +1011,16 @@ const ConcentracaoReparos = () => {
             chartDataHour={chartDataHour}
             selectedDay={selectedDay}
             setSelectedDay={setSelectedDay}
+            municipioFilter={municipioFilter}
+            setMunicipioFilter={setMunicipioFilter}
+            bairroFilter={bairroFilter}
+            setBairroFilter={setBairroFilter}
+            cdoFilter={cdoFilter}
+            setCdoFilter={setCdoFilter}
+            comPotenciaOnly={comPotenciaOnly}
+            setComPotenciaOnly={setComPotenciaOnly}
+            semPotenciaOnly={semPotenciaOnly}
+            setSemPotenciaOnly={setSemPotenciaOnly}
           />
         </TabsContent>
       </Tabs>
