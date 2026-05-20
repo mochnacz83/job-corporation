@@ -1042,15 +1042,44 @@ type DinamicaProps = {
   chartDataHour: any[];
   selectedDay: string | null;
   setSelectedDay: (d: string | null) => void;
+  municipioFilter: string[];
+  setMunicipioFilter: (v: string[]) => void;
+  bairroFilter: string[];
+  setBairroFilter: (v: string[]) => void;
+  cdoFilter: string[];
+  setCdoFilter: (v: string[]) => void;
+  comPotenciaOnly: boolean;
+  setComPotenciaOnly: (v: boolean | ((p: boolean) => boolean)) => void;
+  semPotenciaOnly: boolean;
+  setSemPotenciaOnly: (v: boolean | ((p: boolean) => boolean)) => void;
 };
 
-const DinamicaPanel = ({ cidades, bairros, cdos, comPotencia, semPotencia, totalAberto, chartDataDay, chartDataHour, selectedDay, setSelectedDay }: DinamicaProps) => {
+const DinamicaPanel = ({
+  cidades, bairros, cdos, comPotencia, semPotencia, totalAberto,
+  chartDataDay, chartDataHour, selectedDay, setSelectedDay,
+  municipioFilter, setMunicipioFilter,
+  bairroFilter, setBairroFilter,
+  cdoFilter, setCdoFilter,
+  comPotenciaOnly, setComPotenciaOnly,
+  semPotenciaOnly, setSemPotenciaOnly,
+}: DinamicaProps) => {
   const topCidades = [...cidades].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
   const topBairros = [...bairros].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, value]) => {
     const [mun, bairro] = key.split("||");
     return { name: `${mun}||${bairro}`, value };
   });
   const topCdos = [...cdos].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([name, value]) => ({ name, value }));
+
+  // Helpers: toggle item em array de filtro (clique = ativa, novo clique = remove)
+  const toggleInArray = (arr: string[], setArr: (v: string[]) => void, val: string) => {
+    if (!val) return;
+    if (arr.includes(val)) setArr(arr.filter(x => x !== val));
+    else setArr([...arr, val]);
+  };
+  const ACTIVE_OPACITY = 1;
+  const DIM_OPACITY = 0.35;
+  const cellOpacity = (active: boolean, anyActive: boolean) =>
+    !anyActive ? ACTIVE_OPACITY : active ? ACTIVE_OPACITY : DIM_OPACITY;
   
   const potData = [
     { name: "Com Potência", value: comPotencia },
