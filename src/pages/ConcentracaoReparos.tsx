@@ -1111,8 +1111,21 @@ const DinamicaPanel = ({
               <XAxis type="number" hide={true} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(270 60% 55%)" radius={[0, 4, 4, 0]}>
+              <Bar
+                dataKey="value"
+                radius={[0, 4, 4, 0]}
+                cursor="pointer"
+                onClick={(d: any) => toggleInArray(municipioFilter, setMunicipioFilter, d?.name)}
+              >
                 <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                {topCidades.map((e) => {
+                  const active = municipioFilter.includes(e.name);
+                  return (
+                    <Cell key={e.name} fill="hsl(270 60% 55%)"
+                      fillOpacity={cellOpacity(active, municipioFilter.length > 0)}
+                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                  );
+                })}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -1146,8 +1159,25 @@ const DinamicaPanel = ({
                 }} 
               />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(25 90% 55%)" radius={[0, 4, 4, 0]}>
+              <Bar
+                dataKey="value"
+                radius={[0, 4, 4, 0]}
+                cursor="pointer"
+                onClick={(d: any) => {
+                  const bairro = String(d?.name || "").split("||")[1] || "";
+                  toggleInArray(bairroFilter, setBairroFilter, bairro);
+                }}
+              >
                 <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                {topBairros.map((e) => {
+                  const bairro = e.name.split("||")[1] || "";
+                  const active = bairroFilter.includes(bairro);
+                  return (
+                    <Cell key={e.name} fill="hsl(25 90% 55%)"
+                      fillOpacity={cellOpacity(active, bairroFilter.length > 0)}
+                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                  );
+                })}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -1162,8 +1192,34 @@ const DinamicaPanel = ({
             <PieChart>
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Pie data={potData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(e) => `${e.name}: ${e.value}`}>
-                {potData.map((_, i) => <Cell key={i} fill={POT_COLORS[i]} />)}
+              <Pie
+                data={potData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label={(e) => `${e.name}: ${e.value}`}
+                cursor="pointer"
+                onClick={(d: any) => {
+                  if (d?.name === "Com Potência") {
+                    if (semPotenciaOnly) setSemPotenciaOnly(false);
+                    setComPotenciaOnly(v => !v);
+                  } else if (d?.name === "Sem Potência") {
+                    if (comPotenciaOnly) setComPotenciaOnly(false);
+                    setSemPotenciaOnly(v => !v);
+                  }
+                }}
+              >
+                {potData.map((p, i) => {
+                  const active = (p.name === "Com Potência" && comPotenciaOnly) || (p.name === "Sem Potência" && semPotenciaOnly);
+                  const anyActive = comPotenciaOnly || semPotenciaOnly;
+                  return (
+                    <Cell key={i} fill={POT_COLORS[i]}
+                      fillOpacity={cellOpacity(active, anyActive)}
+                      stroke={active ? "hsl(var(--primary))" : "#fff"} strokeWidth={active ? 3 : 1} />
+                  );
+                })}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
@@ -1179,8 +1235,21 @@ const DinamicaPanel = ({
               <XAxis type="number" hide={true} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
               <Tooltip contentStyle={{ fontSize: 11 }} />
-              <Bar dataKey="value" fill="hsl(0 70% 55%)" radius={[0, 4, 4, 0]}>
+              <Bar
+                dataKey="value"
+                radius={[0, 4, 4, 0]}
+                cursor="pointer"
+                onClick={(d: any) => toggleInArray(cdoFilter, setCdoFilter, d?.name)}
+              >
                 <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                {topCdos.map((e) => {
+                  const active = cdoFilter.includes(e.name);
+                  return (
+                    <Cell key={e.name} fill="hsl(0 70% 55%)"
+                      fillOpacity={cellOpacity(active, cdoFilter.length > 0)}
+                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                  );
+                })}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
