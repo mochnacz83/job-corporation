@@ -1862,6 +1862,19 @@ const AtividadesEncerramento = () => {
               </CardContent>
             </Card>
 
+            {/* Total de técnicos que fecharam qualquer atividade (sem regras de presença/sucesso) */}
+            <Card
+              onClick={() => setCardFilter(cardFilter === "FECHOU_QUALQUER" ? "ALL" : "FECHOU_QUALQUER")}
+              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "FECHOU_QUALQUER" ? "ring-2 ring-primary" : ""}`}
+              title="Total de técnicos distintos que encerraram ao menos uma atividade no dia (com ou sem sucesso), sem regra de presença"
+            >
+              <CardContent className="p-3">
+                <div className="text-[11px] text-muted-foreground">Técnicos que Fecharam</div>
+                <div className="text-2xl font-bold text-primary">{cardMetrics.totalFechouQualquer}</div>
+                <div className="text-[10px] text-muted-foreground mt-1">Qualquer atividade</div>
+              </CardContent>
+            </Card>
+
             {/* Presença OK por macro de sucesso */}
             <Card
               onClick={() => setCardFilter(cardFilter === "PRESENCA_OK" ? "ALL" : "PRESENCA_OK")}
@@ -1952,19 +1965,6 @@ const AtividadesEncerramento = () => {
               <CardContent className="p-3">
                 <div className="text-[11px] text-muted-foreground">Concluídas s/ Sucesso</div>
                 <div className="text-2xl font-bold text-destructive">{totalsAll.insucesso}</div>
-              </CardContent>
-            </Card>
-
-            {/* Total de técnicos que fecharam qualquer atividade (sem regras de presença/sucesso) */}
-            <Card
-              onClick={() => setCardFilter(cardFilter === "FECHOU_QUALQUER" ? "ALL" : "FECHOU_QUALQUER")}
-              className={`cursor-pointer transition-all hover:shadow-md ${cardFilter === "FECHOU_QUALQUER" ? "ring-2 ring-primary" : ""}`}
-              title="Total de técnicos distintos que encerraram ao menos uma atividade no dia (com ou sem sucesso), sem regra de presença"
-            >
-              <CardContent className="p-3">
-                <div className="text-[11px] text-muted-foreground">Técnicos que Fecharam</div>
-                <div className="text-2xl font-bold text-primary">{cardMetrics.totalFechouQualquer}</div>
-                <div className="text-[10px] text-muted-foreground mt-1">Qualquer atividade</div>
               </CardContent>
             </Card>
           </div>
