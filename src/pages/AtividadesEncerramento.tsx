@@ -819,13 +819,14 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
-  // Conjunto de nomes de técnicos que fecharam ALGUMA atividade no dia
+  // Conjunto de nomes de técnicos que fecharam ALGUMA atividade no dia.
+  // Considera o status "Fechado em WFM" (qualquer tipo de atividade encerrada no WFM).
   const ttsComFechamento = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
       if (!isSC(r)) return;
       const estado = norm(r.ds_estado);
-      const isFechada = estado.includes("conclu");
+      const isFechada = estado.includes("fechado") && estado.includes("wfm");
       if (!isFechada) return;
       
       const info = getPresencaInfo(r);
@@ -835,13 +836,13 @@ const AtividadesEncerramento = () => {
     return s;
   }, [fato, presencaByTT, presencaByTR, presencaByNome]);
 
-  // Técnicos que fecharam QUALQUER atividade no dia (com ou sem sucesso),
-  // sem nenhuma regra de presença ou tipo de macro. Apenas contagem livre.
+  // Técnicos que fecharam QUALQUER atividade no dia — contabiliza pelo status
+  // "Fechado em WFM", sem nenhuma regra de presença ou tipo de macro.
   const ttsFechouQualquer = useMemo(() => {
     const s = new Set<string>();
     fato.forEach((r) => {
       const estado = norm(r.ds_estado);
-      if (!estado.includes("conclu")) return;
+      if (!(estado.includes("fechado") && estado.includes("wfm"))) return;
       const info = getPresencaInfo(r);
       const nameKey = info ? normTecnico(info.funcionario) : normTecnico(r.nome_tecnico);
       if (nameKey) s.add(nameKey);
