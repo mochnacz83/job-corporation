@@ -238,6 +238,19 @@ Deno.serve(async (req) => {
       "dt referencia",
       "data_referencia",
     ]);
+    // Fallbacks adicionais para data da atividade quando dt_atividade/dt_termino
+    // não estão preenchidos (ex.: atividades ainda não iniciadas/atribuídas).
+    const idxDataNaf = findCol(headers, ["data_naf", "dh_data_naf", "dh_naf"]);
+    const idxDhAbertura = findCol(headers, [
+      "dh_dataaberturaos",
+      "dh_data_abertura_os",
+      "dh_abertura_os",
+      "dh_abertura_ba",
+    ]);
+    const idxDhAgendamento = findCol(headers, [
+      "dh_inicio_agendamento",
+      "dh inicio agendamento",
+    ]);
     const idxUF = findCol(headers, [
       "cd_uf",
       "uf",
@@ -315,6 +328,19 @@ Deno.serve(async (req) => {
         if (d) dataAtividade = d.slice(0, 10);
       }
       if (!dataAtividade && dtTermino) dataAtividade = dtTermino.slice(0, 10);
+      // Fallbacks: data_naf, dh_dataaberturaos, dh_inicio_agendamento
+      if (!dataAtividade && idxDhAgendamento >= 0 && cols[idxDhAgendamento]) {
+        const d = parseDate(cols[idxDhAgendamento]);
+        if (d) dataAtividade = d.slice(0, 10);
+      }
+      if (!dataAtividade && idxDataNaf >= 0 && cols[idxDataNaf]) {
+        const d = parseDate(cols[idxDataNaf]);
+        if (d) dataAtividade = d.slice(0, 10);
+      }
+      if (!dataAtividade && idxDhAbertura >= 0 && cols[idxDhAbertura]) {
+        const d = parseDate(cols[idxDhAbertura]);
+        if (d) dataAtividade = d.slice(0, 10);
+      }
 
       rows.push({
         ds_estado: normalizeEstado(estadoRaw),
