@@ -23,7 +23,7 @@ import {
   BarChart3, Home, LogOut, User, Shield, Activity, KeyRound,
   CalendarDays, ClipboardList, ClipboardCheck, Boxes, Package,
   Truck, Lock, Unlock, ChevronDown, Lightbulb, CheckCircle2, FileSpreadsheet, Wrench
-  , Radar
+  , Radar, ScanBarcode
 } from "lucide-react";
 import {
   Collapsible,
@@ -102,6 +102,7 @@ const AppSidebar = () => {
     { show: hasModule("material_coleta"), path: "/material-coleta", icon: ClipboardList, label: "Controle Materiais" },
     { show: hasModule("inventario"), path: "/inventario", icon: Boxes, label: "Mini Inventário", locked: !isAdmin && inventoryLocked },
     { show: hasModule("rastreamento_vtal") || isAdmin, path: "/rastreamento-vtal", icon: Radar, label: "Rastreamento Equipamentos VTAL" },
+    { show: hasModule("rastreabilidade_ont") || isAdmin, path: "/rastreabilidade-ont", icon: ScanBarcode, label: "Rastreabilidade ONT" },
   ];
 
   const shortenSidebarLabel = (titulo: string) => {
