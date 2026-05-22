@@ -237,9 +237,21 @@ const ConcentracaoReparos = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Status considerados "em aberto" (exclui Concluído Com Sucesso e demais)
+  // Status considerados "em aberto" — alinhado ao relatório:
+  // exclui apenas "Concluído com sucesso". "Concluído sem sucesso" e
+  // "Fechado em WFM" continuam contando como REP-FTTH em aberto, pois o
+  // reparo não foi efetivamente finalizado com êxito.
   const STATUS_ABERTO = useMemo(
-    () => new Set(["atribuido", "cancelado", "emdeslocamento", "emexecucao", "naoatribuido", "recebido"]),
+    () => new Set([
+      "atribuido",
+      "cancelado",
+      "emdeslocamento",
+      "emexecucao",
+      "naoatribuido",
+      "recebido",
+      "concluidosemsucesso",
+      "fechadoemwfm",
+    ]),
     []
   );
 
