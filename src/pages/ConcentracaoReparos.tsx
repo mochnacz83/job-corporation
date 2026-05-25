@@ -70,6 +70,12 @@ const fixEstado = (s: string): string => {
   return f;
 };
 
+// Para nomes de bairro/cidade: remove acentos e ~ para padronizar agrupamentos
+// (ex.: "SÃO VICENTE" e "SAO VICENTE" passam a contar como o mesmo bairro).
+const stripAccents = (s: string): string =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const cleanLocal = (s: string): string => stripAccents(fixText(s));
+
 const fmtDateTime = (val: string): string => {
   if (!val) return "";
   const v = val.trim();
