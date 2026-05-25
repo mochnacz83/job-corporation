@@ -1139,7 +1139,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(270 60% 55%)"
                       fillOpacity={cellOpacity(active, municipioFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
@@ -1191,7 +1191,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(25 90% 55%)"
                       fillOpacity={cellOpacity(active, bairroFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
@@ -1233,7 +1233,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={i} fill={POT_COLORS[i]}
                       fillOpacity={cellOpacity(active, anyActive)}
-                      stroke={active ? "hsl(var(--primary))" : "#fff"} strokeWidth={active ? 3 : 1} />
+                      stroke={active ? ACTIVE_STROKE : "#fff"} strokeWidth={active ? 3 : 1} />
                   );
                 })}
               </Pie>
@@ -1263,7 +1263,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(0 70% 55%)"
                       fillOpacity={cellOpacity(active, cdoFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
