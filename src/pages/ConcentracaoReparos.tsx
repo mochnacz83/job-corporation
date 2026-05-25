@@ -1133,7 +1133,7 @@ const DinamicaPanel = ({
                 cursor="pointer"
                 onClick={(d: any) => toggleInArray(municipioFilter, setMunicipioFilter, d?.name)}
               >
-                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" stroke="hsl(var(--background))" strokeWidth={3} style={{ paintOrder: "stroke" }} />
                 {topCidades.map((e) => {
                   const active = municipioFilter.includes(e.name);
                   return (
@@ -1184,7 +1184,7 @@ const DinamicaPanel = ({
                   toggleInArray(bairroFilter, setBairroFilter, bairro);
                 }}
               >
-                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" stroke="hsl(var(--background))" strokeWidth={3} style={{ paintOrder: "stroke" }} />
                 {topBairros.map((e) => {
                   const bairro = e.name.split("||")[1] || "";
                   const active = bairroFilter.includes(bairro);
@@ -1257,7 +1257,7 @@ const DinamicaPanel = ({
                 cursor="pointer"
                 onClick={(d: any) => toggleInArray(cdoFilter, setCdoFilter, d?.name)}
               >
-                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" />
+                <LabelList dataKey="value" position="right" fontSize={10} fill="hsl(var(--foreground))" stroke="hsl(var(--background))" strokeWidth={3} style={{ paintOrder: "stroke" }} />
                 {topCdos.map((e) => {
                   const active = cdoFilter.includes(e.name);
                   return (
