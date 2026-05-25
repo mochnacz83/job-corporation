@@ -36,6 +36,7 @@ const Planilhas = lazy(() => import("./pages/Planilhas"));
 const ConcentracaoReparos = lazy(() => import("./pages/ConcentracaoReparos"));
 const RastreamentoVtal = lazy(() => import("./pages/RastreamentoVtal"));
 const RastreabilidadeOnt = lazy(() => import("./pages/RastreabilidadeOnt"));
+const JustificativaDezHoras = lazy(() => import("./pages/JustificativaDezHoras"));
 
 // Generic persistent page wrapper: mounts once, then hides/shows via CSS
 const PersistentPage = ({ path, children }: { path: string; children: ReactNode }) => {
@@ -74,6 +75,7 @@ const persistentPages = [
   { path: "/concentracao-reparos", element: <ConcentracaoReparos /> },
   { path: "/rastreamento-vtal", element: <RastreamentoVtal /> },
   { path: "/rastreabilidade-ont", element: <RastreabilidadeOnt /> },
+  { path: "/justificativa-dez-horas", element: <JustificativaDezHoras /> },
 ];
 
 const Login = lazy(() => import("./pages/Login"));
