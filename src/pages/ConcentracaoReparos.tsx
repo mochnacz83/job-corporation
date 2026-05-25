@@ -1090,9 +1090,12 @@ const DinamicaPanel = ({
     else setArr([...arr, val]);
   };
   const ACTIVE_OPACITY = 1;
-  const DIM_OPACITY = 0.35;
+  const DIM_OPACITY = 0.55;
   const cellOpacity = (active: boolean, anyActive: boolean) =>
     !anyActive ? ACTIVE_OPACITY : active ? ACTIVE_OPACITY : DIM_OPACITY;
+  // Cor usada para destacar a barra/fatia selecionada nos gráficos.
+  // Tom slate suave para manter a leitura confortável (sem agressividade visual).
+  const ACTIVE_STROKE = "hsl(215 35% 25%)";
   
   const potData = [
     { name: "Com Potência", value: comPotencia },
