@@ -58,8 +58,9 @@ const fixText = (s: string): string => {
     .replace(/Ã³/g, "ó").replace(/Ãº/g, "ú").replace(/Ã§/g, "ç").replace(/Ãµ/g, "õ")
     .replace(/Ã¢/g, "â").replace(/Ãª/g, "ê").replace(/Ã´/g, "ô").replace(/Ã /g, "à")
     .replace(/Ã‰/g, "É").replace(/Ã‡/g, "Ç").replace(/Ã“/g, "Ó").replace(/Ã”/g, "Ô")
-    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã").replace(/Ã/g, "Í")
-    .replace(/Ã/g, "Á").replace(/Ã š/g, "Ú").replace(/NULL/gi, "").trim();
+    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã")
+    .replace(/Ã\x8D/g, "Í").replace(/Ã\x81/g, "Á").replace(/Ã\x9A/g, "Ú")
+    .replace(/NULL/gi, "").trim();
 };
 
 const fixEstado = (s: string): string => {
