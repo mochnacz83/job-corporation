@@ -281,7 +281,7 @@ const ConcentracaoReparos = () => {
     return base.filter((r) => {
       const estado = fixEstado(r.ds_estado || "");
       if (estadoFilter.length && !estadoFilter.includes(estado)) return false;
-      const mun = fixText(getRaw(r, ["ds_municipio"]));
+      const mun = cleanLocal(getRaw(r, ["ds_municipio"]));
       if (municipioFilter.length && !municipioFilter.includes(mun)) return false;
       const setor = getRaw(r, ["cd_setor"]);
       if (setorFilter.length && !setorFilter.includes(setor)) return false;
@@ -295,7 +295,7 @@ const ConcentracaoReparos = () => {
       if (estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
       if (cdoFilter.length && !cdoFilter.includes(cdoVal)) return false;
-      const bairroVal = fixText(getRaw(r, ["ds_bairro"]));
+      const bairroVal = cleanLocal(getRaw(r, ["ds_bairro"]));
       if (bairroFilter.length && !bairroFilter.includes(bairroVal)) return false;
       if (q) {
         const blob = JSON.stringify(r.raw || {}).toLowerCase();
@@ -310,8 +310,8 @@ const ConcentracaoReparos = () => {
   const bairroCount = useMemo(() => {
     const m = new Map<string, number>();
     filteredBase.forEach((r) => {
-      const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-      const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      const b = cleanLocal(getRaw(r, ["ds_bairro"])).toUpperCase();
+      const mun = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!b) return;
       const key = `${mun}||${b}`;
       m.set(key, (m.get(key) || 0) + 1);
@@ -332,7 +332,7 @@ const ConcentracaoReparos = () => {
   const cidadeCount = useMemo(() => {
     const m = new Map<string, number>();
     filteredBase.forEach((r) => {
-      const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      const c = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!c) return;
       m.set(c, (m.get(c) || 0) + 1);
     });
@@ -346,8 +346,8 @@ const ConcentracaoReparos = () => {
   const applyCardToggles = (skip: SkipKeys = {}) => {
     return filteredBase.filter((r) => {
       if (!skip.bairro && bairroOnlyConc) {
-        const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-        const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        const b = cleanLocal(getRaw(r, ["ds_bairro"])).toUpperCase();
+        const mun = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
         if ((bairroCount.get(`${mun}||${b}`) || 0) < 2) return false;
       }
       if (!skip.cdo && cdoOnlyConc) {
@@ -355,7 +355,7 @@ const ConcentracaoReparos = () => {
         if ((cdoCount.get(c) || 0) < 2) return false;
       }
       if (!skip.cidade && cidadeOnlyConc) {
-        const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        const c = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
         if ((cidadeCount.get(c) || 0) <= 20) return false;
       }
       if (!skip.comPot && comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
@@ -380,8 +380,8 @@ const ConcentracaoReparos = () => {
   const bairrosConcentrados = useMemo(() => {
     const m = new Map<string, number>();
     applyCardToggles({ bairro: true }).forEach((r) => {
-      const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-      const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      const b = cleanLocal(getRaw(r, ["ds_bairro"])).toUpperCase();
+      const mun = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!b) return;
       const key = `${mun}||${b}`;
       m.set(key, (m.get(key) || 0) + 1);
@@ -404,7 +404,7 @@ const ConcentracaoReparos = () => {
   const cidadesConcentradas = useMemo(() => {
     const m = new Map<string, number>();
     applyCardToggles({ cidade: true }).forEach((r) => {
-      const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+      const c = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
       if (!c) return;
       m.set(c, (m.get(c) || 0) + 1);
     });
@@ -457,7 +457,7 @@ const ConcentracaoReparos = () => {
     const dropFiltered = base.filter((r) => {
       const estado = fixEstado(r.ds_estado || "");
       if (skip !== "estado" && estadoFilter.length && !estadoFilter.includes(estado)) return false;
-      const mun = fixText(getRaw(r, ["ds_municipio"]));
+      const mun = cleanLocal(getRaw(r, ["ds_municipio"]));
       if (skip !== "municipio" && municipioFilter.length && !municipioFilter.includes(mun)) return false;
       const setor = getRaw(r, ["cd_setor"]);
       if (skip !== "setor" && setorFilter.length && !setorFilter.includes(setor)) return false;
@@ -471,7 +471,7 @@ const ConcentracaoReparos = () => {
       if (skip !== "estacao" && estacaoFilter.length && !estacaoFilter.includes(estacao)) return false;
       const cdoVal = getRaw(r, ["cdo"]);
       if (skip !== "cdo" && cdoFilter.length && !cdoFilter.includes(cdoVal)) return false;
-      const bairroVal = fixText(getRaw(r, ["ds_bairro"]));
+      const bairroVal = cleanLocal(getRaw(r, ["ds_bairro"]));
       if (skip !== "bairro" && bairroFilter.length && !bairroFilter.includes(bairroVal)) return false;
       if (q) {
         const blob = JSON.stringify(r.raw || {}).toLowerCase();
@@ -482,8 +482,8 @@ const ConcentracaoReparos = () => {
     // Aplica também os toggles dos cards
     return dropFiltered.filter((r) => {
       if (bairroOnlyConc) {
-        const b = fixText(getRaw(r, ["ds_bairro"])).toUpperCase();
-        const mun = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        const b = cleanLocal(getRaw(r, ["ds_bairro"])).toUpperCase();
+        const mun = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
         if ((bairroCount.get(`${mun}||${b}`) || 0) < 2) return false;
       }
       if (cdoOnlyConc) {
@@ -491,7 +491,7 @@ const ConcentracaoReparos = () => {
         if ((cdoCount.get(c) || 0) < 2) return false;
       }
       if (cidadeOnlyConc) {
-        const c = fixText(getRaw(r, ["ds_municipio"])).toUpperCase();
+        const c = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
         if ((cidadeCount.get(c) || 0) <= 20) return false;
       }
       if (comPotenciaOnly && !/com\s*pot/i.test(getRaw(r, ["status_naf"]))) return false;
@@ -610,7 +610,7 @@ const ConcentracaoReparos = () => {
 
   const municipioOptions = useMemo(() => {
     const s = new Set<string>();
-    buildPool("municipio").forEach((r) => { const v = fixText(getRaw(r, ["ds_municipio"])); if (v) s.add(v); });
+    buildPool("municipio").forEach((r) => { const v = cleanLocal(getRaw(r, ["ds_municipio"])); if (v) s.add(v); });
     return Array.from(s).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, optionsDeps);
@@ -655,7 +655,7 @@ const ConcentracaoReparos = () => {
 
   const bairroOptions = useMemo(() => {
     const s = new Set<string>();
-    buildPool("bairro").forEach((r) => { const v = fixText(getRaw(r, ["ds_bairro"])); if (v) s.add(v); });
+    buildPool("bairro").forEach((r) => { const v = cleanLocal(getRaw(r, ["ds_bairro"])); if (v) s.add(v); });
     return Array.from(s).sort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, optionsDeps);
@@ -667,7 +667,7 @@ const ConcentracaoReparos = () => {
         const estado = fixEstado(r.ds_estado || "");
         const abertura = fmtDateTime(getRaw(r, ["dh_abertura_ba"]));
         const gpon = getRaw(r, ["cd_gpon"]);
-        const municipio = fixText(getRaw(r, ["ds_municipio"]));
+        const municipio = cleanLocal(getRaw(r, ["ds_municipio"]));
         const estacao = getRaw(r, ["cd_estacao"]);
         const setor = getRaw(r, ["cd_setor"]);
         const logradouro = fixText(getRaw(r, ["ds_logradouro"]));
@@ -675,7 +675,7 @@ const ConcentracaoReparos = () => {
         const compTipo = fixText(getRaw(r, ["ds_complemento_tipo"]));
         const compDesc = fixText(getRaw(r, ["ds_complemento_desc"]));
         const rua = [logradouro, numero, compTipo, compDesc].filter(Boolean).join(", ");
-        const bairro = fixText(getRaw(r, ["ds_bairro"]));
+        const bairro = cleanLocal(getRaw(r, ["ds_bairro"]));
         const bairroKey = `${municipio.toUpperCase()}||${bairro.toUpperCase()}`;
         const bairroAfet = bairroCount.get(bairroKey) || 0;
         const cabo1 = getRaw(r, ["cabo_primario"]);
