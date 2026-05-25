@@ -58,8 +58,9 @@ const fixText = (s: string): string => {
     .replace(/Ã³/g, "ó").replace(/Ãº/g, "ú").replace(/Ã§/g, "ç").replace(/Ãµ/g, "õ")
     .replace(/Ã¢/g, "â").replace(/Ãª/g, "ê").replace(/Ã´/g, "ô").replace(/Ã /g, "à")
     .replace(/Ã‰/g, "É").replace(/Ã‡/g, "Ç").replace(/Ã“/g, "Ó").replace(/Ã”/g, "Ô")
-    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã").replace(/Ã/g, "Í")
-    .replace(/Ã/g, "Á").replace(/Ã š/g, "Ú").replace(/NULL/gi, "").trim();
+    .replace(/Ã‚/g, "Â").replace(/Ãƒ/g, "Ã")
+    .replace(/Ã\x8D/g, "Í").replace(/Ã\x81/g, "Á").replace(/Ã\x9A/g, "Ú")
+    .replace(/NULL/gi, "").trim();
 };
 
 const fixEstado = (s: string): string => {
@@ -1089,9 +1090,12 @@ const DinamicaPanel = ({
     else setArr([...arr, val]);
   };
   const ACTIVE_OPACITY = 1;
-  const DIM_OPACITY = 0.35;
+  const DIM_OPACITY = 0.55;
   const cellOpacity = (active: boolean, anyActive: boolean) =>
     !anyActive ? ACTIVE_OPACITY : active ? ACTIVE_OPACITY : DIM_OPACITY;
+  // Cor usada para destacar a barra/fatia selecionada nos gráficos.
+  // Tom slate suave para manter a leitura confortável (sem agressividade visual).
+  const ACTIVE_STROKE = "hsl(215 35% 25%)";
   
   const potData = [
     { name: "Com Potência", value: comPotencia },
@@ -1135,7 +1139,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(270 60% 55%)"
                       fillOpacity={cellOpacity(active, municipioFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
@@ -1187,7 +1191,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(25 90% 55%)"
                       fillOpacity={cellOpacity(active, bairroFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
@@ -1229,7 +1233,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={i} fill={POT_COLORS[i]}
                       fillOpacity={cellOpacity(active, anyActive)}
-                      stroke={active ? "hsl(var(--primary))" : "#fff"} strokeWidth={active ? 3 : 1} />
+                      stroke={active ? ACTIVE_STROKE : "#fff"} strokeWidth={active ? 3 : 1} />
                   );
                 })}
               </Pie>
@@ -1259,7 +1263,7 @@ const DinamicaPanel = ({
                   return (
                     <Cell key={e.name} fill="hsl(0 70% 55%)"
                       fillOpacity={cellOpacity(active, cdoFilter.length > 0)}
-                      stroke={active ? "hsl(var(--primary))" : "none"} strokeWidth={active ? 2 : 0} />
+                      stroke={active ? ACTIVE_STROKE : "none"} strokeWidth={active ? 2 : 0} />
                   );
                 })}
               </Bar>
