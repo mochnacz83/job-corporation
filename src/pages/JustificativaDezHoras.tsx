@@ -9,10 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Clock, AlertTriangle, CheckCircle2, Lock, Unlock, 
   Save, RefreshCw, FileSpreadsheet, Search, Filter,
-  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp
+  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp,
+  Copy, Download, FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -86,6 +91,11 @@ const JustificativaDezHoras = () => {
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("todos");
   const [statusFiltroJustificativa, setStatusFiltroJustificativa] = useState<"todos" | "pendentes" | "justificados">("todos");
   const [searchQuery, setSearchQuery] = useState("");
+  // Card-based filter (acts as the primary "view" filter)
+  // "pendente" = comportamento padrão (apenas quem NÃO fechou antes das 10h)
+  const [cardFilter, setCardFilter] = useState<"todos" | "fechou" | "pendente" | "justificado">("pendente");
+  // Export TXT dialog
+  const [exportOpen, setExportOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -252,8 +262,11 @@ const JustificativaDezHoras = () => {
   // Filtered List for Table
   const filteredList = useMemo(() => {
     return analysisList.filter(item => {
-      // 1. We ONLY show technicians who DID NOT close any activity before 10 AM
-      if (item.closedBefore10) return false;
+      // 1. Card filter (primary view)
+      if (cardFilter === "pendente" && item.closedBefore10) return false;
+      if (cardFilter === "fechou" && !item.closedBefore10) return false;
+      if (cardFilter === "justificado" && (item.closedBefore10 || !item.justification)) return false;
+      // "todos" => no card-based exclusion
 
       // 2. Supervisor filter
       if (supervisorFilter !== "todos" && item.supervisor !== supervisorFilter) return false;
@@ -275,7 +288,42 @@ const JustificativaDezHoras = () => {
 
       return true;
     });
-  }, [analysisList, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
+  }, [analysisList, cardFilter, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
+
+  // Concatenated names text for export (uses currently filtered list)
+  const exportNamesText = useMemo(() => {
+    return filteredList.map(i => i.nome).filter(Boolean).join(", ");
+  }, [filteredList]);
+
+  const handleCopyNames = async () => {
+    if (!exportNamesText) {
+      toast.info("Nenhum técnico na seleção atual.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(exportNamesText);
+      toast.success(`Nomes copiados (${filteredList.length} técnicos).`);
+    } catch {
+      toast.error("Não foi possível copiar — selecione o texto manualmente.");
+    }
+  };
+
+  const handleDownloadNamesTxt = () => {
+    if (!exportNamesText) {
+      toast.info("Nenhum técnico na seleção atual.");
+      return;
+    }
+    const blob = new Blob([exportNamesText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tecnicos_FSL_${date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo TXT gerado!");
+  };
 
   // ===================== DINÂMICA — agregações sobre a base histórica =====================
   const dinamica = useMemo(() => {
@@ -479,6 +527,15 @@ const JustificativaDezHoras = () => {
           >
             <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
             Exportar XLSX
+          </Button>
+
+          <Button
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+            onClick={() => setExportOpen(true)}
+          >
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
+            Exportar Nomes (FSL)
           </Button>
         </div>
       </div>
