@@ -277,6 +277,57 @@ const JustificativaDezHoras = () => {
     });
   }, [analysisList, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
 
+  // ===================== DINÂMICA — agregações sobre a base histórica =====================
+  const dinamica = useMemo(() => {
+    const byTec = new Map<string, { nome: string; count: number }>();
+    const bySup = new Map<string, number>();
+    const byCausa = new Map<string, number>();
+    const byDia = new Map<string, number>();
+
+    historico.forEach((h) => {
+      const tt = (h.matricula_tt || "").trim().toUpperCase();
+      if (tt) {
+        const cur = byTec.get(tt) || { nome: h.nome_tecnico || tt, count: 0 };
+        cur.count++;
+        cur.nome = h.nome_tecnico || cur.nome;
+        byTec.set(tt, cur);
+      }
+      const sup = (h.supervisor || "").trim();
+      if (sup && sup !== "—") bySup.set(sup, (bySup.get(sup) || 0) + 1);
+
+      const causa = (h.causa || "").trim();
+      if (causa) byCausa.set(causa, (byCausa.get(causa) || 0) + 1);
+
+      const d = (h.data_atividade || "").slice(0, 10);
+      if (d) byDia.set(d, (byDia.get(d) || 0) + 1);
+    });
+
+    const topTecnicos = Array.from(byTec.entries())
+      .map(([tt, v]) => ({ tt, nome: v.nome, qtd: v.count, label: `${v.nome} (${tt})` }))
+      .sort((a, b) => b.qtd - a.qtd)
+      .slice(0, 10);
+
+    const topSupervisores = Array.from(bySup.entries())
+      .map(([nome, qtd]) => ({ nome, qtd }))
+      .sort((a, b) => b.qtd - a.qtd)
+      .slice(0, 10);
+
+    const causas = Array.from(byCausa.entries())
+      .map(([causa, qtd]) => ({ causa, qtd }))
+      .sort((a, b) => b.qtd - a.qtd);
+
+    const porDia = Array.from(byDia.entries())
+      .map(([d, qtd]) => {
+        const [y, m, dd] = d.split("-");
+        return { data: `${dd}/${m}`, dataIso: d, qtd };
+      })
+      .sort((a, b) => a.dataIso.localeCompare(b.dataIso));
+
+    return { topTecnicos, topSupervisores, causas, porDia, total: historico.length };
+  }, [historico]);
+
+  const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ef4444", "#a855f7", "#14b8a6", "#f43f5e"];
+
   // Handle Form changes
   const handleFormChange = (tt: string, field: "causa" | "observacao", value: string) => {
     setFormsState(prev => ({
@@ -322,7 +373,7 @@ const JustificativaDezHoras = () => {
       if (error) throw error;
 
       toast.success(`Justificativa de ${item.nome} salva e bloqueada com sucesso!`);
-      loadData(); // reload to reflect the locked state
+      loadData();
     } catch (err: any) {
       console.error("Erro ao salvar justificativa:", err);
       toast.error("Erro ao salvar a justificativa: " + err.message);
