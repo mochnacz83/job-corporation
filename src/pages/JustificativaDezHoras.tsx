@@ -640,7 +640,7 @@ const JustificativaDezHoras = () => {
                             </Badge>
                             {isAdmin && (
                               <Button
-                                size="xs"
+                                size="sm"
                                 variant="outline"
                                 className="h-7 text-[10px] text-rose-600 border-rose-100 hover:bg-rose-50"
                                 onClick={() => handleUnlockJustification(item.justification!.id!)}
