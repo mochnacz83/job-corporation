@@ -9,10 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Clock, AlertTriangle, CheckCircle2, Lock, Unlock, 
   Save, RefreshCw, FileSpreadsheet, Search, Filter,
-  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp
+  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp,
+  Copy, Download, FileText
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -86,6 +91,11 @@ const JustificativaDezHoras = () => {
   const [coordenadorFilter, setCoordenadorFilter] = useState<string>("todos");
   const [statusFiltroJustificativa, setStatusFiltroJustificativa] = useState<"todos" | "pendentes" | "justificados">("todos");
   const [searchQuery, setSearchQuery] = useState("");
+  // Card-based filter (acts as the primary "view" filter)
+  // "pendente" = comportamento padrão (apenas quem NÃO fechou antes das 10h)
+  const [cardFilter, setCardFilter] = useState<"todos" | "fechou" | "pendente" | "justificado">("pendente");
+  // Export TXT dialog
+  const [exportOpen, setExportOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -252,8 +262,11 @@ const JustificativaDezHoras = () => {
   // Filtered List for Table
   const filteredList = useMemo(() => {
     return analysisList.filter(item => {
-      // 1. We ONLY show technicians who DID NOT close any activity before 10 AM
-      if (item.closedBefore10) return false;
+      // 1. Card filter (primary view)
+      if (cardFilter === "pendente" && item.closedBefore10) return false;
+      if (cardFilter === "fechou" && !item.closedBefore10) return false;
+      if (cardFilter === "justificado" && (item.closedBefore10 || !item.justification)) return false;
+      // "todos" => no card-based exclusion
 
       // 2. Supervisor filter
       if (supervisorFilter !== "todos" && item.supervisor !== supervisorFilter) return false;
@@ -275,7 +288,42 @@ const JustificativaDezHoras = () => {
 
       return true;
     });
-  }, [analysisList, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
+  }, [analysisList, cardFilter, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
+
+  // Concatenated names text for export (uses currently filtered list)
+  const exportNamesText = useMemo(() => {
+    return filteredList.map(i => i.nome).filter(Boolean).join(", ");
+  }, [filteredList]);
+
+  const handleCopyNames = async () => {
+    if (!exportNamesText) {
+      toast.info("Nenhum técnico na seleção atual.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(exportNamesText);
+      toast.success(`Nomes copiados (${filteredList.length} técnicos).`);
+    } catch {
+      toast.error("Não foi possível copiar — selecione o texto manualmente.");
+    }
+  };
+
+  const handleDownloadNamesTxt = () => {
+    if (!exportNamesText) {
+      toast.info("Nenhum técnico na seleção atual.");
+      return;
+    }
+    const blob = new Blob([exportNamesText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tecnicos_FSL_${date}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Arquivo TXT gerado!");
+  };
 
   // ===================== DINÂMICA — agregações sobre a base histórica =====================
   const dinamica = useMemo(() => {
@@ -480,6 +528,15 @@ const JustificativaDezHoras = () => {
             <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
             Exportar XLSX
           </Button>
+
+          <Button
+            size="sm"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+            onClick={() => setExportOpen(true)}
+          >
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
+            Exportar Nomes (FSL)
+          </Button>
         </div>
       </div>
 
@@ -498,7 +555,10 @@ const JustificativaDezHoras = () => {
         <TabsContent value="justificativas" className="mt-0">
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("todos")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "todos" ? "ring-2 ring-slate-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Total Técnicos Ativos</span>
             <Users className="w-4 h-4 text-slate-400" />
@@ -507,7 +567,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Técnicos com presença ativa</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("fechou")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "fechou" ? "ring-2 ring-emerald-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Encerramento antes das 10h</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -519,7 +582,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Fecharam ao menos 1 atividade</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("pendente")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "pendente" ? "ring-2 ring-amber-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Sem Encerramento antes das 10h</span>
             <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -531,7 +597,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Exigem justificativa do supervisor</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("justificado")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "justificado" ? "ring-2 ring-sky-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Justificados</span>
             <Lock className="w-4 h-4 text-sky-500" />
@@ -859,6 +928,49 @@ const JustificativaDezHoras = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Export Names Dialog */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              Exportar Nomes para FSL
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {filteredList.length} técnico(s) na seleção atual — nomes concatenados com ", " prontos para colar no FSL.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Textarea
+            readOnly
+            value={exportNamesText}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-[220px] text-xs font-mono bg-slate-50 border-slate-200"
+            placeholder="Nenhum técnico na seleção atual."
+          />
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleDownloadNamesTxt}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Baixar .txt
+            </Button>
+            <Button
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              onClick={handleCopyNames}
+            >
+              <Copy className="w-3.5 h-3.5 mr-1.5" />
+              Copiar Nomes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
