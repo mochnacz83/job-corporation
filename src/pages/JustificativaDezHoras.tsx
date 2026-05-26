@@ -8,14 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   Clock, AlertTriangle, CheckCircle2, Lock, Unlock, 
   Save, RefreshCw, FileSpreadsheet, Search, Filter,
-  Users, UserCheck, ShieldAlert, BookOpen
+  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+  LabelList, LineChart, Line, PieChart, Pie, Cell, Legend
+} from "recharts";
 
 type FatoRow = {
   id: string;
@@ -52,14 +56,6 @@ type JustificativaRow = {
   created_by?: string;
 };
 
-const ESTADOS_EM_ANDAMENTO = [
-  "atribuído",
-  "em deslocamento",
-  "não atribuído",
-  "recebido",
-  "em execução",
-];
-
 const CAUSAS_PERMITIDAS = [
   "Inversão de atividade",
   "Cancelamento",
@@ -79,6 +75,7 @@ const JustificativaDezHoras = () => {
   const [fato, setFato] = useState<FatoRow[]>([]);
   const [presenca, setPresenca] = useState<PresencaRow[]>([]);
   const [justificativas, setJustificativas] = useState<JustificativaRow[]>([]);
+  const [historico, setHistorico] = useState<JustificativaRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Form states for each technician
@@ -93,7 +90,7 @@ const JustificativaDezHoras = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: f }, { data: p }, { data: j }] = await Promise.all([
+      const [{ data: f }, { data: p }, { data: j }, { data: hist }] = await Promise.all([
         supabase
           .from("atividades_fato")
           .select("id, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico, data_atividade, raw")
@@ -107,6 +104,10 @@ const JustificativaDezHoras = () => {
           .from("justificativas_10h" as any)
           .select("*")
           .eq("data_atividade", date),
+        supabase
+          .from("justificativas_10h" as any)
+          .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, causa")
+          .limit(50000),
       ]);
 
       const cleanedFato = ((f || []) as FatoRow[]).filter((r) => {
@@ -121,7 +122,8 @@ const JustificativaDezHoras = () => {
       });
       setPresenca(cleanedPresenca);
 
-      setJustificativas((j || []) as JustificativaRow[]);
+      setJustificativas((j || []) as unknown as JustificativaRow[]);
+      setHistorico((hist || []) as unknown as JustificativaRow[]);
 
       // Reset form states
       setFormsState({});
@@ -172,21 +174,23 @@ const JustificativaDezHoras = () => {
     if (techActs.length === 0) return false;
 
     return techActs.some(act => {
+      // Alinhado ao módulo Acompanhamento de Atividades: estado contém "conclu" (Com/Sem Sucesso)
+      // ou "wfm" (Fechado em WFM). Qualquer outra coisa não conta como fechamento.
       const state = (act.ds_estado || "").toLowerCase();
-      // An activity is closed if its state is not in the in-progress list
-      const isClosed = !ESTADOS_EM_ANDAMENTO.some(s => state.includes(s));
+      const isClosed = state.includes("conclu") || state.includes("wfm");
       if (!isClosed) return false;
 
-      const endTimeStr = getRawStr(act, ["dh_fim_execucao_real", "dh_fim_execucao"]);
+      const endTimeStr = getRawStr(act, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
       if (!endTimeStr) return false;
 
-      // Extract time in HH:MM:SS
+      // Extrai HH:MM:SS e considera fechada se for <= 10:00:00
       const timeMatch = endTimeStr.match(/(\d{2}):(\d{2}):(\d{2})/);
-      if (timeMatch) {
-        const hour = parseInt(timeMatch[1], 10);
-        return hour < 10;
-      }
-      return false;
+      if (!timeMatch) return false;
+      const hh = parseInt(timeMatch[1], 10);
+      const mm = parseInt(timeMatch[2], 10);
+      const ss = parseInt(timeMatch[3], 10);
+      const totalSec = hh * 3600 + mm * 60 + ss;
+      return totalSec <= 10 * 3600; // antes ou igual às 10:00
     });
   };
 
@@ -273,6 +277,57 @@ const JustificativaDezHoras = () => {
     });
   }, [analysisList, supervisorFilter, coordenadorFilter, statusFiltroJustificativa, searchQuery]);
 
+  // ===================== DINÂMICA — agregações sobre a base histórica =====================
+  const dinamica = useMemo(() => {
+    const byTec = new Map<string, { nome: string; count: number }>();
+    const bySup = new Map<string, number>();
+    const byCausa = new Map<string, number>();
+    const byDia = new Map<string, number>();
+
+    historico.forEach((h) => {
+      const tt = (h.matricula_tt || "").trim().toUpperCase();
+      if (tt) {
+        const cur = byTec.get(tt) || { nome: h.nome_tecnico || tt, count: 0 };
+        cur.count++;
+        cur.nome = h.nome_tecnico || cur.nome;
+        byTec.set(tt, cur);
+      }
+      const sup = (h.supervisor || "").trim();
+      if (sup && sup !== "—") bySup.set(sup, (bySup.get(sup) || 0) + 1);
+
+      const causa = (h.causa || "").trim();
+      if (causa) byCausa.set(causa, (byCausa.get(causa) || 0) + 1);
+
+      const d = (h.data_atividade || "").slice(0, 10);
+      if (d) byDia.set(d, (byDia.get(d) || 0) + 1);
+    });
+
+    const topTecnicos = Array.from(byTec.entries())
+      .map(([tt, v]) => ({ tt, nome: v.nome, qtd: v.count, label: `${v.nome} (${tt})` }))
+      .sort((a, b) => b.qtd - a.qtd)
+      .slice(0, 10);
+
+    const topSupervisores = Array.from(bySup.entries())
+      .map(([nome, qtd]) => ({ nome, qtd }))
+      .sort((a, b) => b.qtd - a.qtd)
+      .slice(0, 10);
+
+    const causas = Array.from(byCausa.entries())
+      .map(([causa, qtd]) => ({ causa, qtd }))
+      .sort((a, b) => b.qtd - a.qtd);
+
+    const porDia = Array.from(byDia.entries())
+      .map(([d, qtd]) => {
+        const [y, m, dd] = d.split("-");
+        return { data: `${dd}/${m}`, dataIso: d, qtd };
+      })
+      .sort((a, b) => a.dataIso.localeCompare(b.dataIso));
+
+    return { topTecnicos, topSupervisores, causas, porDia, total: historico.length };
+  }, [historico]);
+
+  const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ef4444", "#a855f7", "#14b8a6", "#f43f5e"];
+
   // Handle Form changes
   const handleFormChange = (tt: string, field: "causa" | "observacao", value: string) => {
     setFormsState(prev => ({
@@ -297,7 +352,7 @@ const JustificativaDezHoras = () => {
     }
 
     try {
-      const payload: JustificativaRow = {
+      const payload: any = {
         matricula_tt: item.tt,
         nome_tecnico: item.nome,
         supervisor: item.supervisor,
@@ -306,8 +361,9 @@ const JustificativaDezHoras = () => {
         data_atividade: date,
         causa,
         observacao: observacao.trim() || null,
-        bloqueado: true, // locked upon saving
-        created_by: profile?.nome || "Supervisor"
+        bloqueado: true,
+        created_by: profile?.nome || "Supervisor",
+        created_by_user: profile?.user_id || null,
       };
 
       const { error } = await supabase
@@ -317,7 +373,7 @@ const JustificativaDezHoras = () => {
       if (error) throw error;
 
       toast.success(`Justificativa de ${item.nome} salva e bloqueada com sucesso!`);
-      loadData(); // reload to reflect the locked state
+      loadData();
     } catch (err: any) {
       console.error("Erro ao salvar justificativa:", err);
       toast.error("Erro ao salvar a justificativa: " + err.message);
@@ -427,6 +483,19 @@ const JustificativaDezHoras = () => {
         </div>
       </div>
 
+      <Tabs defaultValue="justificativas" className="w-full">
+        <TabsList className="bg-white border border-slate-100 rounded-xl p-1 mb-4">
+          <TabsTrigger value="justificativas" className="text-xs gap-1.5 data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            Justificativas
+          </TabsTrigger>
+          <TabsTrigger value="dinamica" className="text-xs gap-1.5 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700">
+            <BarChart3 className="w-3.5 h-3.5" />
+            Dinâmica
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="justificativas" className="mt-0">
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
@@ -635,7 +704,7 @@ const JustificativaDezHoras = () => {
                             </Badge>
                             {isAdmin && (
                               <Button
-                                size="xs"
+                                size="sm"
                                 variant="outline"
                                 className="h-7 text-[10px] text-rose-600 border-rose-100 hover:bg-rose-50"
                                 onClick={() => handleUnlockJustification(item.justification!.id!)}
@@ -665,6 +734,131 @@ const JustificativaDezHoras = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="dinamica" className="mt-0 space-y-4">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-800">Dinâmica da Base Histórica</h2>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Consolidação de todas as justificativas registradas no portal — total acumulado: <strong>{dinamica.total}</strong> registros.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Top 10 técnicos */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold text-slate-800">Top 10 Técnicos com Maior Reincidência</CardTitle>
+                <CardDescription className="text-[11px]">Técnicos que mais vezes não fecharam atividade até as 10h</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamica.topTecnicos.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Sem dados na base histórica.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={dinamica.topTecnicos} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                      <CartesianGrid horizontal={false} stroke="#e2e8f0" />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="label" tick={{ fontSize: 10, fill: "#475569" }} width={180} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                      <Bar dataKey="qtd" fill="#0ea5e9" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="qtd" position="right" style={{ fontSize: 10, fill: "#0f172a", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top 10 supervisores */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold text-slate-800">Top 10 Supervisores com Maior Reincidência</CardTitle>
+                <CardDescription className="text-[11px]">Supervisores com maior volume de justificativas registradas</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamica.topSupervisores.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Sem dados na base histórica.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={dinamica.topSupervisores} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+                      <CartesianGrid horizontal={false} stroke="#e2e8f0" />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "#64748b" }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="nome" tick={{ fontSize: 10, fill: "#475569" }} width={160} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                      <Bar dataKey="qtd" fill="#6366f1" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="qtd" position="right" style={{ fontSize: 10, fill: "#0f172a", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Justificativas por dia */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold text-slate-800">Evolução por Dia</CardTitle>
+                <CardDescription className="text-[11px]">Quantidade de justificativas registradas a cada dia</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamica.porDia.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Sem dados na base histórica.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={dinamica.porDia} margin={{ left: 0, right: 16, top: 8, bottom: 4 }}>
+                      <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                      <XAxis dataKey="data" tick={{ fontSize: 10, fill: "#64748b" }} />
+                      <YAxis tick={{ fontSize: 10, fill: "#64748b" }} allowDecimals={false} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                      <Line type="monotone" dataKey="qtd" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3 }}>
+                        <LabelList dataKey="qtd" position="top" style={{ fontSize: 10, fill: "#0f172a", fontWeight: 600 }} />
+                      </Line>
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Causas */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-bold text-slate-800">Causas Justificativa</CardTitle>
+                <CardDescription className="text-[11px]">Distribuição das causas pré-estabelecidas escolhidas pelos supervisores</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamica.causas.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Sem dados na base histórica.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={320}>
+                    <PieChart>
+                      <Pie
+                        data={dinamica.causas}
+                        dataKey="qtd"
+                        nameKey="causa"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={110}
+                        label={(e: any) => `${e.qtd}`}
+                        labelLine={false}
+                      >
+                        {dinamica.causas.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
