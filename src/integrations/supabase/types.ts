@@ -394,6 +394,57 @@ export type Database = {
         }
         Relationships: []
       }
+      justificativas_10h: {
+        Row: {
+          bloqueado: boolean
+          causa: string
+          coordenador: string | null
+          created_at: string
+          created_by: string | null
+          created_by_user: string | null
+          data_atividade: string
+          id: string
+          matricula_tt: string
+          nome_tecnico: string
+          observacao: string | null
+          setor: string | null
+          supervisor: string | null
+          updated_at: string
+        }
+        Insert: {
+          bloqueado?: boolean
+          causa: string
+          coordenador?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_user?: string | null
+          data_atividade: string
+          id?: string
+          matricula_tt: string
+          nome_tecnico: string
+          observacao?: string | null
+          setor?: string | null
+          supervisor?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bloqueado?: boolean
+          causa?: string
+          coordenador?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_user?: string | null
+          data_atividade?: string
+          id?: string
+          matricula_tt?: string
+          nome_tecnico?: string
+          observacao?: string | null
+          setor?: string | null
+          supervisor?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       materiais_cadastro: {
         Row: {
           codigo: string
