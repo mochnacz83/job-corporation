@@ -555,7 +555,10 @@ const JustificativaDezHoras = () => {
         <TabsContent value="justificativas" className="mt-0">
       {/* Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("todos")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "todos" ? "ring-2 ring-slate-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Total Técnicos Ativos</span>
             <Users className="w-4 h-4 text-slate-400" />
@@ -564,7 +567,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Técnicos com presença ativa</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("fechou")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "fechou" ? "ring-2 ring-emerald-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Encerramento antes das 10h</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -576,7 +582,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Fecharam ao menos 1 atividade</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("pendente")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "pendente" ? "ring-2 ring-amber-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Sem Encerramento antes das 10h</span>
             <AlertTriangle className="w-4 h-4 text-amber-500" />
@@ -588,7 +597,10 @@ const JustificativaDezHoras = () => {
           <span className="text-[10px] text-slate-400 mt-1 block">Exigem justificativa do supervisor</span>
         </Card>
 
-        <Card className="border-slate-100 shadow-sm rounded-xl bg-white p-4">
+        <Card
+          onClick={() => setCardFilter("justificado")}
+          className={`border-slate-100 shadow-sm rounded-xl bg-white p-4 cursor-pointer transition-all hover:shadow-md ${cardFilter === "justificado" ? "ring-2 ring-sky-400" : ""}`}
+        >
           <div className="flex justify-between items-start">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block">Justificados</span>
             <Lock className="w-4 h-4 text-sky-500" />
