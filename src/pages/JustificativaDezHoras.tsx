@@ -8,14 +8,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { 
   Clock, AlertTriangle, CheckCircle2, Lock, Unlock, 
   Save, RefreshCw, FileSpreadsheet, Search, Filter,
-  Users, UserCheck, ShieldAlert, BookOpen
+  Users, UserCheck, ShieldAlert, BookOpen, BarChart3, TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+  LabelList, LineChart, Line, PieChart, Pie, Cell, Legend
+} from "recharts";
 
 type FatoRow = {
   id: string;
@@ -52,14 +56,6 @@ type JustificativaRow = {
   created_by?: string;
 };
 
-const ESTADOS_EM_ANDAMENTO = [
-  "atribuído",
-  "em deslocamento",
-  "não atribuído",
-  "recebido",
-  "em execução",
-];
-
 const CAUSAS_PERMITIDAS = [
   "Inversão de atividade",
   "Cancelamento",
@@ -79,6 +75,7 @@ const JustificativaDezHoras = () => {
   const [fato, setFato] = useState<FatoRow[]>([]);
   const [presenca, setPresenca] = useState<PresencaRow[]>([]);
   const [justificativas, setJustificativas] = useState<JustificativaRow[]>([]);
+  const [historico, setHistorico] = useState<JustificativaRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Form states for each technician
@@ -93,7 +90,7 @@ const JustificativaDezHoras = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: f }, { data: p }, { data: j }] = await Promise.all([
+      const [{ data: f }, { data: p }, { data: j }, { data: hist }] = await Promise.all([
         supabase
           .from("atividades_fato")
           .select("id, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico, data_atividade, raw")
@@ -107,6 +104,10 @@ const JustificativaDezHoras = () => {
           .from("justificativas_10h" as any)
           .select("*")
           .eq("data_atividade", date),
+        supabase
+          .from("justificativas_10h" as any)
+          .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, causa")
+          .limit(50000),
       ]);
 
       const cleanedFato = ((f || []) as FatoRow[]).filter((r) => {
@@ -121,7 +122,8 @@ const JustificativaDezHoras = () => {
       });
       setPresenca(cleanedPresenca);
 
-      setJustificativas((j || []) as JustificativaRow[]);
+      setJustificativas((j || []) as unknown as JustificativaRow[]);
+      setHistorico((hist || []) as unknown as JustificativaRow[]);
 
       // Reset form states
       setFormsState({});
@@ -172,21 +174,23 @@ const JustificativaDezHoras = () => {
     if (techActs.length === 0) return false;
 
     return techActs.some(act => {
+      // Alinhado ao módulo Acompanhamento de Atividades: estado contém "conclu" (Com/Sem Sucesso)
+      // ou "wfm" (Fechado em WFM). Qualquer outra coisa não conta como fechamento.
       const state = (act.ds_estado || "").toLowerCase();
-      // An activity is closed if its state is not in the in-progress list
-      const isClosed = !ESTADOS_EM_ANDAMENTO.some(s => state.includes(s));
+      const isClosed = state.includes("conclu") || state.includes("wfm");
       if (!isClosed) return false;
 
-      const endTimeStr = getRawStr(act, ["dh_fim_execucao_real", "dh_fim_execucao"]);
+      const endTimeStr = getRawStr(act, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
       if (!endTimeStr) return false;
 
-      // Extract time in HH:MM:SS
+      // Extrai HH:MM:SS e considera fechada se for <= 10:00:00
       const timeMatch = endTimeStr.match(/(\d{2}):(\d{2}):(\d{2})/);
-      if (timeMatch) {
-        const hour = parseInt(timeMatch[1], 10);
-        return hour < 10;
-      }
-      return false;
+      if (!timeMatch) return false;
+      const hh = parseInt(timeMatch[1], 10);
+      const mm = parseInt(timeMatch[2], 10);
+      const ss = parseInt(timeMatch[3], 10);
+      const totalSec = hh * 3600 + mm * 60 + ss;
+      return totalSec <= 10 * 3600; // antes ou igual às 10:00
     });
   };
 
@@ -297,7 +301,7 @@ const JustificativaDezHoras = () => {
     }
 
     try {
-      const payload: JustificativaRow = {
+      const payload: any = {
         matricula_tt: item.tt,
         nome_tecnico: item.nome,
         supervisor: item.supervisor,
@@ -306,8 +310,9 @@ const JustificativaDezHoras = () => {
         data_atividade: date,
         causa,
         observacao: observacao.trim() || null,
-        bloqueado: true, // locked upon saving
-        created_by: profile?.nome || "Supervisor"
+        bloqueado: true,
+        created_by: profile?.nome || "Supervisor",
+        created_by_user: profile?.user_id || null,
       };
 
       const { error } = await supabase
