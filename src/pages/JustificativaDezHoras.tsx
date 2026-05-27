@@ -38,6 +38,7 @@ type FatoRow = {
 
 type PresencaRow = {
   tt: string | null;
+  tr?: string | null;
   funcionario: string | null;
   supervisor: string | null;
   coordenador: string | null;
@@ -108,7 +109,7 @@ const JustificativaDezHoras = () => {
           .limit(15000),
         supabase
           .from("tecnicos_presenca")
-          .select("tt, funcionario, supervisor, coordenador, setor_origem, setor_atual, status")
+          .select("tt, tr, funcionario, supervisor, coordenador, setor_origem, setor_atual, status")
           .limit(10000),
         supabase
           .from("justificativas_10h" as any)
@@ -165,43 +166,65 @@ const JustificativaDezHoras = () => {
     return "";
   };
 
-  // Group activities by technician matricula
-  const activitiesByTech = useMemo(() => {
-    const map = new Map<string, FatoRow[]>();
-    fato.forEach(r => {
-      if (r.matricula_tt) {
-        const tt = r.matricula_tt.trim().toUpperCase();
-        if (!map.has(tt)) map.set(tt, []);
-        map.get(tt)!.push(r);
-      }
+  // Normaliza nome (igual ao módulo Acompanhamento de Atividades) para casamento por nome
+  const normTecnico = (s: string | null | undefined): string => {
+    return (s || "")
+      .toString()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  // Índices da presença por TT, TR e nome — mesmo critério usado em Acompanhamento de Atividades
+  // para evitar perder técnicos cuja matrícula no fato é TR (não TT) ou que casam apenas por nome.
+  const presencaIdx = useMemo(() => {
+    const byTT = new Map<string, PresencaRow & { tr?: string | null }>();
+    const byTR = new Map<string, PresencaRow & { tr?: string | null }>();
+    const byNome = new Map<string, PresencaRow & { tr?: string | null }>();
+    (presenca as Array<PresencaRow & { tr?: string | null }>).forEach((p) => {
+      const tt = (p.tt || "").trim().toUpperCase();
+      const tr = ((p as { tr?: string | null }).tr || "").trim().toUpperCase();
+      const nome = normTecnico(p.funcionario);
+      if (tt) byTT.set(tt, p);
+      if (tr) byTR.set(tr, p);
+      if (nome) byNome.set(nome, p);
     });
-    return map;
-  }, [fato]);
+    return { byTT, byTR, byNome };
+  }, [presenca]);
 
-  // Check if technician closed any activity before 10 AM
-  const hasClosedBefore10 = (tt: string): boolean => {
-    const techActs = activitiesByTech.get(tt.trim().toUpperCase()) || [];
-    if (techActs.length === 0) return false;
+  const getPresencaNameKey = (r: FatoRow): string => {
+    const tt = (r.matricula_tt || "").trim().toUpperCase();
+    if (tt && presencaIdx.byTT.has(tt)) return normTecnico(presencaIdx.byTT.get(tt)!.funcionario);
+    if (tt && presencaIdx.byTR.has(tt)) return normTecnico(presencaIdx.byTR.get(tt)!.funcionario);
+    const nome = normTecnico(r.nome_tecnico);
+    if (nome && presencaIdx.byNome.has(nome)) return normTecnico(presencaIdx.byNome.get(nome)!.funcionario);
+    return nome; // fallback
+  };
 
-    return techActs.some(act => {
-      // Alinhado ao módulo Acompanhamento de Atividades: estado contém "conclu" (Com/Sem Sucesso)
-      // ou "wfm" (Fechado em WFM). Qualquer outra coisa não conta como fechamento.
-      const state = (act.ds_estado || "").toLowerCase();
+  // Conjunto de nomes (presença) que fecharam pelo menos UMA atividade até as 10:00:00,
+  // alinhado à regra do Acompanhamento (estado contém "conclu" ou "wfm") + janela de horário.
+  const namesClosedBefore10 = useMemo(() => {
+    const s = new Set<string>();
+    fato.forEach((r) => {
+      const state = (r.ds_estado || "").toLowerCase();
       const isClosed = state.includes("conclu") || state.includes("wfm");
-      if (!isClosed) return false;
-
-      const endTimeStr = getRawStr(act, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
-      if (!endTimeStr) return false;
-
-      // Extrai HH:MM:SS e considera fechada se for <= 10:00:00
-      const timeMatch = endTimeStr.match(/(\d{2}):(\d{2}):(\d{2})/);
-      if (!timeMatch) return false;
-      const hh = parseInt(timeMatch[1], 10);
-      const mm = parseInt(timeMatch[2], 10);
-      const ss = parseInt(timeMatch[3], 10);
-      const totalSec = hh * 3600 + mm * 60 + ss;
-      return totalSec <= 10 * 3600; // antes ou igual às 10:00
+      if (!isClosed) return;
+      const endTimeStr = getRawStr(r, ["dh_fim_execucao_real", "dh_fim_execucao", "fim_execucao_real"]);
+      if (!endTimeStr) return;
+      const m = endTimeStr.match(/(\d{2}):(\d{2}):(\d{2})/);
+      if (!m) return;
+      const totalSec = parseInt(m[1], 10) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+      if (totalSec > 10 * 3600) return;
+      const key = getPresencaNameKey(r);
+      if (key) s.add(key);
     });
+    return s;
+  }, [fato, presencaIdx]);
+
+  const hasClosedBefore10 = (presenceNameKey: string): boolean => {
+    return presenceNameKey ? namesClosedBefore10.has(presenceNameKey) : false;
   };
 
   // Compute final lists of technicians and metrics
@@ -214,7 +237,8 @@ const JustificativaDezHoras = () => {
 
     return activeTechs.map(p => {
       const tt = p.tt!.trim().toUpperCase();
-      const closedBefore10 = hasClosedBefore10(tt);
+      const nameKey = normTecnico(p.funcionario);
+      const closedBefore10 = hasClosedBefore10(nameKey);
       const justification = justificativas.find(j => j.matricula_tt.trim().toUpperCase() === tt);
 
       return {
@@ -227,7 +251,7 @@ const JustificativaDezHoras = () => {
         justification
       };
     });
-  }, [presenca, activitiesByTech, justificativas]);
+  }, [presenca, namesClosedBefore10, justificativas]);
 
   // Filter options for Dropdowns
   const supervisorsList = useMemo(() => {
