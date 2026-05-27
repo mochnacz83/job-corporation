@@ -17,7 +17,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download, FileSpreadsheet } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download, FileSpreadsheet, Copy, FileText } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
