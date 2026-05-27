@@ -15,9 +15,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download, FileSpreadsheet } from "lucide-react";
+import { Loader2, RefreshCw, Upload, Save, Activity as ActivityIcon, Filter, X, Clock, Plus, Trash2, Download, FileSpreadsheet, Copy, FileText } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
@@ -228,6 +232,7 @@ const AtividadesEncerramento = () => {
   const [atividadesStatusSaFilter, setAtividadesStatusSaFilter] = useState<string[]>([]);
   const [atividadesSetorFilter, setAtividadesSetorFilter] = useState<string[]>([]);
   const [atividadesStatusNafFilter, setAtividadesStatusNafFilter] = useState<string[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
   type HistRow = {
@@ -1666,23 +1671,46 @@ const AtividadesEncerramento = () => {
     XLSX.writeFile(wb, `Resumo_Atividades_${date}.xlsx`);
   };
 
+  const exportNamesText = useMemo(() => {
+    return aggregated.map(r => r.nome).filter(n => n && n !== "—").join(", ");
+  }, [aggregated]);
+
   const handleExportFSL = () => {
     if (aggregated.length === 0) {
       toast({ title: "Nenhum técnico filtrado", variant: "destructive" });
       return;
     }
-    const names = aggregated.map(r => r.nome).filter(n => n && n !== "—").join(", ");
-    
-    // Criar um blob de texto e baixar como .txt ou gerar um Excel de uma célula
-    const blob = new Blob([names], { type: "text/plain" });
+    setExportOpen(true);
+  };
+
+  const handleCopyNames = async () => {
+    if (!exportNamesText) {
+      toast({ title: "Nenhum técnico na seleção atual." });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(exportNamesText);
+      toast({ title: `Nomes copiados (${aggregated.length} técnicos).` });
+    } catch {
+      toast({ title: "Não foi possível copiar — selecione o texto manualmente.", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadNamesTxt = () => {
+    if (!exportNamesText) {
+      toast({ title: "Nenhum técnico na seleção atual." });
+      return;
+    }
+    const blob = new Blob([exportNamesText], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `Tecnicos_FSL_${date}.txt`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    toast({ title: "Lista para FSL gerada", description: "O arquivo .txt foi baixado." });
+    toast({ title: "Arquivo TXT gerado!" });
   };
 
   // ===== Histórico (60 dias) - agregações =====
@@ -2563,6 +2591,49 @@ const AtividadesEncerramento = () => {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Export Names Dialog */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              Exportar Nomes para FSL
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {aggregated.length} técnico(s) na seleção atual — nomes concatenados com ", " prontos para colar no FSL.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Textarea
+            readOnly
+            value={exportNamesText}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-[220px] text-xs font-mono bg-slate-50 border-slate-200"
+            placeholder="Nenhum técnico na seleção atual."
+          />
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleDownloadNamesTxt}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Baixar .txt
+            </Button>
+            <Button
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              onClick={handleCopyNames}
+            >
+              <Copy className="w-3.5 h-3.5 mr-1.5" />
+              Copiar Nomes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
