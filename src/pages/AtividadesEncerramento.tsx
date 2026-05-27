@@ -2591,6 +2591,49 @@ const AtividadesEncerramento = () => {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Export Names Dialog */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileText className="w-4 h-4 text-indigo-600" />
+              Exportar Nomes para FSL
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {aggregated.length} técnico(s) na seleção atual — nomes concatenados com ", " prontos para colar no FSL.
+            </DialogDescription>
+          </DialogHeader>
+
+          <Textarea
+            readOnly
+            value={exportNamesText}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-h-[220px] text-xs font-mono bg-slate-50 border-slate-200"
+            placeholder="Nenhum técnico na seleção atual."
+          />
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleDownloadNamesTxt}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Baixar .txt
+            </Button>
+            <Button
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs"
+              onClick={handleCopyNames}
+            >
+              <Copy className="w-3.5 h-3.5 mr-1.5" />
+              Copiar Nomes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
