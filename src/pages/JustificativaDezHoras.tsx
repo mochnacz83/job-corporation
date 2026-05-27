@@ -38,6 +38,7 @@ type FatoRow = {
 
 type PresencaRow = {
   tt: string | null;
+  tr?: string | null;
   funcionario: string | null;
   supervisor: string | null;
   coordenador: string | null;
@@ -108,7 +109,7 @@ const JustificativaDezHoras = () => {
           .limit(15000),
         supabase
           .from("tecnicos_presenca")
-          .select("tt, funcionario, supervisor, coordenador, setor_origem, setor_atual, status")
+          .select("tt, tr, funcionario, supervisor, coordenador, setor_origem, setor_atual, status")
           .limit(10000),
         supabase
           .from("justificativas_10h" as any)
