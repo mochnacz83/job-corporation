@@ -1671,23 +1671,46 @@ const AtividadesEncerramento = () => {
     XLSX.writeFile(wb, `Resumo_Atividades_${date}.xlsx`);
   };
 
+  const exportNamesText = useMemo(() => {
+    return aggregated.map(r => r.nome).filter(n => n && n !== "—").join(", ");
+  }, [aggregated]);
+
   const handleExportFSL = () => {
     if (aggregated.length === 0) {
       toast({ title: "Nenhum técnico filtrado", variant: "destructive" });
       return;
     }
-    const names = aggregated.map(r => r.nome).filter(n => n && n !== "—").join(", ");
-    
-    // Criar um blob de texto e baixar como .txt ou gerar um Excel de uma célula
-    const blob = new Blob([names], { type: "text/plain" });
+    setExportOpen(true);
+  };
+
+  const handleCopyNames = async () => {
+    if (!exportNamesText) {
+      toast({ title: "Nenhum técnico na seleção atual." });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(exportNamesText);
+      toast({ title: `Nomes copiados (${aggregated.length} técnicos).` });
+    } catch {
+      toast({ title: "Não foi possível copiar — selecione o texto manualmente.", variant: "destructive" });
+    }
+  };
+
+  const handleDownloadNamesTxt = () => {
+    if (!exportNamesText) {
+      toast({ title: "Nenhum técnico na seleção atual." });
+      return;
+    }
+    const blob = new Blob([exportNamesText], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `Tecnicos_FSL_${date}.txt`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    toast({ title: "Lista para FSL gerada", description: "O arquivo .txt foi baixado." });
+    toast({ title: "Arquivo TXT gerado!" });
   };
 
   // ===== Histórico (60 dias) - agregações =====
