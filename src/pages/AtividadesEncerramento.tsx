@@ -232,6 +232,7 @@ const AtividadesEncerramento = () => {
   const [atividadesStatusSaFilter, setAtividadesStatusSaFilter] = useState<string[]>([]);
   const [atividadesSetorFilter, setAtividadesSetorFilter] = useState<string[]>([]);
   const [atividadesStatusNafFilter, setAtividadesStatusNafFilter] = useState<string[]>([]);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // Histórico (últimos 60 dias) — usado para o resumo do dia / comparativo dia x mês
   type HistRow = {
