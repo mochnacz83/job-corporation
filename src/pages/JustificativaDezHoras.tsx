@@ -425,12 +425,13 @@ const JustificativaDezHoras = () => {
   const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ef4444", "#a855f7", "#14b8a6", "#f43f5e"];
 
   // Handle Form changes
-  const handleFormChange = (tt: string, field: "causa" | "observacao", value: string) => {
+  const handleFormChange = (tt: string, field: "causa" | "observacao" | "hora_inicio", value: string) => {
     setFormsState(prev => ({
       ...prev,
       [tt]: {
         causa: prev[tt]?.causa || "",
         observacao: prev[tt]?.observacao || "",
+        hora_inicio: prev[tt]?.hora_inicio || "",
         [field]: value
       }
     }));
