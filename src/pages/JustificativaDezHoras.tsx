@@ -62,6 +62,18 @@ type JustificativaRow = {
   created_by?: string;
 };
 
+type InicioDiaRow = {
+  id?: string;
+  data_atividade: string;
+  matricula_tt: string;
+  nome_tecnico: string;
+  supervisor: string | null;
+  coordenador: string | null;
+  setor: string | null;
+  hora_inicio: string | null; // "HH:MM" or "HH:MM:SS"
+  fechou_antes_10h: boolean;
+};
+
 const CAUSAS_PERMITIDAS = [
   "Inversão de atividade",
   "Cancelamento",
@@ -82,10 +94,12 @@ const JustificativaDezHoras = () => {
   const [presenca, setPresenca] = useState<PresencaRow[]>([]);
   const [justificativas, setJustificativas] = useState<JustificativaRow[]>([]);
   const [historico, setHistorico] = useState<JustificativaRow[]>([]);
+  const [inicioDia, setInicioDia] = useState<InicioDiaRow[]>([]);
+  const [inicioDiaHist, setInicioDiaHist] = useState<InicioDiaRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Form states for each technician
-  const [formsState, setFormsState] = useState<Record<string, { causa: string; observacao: string }>>({});
+  const [formsState, setFormsState] = useState<Record<string, { causa: string; observacao: string; hora_inicio: string }>>({});
 
   // Filters
   const [supervisorFilter, setSupervisorFilter] = useState<string>("todos");
@@ -101,7 +115,7 @@ const JustificativaDezHoras = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: f }, { data: p }, { data: j }, { data: hist }] = await Promise.all([
+      const [{ data: f }, { data: p }, { data: j }, { data: hist }, { data: ini }, { data: iniHist }] = await Promise.all([
         supabase
           .from("atividades_fato")
           .select("id, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico, data_atividade, raw")
@@ -119,6 +133,14 @@ const JustificativaDezHoras = () => {
           .from("justificativas_10h" as any)
           .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, causa")
           .limit(50000),
+        supabase
+          .from("tecnicos_inicio_dia" as any)
+          .select("*")
+          .eq("data_atividade", date),
+        supabase
+          .from("tecnicos_inicio_dia" as any)
+          .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, hora_inicio, fechou_antes_10h")
+          .limit(50000),
       ]);
 
       const cleanedFato = ((f || []) as FatoRow[]).filter((r) => {
@@ -135,6 +157,8 @@ const JustificativaDezHoras = () => {
 
       setJustificativas((j || []) as unknown as JustificativaRow[]);
       setHistorico((hist || []) as unknown as JustificativaRow[]);
+      setInicioDia((ini || []) as unknown as InicioDiaRow[]);
+      setInicioDiaHist((iniHist || []) as unknown as InicioDiaRow[]);
 
       // Reset form states
       setFormsState({});
