@@ -62,6 +62,18 @@ type JustificativaRow = {
   created_by?: string;
 };
 
+type InicioDiaRow = {
+  id?: string;
+  data_atividade: string;
+  matricula_tt: string;
+  nome_tecnico: string;
+  supervisor: string | null;
+  coordenador: string | null;
+  setor: string | null;
+  hora_inicio: string | null; // "HH:MM" or "HH:MM:SS"
+  fechou_antes_10h: boolean;
+};
+
 const CAUSAS_PERMITIDAS = [
   "Inversão de atividade",
   "Cancelamento",
@@ -82,10 +94,12 @@ const JustificativaDezHoras = () => {
   const [presenca, setPresenca] = useState<PresencaRow[]>([]);
   const [justificativas, setJustificativas] = useState<JustificativaRow[]>([]);
   const [historico, setHistorico] = useState<JustificativaRow[]>([]);
+  const [inicioDia, setInicioDia] = useState<InicioDiaRow[]>([]);
+  const [inicioDiaHist, setInicioDiaHist] = useState<InicioDiaRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Form states for each technician
-  const [formsState, setFormsState] = useState<Record<string, { causa: string; observacao: string }>>({});
+  const [formsState, setFormsState] = useState<Record<string, { causa: string; observacao: string; hora_inicio: string }>>({});
 
   // Filters
   const [supervisorFilter, setSupervisorFilter] = useState<string>("todos");
@@ -101,7 +115,7 @@ const JustificativaDezHoras = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [{ data: f }, { data: p }, { data: j }, { data: hist }] = await Promise.all([
+      const [{ data: f }, { data: p }, { data: j }, { data: hist }, { data: ini }, { data: iniHist }] = await Promise.all([
         supabase
           .from("atividades_fato")
           .select("id, ds_estado, ds_macro_atividade, matricula_tt, nome_tecnico, data_atividade, raw")
@@ -119,6 +133,14 @@ const JustificativaDezHoras = () => {
           .from("justificativas_10h" as any)
           .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, causa")
           .limit(50000),
+        supabase
+          .from("tecnicos_inicio_dia" as any)
+          .select("*")
+          .eq("data_atividade", date),
+        supabase
+          .from("tecnicos_inicio_dia" as any)
+          .select("matricula_tt, nome_tecnico, supervisor, coordenador, setor, data_atividade, hora_inicio, fechou_antes_10h")
+          .limit(50000),
       ]);
 
       const cleanedFato = ((f || []) as FatoRow[]).filter((r) => {
@@ -135,6 +157,8 @@ const JustificativaDezHoras = () => {
 
       setJustificativas((j || []) as unknown as JustificativaRow[]);
       setHistorico((hist || []) as unknown as JustificativaRow[]);
+      setInicioDia((ini || []) as unknown as InicioDiaRow[]);
+      setInicioDiaHist((iniHist || []) as unknown as InicioDiaRow[]);
 
       // Reset form states
       setFormsState({});
@@ -240,6 +264,7 @@ const JustificativaDezHoras = () => {
       const nameKey = normTecnico(p.funcionario);
       const closedBefore10 = hasClosedBefore10(nameKey);
       const justification = justificativas.find(j => j.matricula_tt.trim().toUpperCase() === tt);
+      const inicio = inicioDia.find(i => i.matricula_tt.trim().toUpperCase() === tt);
 
       return {
         tt,
@@ -248,10 +273,11 @@ const JustificativaDezHoras = () => {
         coordenador: p.coordenador || "—",
         setor: p.setor_atual || p.setor_origem || "—",
         closedBefore10,
-        justification
+        justification,
+        inicio
       };
     });
-  }, [presenca, namesClosedBefore10, justificativas]);
+  }, [presenca, namesClosedBefore10, justificativas, inicioDia]);
 
   // Filter options for Dropdowns
   const supervisorsList = useMemo(() => {
@@ -398,15 +424,57 @@ const JustificativaDezHoras = () => {
     return { topTecnicos, topSupervisores, causas, porDia, total: historico.length };
   }, [historico]);
 
+  // Dinâmica adicional — base de Início do Dia
+  const dinamicaInicio = useMemo(() => {
+    const toMinutes = (h: string | null) => {
+      if (!h) return null;
+      const m = h.match(/(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const toHHMM = (mins: number) => {
+      const h = Math.floor(mins / 60).toString().padStart(2, "0");
+      const mm = Math.round(mins % 60).toString().padStart(2, "0");
+      return `${h}:${mm}`;
+    };
+
+    const bySup = new Map<string, { soma: number; n: number }>();
+    let totalRegistros = 0;
+    let totalFechouOk = 0;
+    let totalNaoFechou = 0;
+
+    inicioDiaHist.forEach((r) => {
+      totalRegistros++;
+      if (r.fechou_antes_10h) totalFechouOk++;
+      else totalNaoFechou++;
+      const mins = toMinutes(r.hora_inicio);
+      const sup = (r.supervisor || "").trim();
+      if (mins !== null && sup && sup !== "—") {
+        const cur = bySup.get(sup) || { soma: 0, n: 0 };
+        cur.soma += mins;
+        cur.n += 1;
+        bySup.set(sup, cur);
+      }
+    });
+
+    const mediaPorSupervisor = Array.from(bySup.entries())
+      .map(([nome, v]) => ({ nome, mediaMin: v.soma / v.n, mediaHHMM: toHHMM(v.soma / v.n), qtd: v.n }))
+      .sort((a, b) => a.mediaMin - b.mediaMin)
+      .slice(0, 12);
+
+    return { mediaPorSupervisor, totalRegistros, totalFechouOk, totalNaoFechou };
+  }, [inicioDiaHist]);
+
   const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ef4444", "#a855f7", "#14b8a6", "#f43f5e"];
 
   // Handle Form changes
-  const handleFormChange = (tt: string, field: "causa" | "observacao", value: string) => {
+  const handleFormChange = (tt: string, field: "causa" | "observacao" | "hora_inicio", value: string) => {
     setFormsState(prev => ({
       ...prev,
       [tt]: {
         causa: prev[tt]?.causa || "",
         observacao: prev[tt]?.observacao || "",
+        hora_inicio: prev[tt]?.hora_inicio || "",
         [field]: value
       }
     }));
@@ -417,6 +485,7 @@ const JustificativaDezHoras = () => {
     const form = formsState[item.tt];
     const causa = form?.causa || "";
     const observacao = form?.observacao || "";
+    const horaInicio = (form?.hora_inicio || item.inicio?.hora_inicio || "").trim();
 
     if (!causa) {
       toast.warning("Selecione uma causa para a justificativa.");
@@ -444,11 +513,52 @@ const JustificativaDezHoras = () => {
 
       if (error) throw error;
 
+      // Salva também a hora de início do dia (upsert na base diária)
+      await upsertInicioDia(item, horaInicio);
+
       toast.success(`Justificativa de ${item.nome} salva e bloqueada com sucesso!`);
       loadData();
     } catch (err: any) {
       console.error("Erro ao salvar justificativa:", err);
       toast.error("Erro ao salvar a justificativa: " + err.message);
+    }
+  };
+
+  // Upsert helper: grava na tabela tecnicos_inicio_dia
+  const upsertInicioDia = async (item: typeof analysisList[0], horaInicio: string) => {
+    const payload: any = {
+      matricula_tt: item.tt,
+      nome_tecnico: item.nome,
+      supervisor: item.supervisor,
+      coordenador: item.coordenador,
+      setor: item.setor,
+      data_atividade: date,
+      hora_inicio: horaInicio || null,
+      fechou_antes_10h: item.closedBefore10,
+      created_by: profile?.nome || "Supervisor",
+      created_by_user: profile?.user_id || null,
+    };
+    const { error } = await supabase
+      .from("tecnicos_inicio_dia" as any)
+      .upsert(payload, { onConflict: "matricula_tt,data_atividade" });
+    if (error) throw error;
+  };
+
+  // Salva somente a hora de início do dia (para quem já fechou antes das 10h)
+  const handleSaveInicio = async (item: typeof analysisList[0]) => {
+    const form = formsState[item.tt];
+    const horaInicio = (form?.hora_inicio || item.inicio?.hora_inicio || "").trim();
+    if (!horaInicio) {
+      toast.warning("Informe a hora de início do dia.");
+      return;
+    }
+    try {
+      await upsertInicioDia(item, horaInicio);
+      toast.success(`Início do dia registrado para ${item.nome}.`);
+      loadData();
+    } catch (err: any) {
+      console.error("Erro ao salvar início do dia:", err);
+      toast.error("Erro ao salvar início do dia: " + err.message);
     }
   };
 
@@ -731,6 +841,7 @@ const JustificativaDezHoras = () => {
                   <TableHead className="text-xs font-semibold text-slate-600 py-3">Supervisor</TableHead>
                   <TableHead className="text-xs font-semibold text-slate-600 py-3">Coord.</TableHead>
                   <TableHead className="text-xs font-semibold text-slate-600 py-3">Setor</TableHead>
+                  <TableHead className="text-xs font-semibold text-slate-600 py-3 w-28">Início Dia</TableHead>
                   <TableHead className="text-xs font-semibold text-slate-600 py-3 w-[220px]">Causa Justificativa</TableHead>
                   <TableHead className="text-xs font-semibold text-slate-600 py-3 w-72">Informações Complementares</TableHead>
                   <TableHead className="text-xs font-semibold text-slate-600 py-3 pr-6 text-right w-36">Ação</TableHead>
@@ -739,7 +850,8 @@ const JustificativaDezHoras = () => {
               <TableBody>
                 {filteredList.map((item) => {
                   const isJustified = !!item.justification;
-                  const currentForm = formsState[item.tt] || { causa: "", observacao: "" };
+                  const currentForm = formsState[item.tt] || { causa: "", observacao: "", hora_inicio: "" };
+                  const horaInicioValue = currentForm.hora_inicio || (item.inicio?.hora_inicio ? item.inicio.hora_inicio.slice(0, 5) : "");
 
                   return (
                     <TableRow key={item.tt} className="border-b border-slate-100 hover:bg-slate-50/20">
@@ -748,10 +860,26 @@ const JustificativaDezHoras = () => {
                       <TableCell className="text-xs text-slate-500 py-3">{item.supervisor}</TableCell>
                       <TableCell className="text-xs text-slate-500 py-3">{item.coordenador}</TableCell>
                       <TableCell className="text-xs text-slate-500 py-3">{item.setor}</TableCell>
+
+                      {/* INÍCIO DO DIA — hora */}
+                      <TableCell className="text-xs py-3">
+                        <Input
+                          type="time"
+                          step={60}
+                          className="bg-slate-50 border-slate-200 h-8 text-[11px] w-24 font-mono"
+                          value={horaInicioValue}
+                          onChange={(e) => handleFormChange(item.tt, "hora_inicio", e.target.value)}
+                        />
+                      </TableCell>
                       
                       {/* CAUSE SELECT / READ-ONLY */}
                       <TableCell className="text-xs py-3">
-                        {isJustified ? (
+                        {item.closedBefore10 ? (
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2 py-0.5 gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Encerramento OK
+                          </Badge>
+                        ) : isJustified ? (
                           <Badge className="bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-semibold rounded-full px-2 py-0.5">
                             {item.justification!.causa}
                           </Badge>
@@ -774,7 +902,9 @@ const JustificativaDezHoras = () => {
 
                       {/* COMPLEMENTARY INFORMATION */}
                       <TableCell className="text-xs py-3">
-                        {isJustified ? (
+                        {item.closedBefore10 ? (
+                          <span className="text-[11px] text-slate-400 italic">Não exige justificativa</span>
+                        ) : isJustified ? (
                           <p className="text-[11px] text-slate-600 line-clamp-2 pr-4">{item.justification!.observacao || "Sem observações."}</p>
                         ) : (
                           <Input
@@ -789,7 +919,18 @@ const JustificativaDezHoras = () => {
 
                       {/* LOCK STATUS & ACTIONS */}
                       <TableCell className="text-xs py-3 pr-6 text-right">
-                        {isJustified ? (
+                        {item.closedBefore10 ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-[11px] text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                            onClick={() => handleSaveInicio(item)}
+                            title="Salvar hora de início do dia"
+                          >
+                            <Save className="w-3.5 h-3.5 mr-1" />
+                            Salvar Hora
+                          </Button>
+                        ) : isJustified ? (
                           <div className="flex items-center justify-end gap-2">
                             <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2.5 py-0.5 gap-1.5">
                               <Lock className="w-3 h-3 text-emerald-600" />
@@ -945,6 +1086,49 @@ const JustificativaDezHoras = () => {
                       <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
                     </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Início do Dia — média por supervisor */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl lg:col-span-2">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-xs font-bold text-slate-800">Início do Dia — Média por Supervisor</CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Base diária acumulada: <strong>{dinamicaInicio.totalRegistros}</strong> registros — Encerramento OK: <strong className="text-emerald-600">{dinamicaInicio.totalFechouOk}</strong> · Sem encerramento: <strong className="text-amber-600">{dinamicaInicio.totalNaoFechou}</strong>
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamicaInicio.mediaPorSupervisor.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Ainda sem horas de início registradas na base.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={340}>
+                    <BarChart data={dinamicaInicio.mediaPorSupervisor} layout="vertical" margin={{ left: 8, right: 40, top: 4, bottom: 4 }}>
+                      <CartesianGrid horizontal={false} stroke="#e2e8f0" />
+                      <XAxis
+                        type="number"
+                        domain={[360, 720]}
+                        tick={{ fontSize: 10, fill: "#64748b" }}
+                        tickFormatter={(v: number) => {
+                          const h = Math.floor(v / 60).toString().padStart(2, "0");
+                          const m = (v % 60).toString().padStart(2, "0");
+                          return `${h}:${m}`;
+                        }}
+                      />
+                      <YAxis type="category" dataKey="nome" tick={{ fontSize: 10, fill: "#475569" }} width={160} />
+                      <Tooltip
+                        contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                        formatter={(_v: any, _n: any, p: any) => [`${p.payload.mediaHHMM} (${p.payload.qtd} registros)`, "Média de início"]}
+                      />
+                      <Bar dataKey="mediaMin" fill="#10b981" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="mediaHHMM" position="right" style={{ fontSize: 10, fill: "#0f172a", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 )}
               </CardContent>
