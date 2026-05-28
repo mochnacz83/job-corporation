@@ -424,6 +424,47 @@ const JustificativaDezHoras = () => {
     return { topTecnicos, topSupervisores, causas, porDia, total: historico.length };
   }, [historico]);
 
+  // Dinâmica adicional — base de Início do Dia
+  const dinamicaInicio = useMemo(() => {
+    const toMinutes = (h: string | null) => {
+      if (!h) return null;
+      const m = h.match(/(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const toHHMM = (mins: number) => {
+      const h = Math.floor(mins / 60).toString().padStart(2, "0");
+      const mm = Math.round(mins % 60).toString().padStart(2, "0");
+      return `${h}:${mm}`;
+    };
+
+    const bySup = new Map<string, { soma: number; n: number }>();
+    let totalRegistros = 0;
+    let totalFechouOk = 0;
+    let totalNaoFechou = 0;
+
+    inicioDiaHist.forEach((r) => {
+      totalRegistros++;
+      if (r.fechou_antes_10h) totalFechouOk++;
+      else totalNaoFechou++;
+      const mins = toMinutes(r.hora_inicio);
+      const sup = (r.supervisor || "").trim();
+      if (mins !== null && sup && sup !== "—") {
+        const cur = bySup.get(sup) || { soma: 0, n: 0 };
+        cur.soma += mins;
+        cur.n += 1;
+        bySup.set(sup, cur);
+      }
+    });
+
+    const mediaPorSupervisor = Array.from(bySup.entries())
+      .map(([nome, v]) => ({ nome, mediaMin: v.soma / v.n, mediaHHMM: toHHMM(v.soma / v.n), qtd: v.n }))
+      .sort((a, b) => a.mediaMin - b.mediaMin)
+      .slice(0, 12);
+
+    return { mediaPorSupervisor, totalRegistros, totalFechouOk, totalNaoFechou };
+  }, [inicioDiaHist]);
+
   const PIE_COLORS = ["#0ea5e9", "#f59e0b", "#10b981", "#6366f1", "#ef4444", "#a855f7", "#14b8a6", "#f43f5e"];
 
   // Handle Form changes
