@@ -1090,6 +1090,49 @@ const JustificativaDezHoras = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* Início do Dia — média por supervisor */}
+            <Card className="border-slate-100 shadow-sm bg-white rounded-xl lg:col-span-2">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <CardTitle className="text-xs font-bold text-slate-800">Início do Dia — Média por Supervisor</CardTitle>
+                    <CardDescription className="text-[11px]">
+                      Base diária acumulada: <strong>{dinamicaInicio.totalRegistros}</strong> registros — Encerramento OK: <strong className="text-emerald-600">{dinamicaInicio.totalFechouOk}</strong> · Sem encerramento: <strong className="text-amber-600">{dinamicaInicio.totalNaoFechou}</strong>
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                {dinamicaInicio.mediaPorSupervisor.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 text-center py-8">Ainda sem horas de início registradas na base.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={340}>
+                    <BarChart data={dinamicaInicio.mediaPorSupervisor} layout="vertical" margin={{ left: 8, right: 40, top: 4, bottom: 4 }}>
+                      <CartesianGrid horizontal={false} stroke="#e2e8f0" />
+                      <XAxis
+                        type="number"
+                        domain={[360, 720]}
+                        tick={{ fontSize: 10, fill: "#64748b" }}
+                        tickFormatter={(v: number) => {
+                          const h = Math.floor(v / 60).toString().padStart(2, "0");
+                          const m = (v % 60).toString().padStart(2, "0");
+                          return `${h}:${m}`;
+                        }}
+                      />
+                      <YAxis type="category" dataKey="nome" tick={{ fontSize: 10, fill: "#475569" }} width={160} />
+                      <Tooltip
+                        contentStyle={{ fontSize: 11, borderRadius: 8 }}
+                        formatter={(_v: any, _n: any, p: any) => [`${p.payload.mediaHHMM} (${p.payload.qtd} registros)`, "Média de início"]}
+                      />
+                      <Bar dataKey="mediaMin" fill="#10b981" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="mediaHHMM" position="right" style={{ fontSize: 10, fill: "#0f172a", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
