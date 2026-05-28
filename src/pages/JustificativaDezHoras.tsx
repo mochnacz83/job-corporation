@@ -264,6 +264,7 @@ const JustificativaDezHoras = () => {
       const nameKey = normTecnico(p.funcionario);
       const closedBefore10 = hasClosedBefore10(nameKey);
       const justification = justificativas.find(j => j.matricula_tt.trim().toUpperCase() === tt);
+      const inicio = inicioDia.find(i => i.matricula_tt.trim().toUpperCase() === tt);
 
       return {
         tt,
@@ -272,10 +273,11 @@ const JustificativaDezHoras = () => {
         coordenador: p.coordenador || "—",
         setor: p.setor_atual || p.setor_origem || "—",
         closedBefore10,
-        justification
+        justification,
+        inicio
       };
     });
-  }, [presenca, namesClosedBefore10, justificativas]);
+  }, [presenca, namesClosedBefore10, justificativas, inicioDia]);
 
   // Filter options for Dropdowns
   const supervisorsList = useMemo(() => {
