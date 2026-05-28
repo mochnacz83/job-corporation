@@ -444,6 +444,7 @@ const JustificativaDezHoras = () => {
     const form = formsState[item.tt];
     const causa = form?.causa || "";
     const observacao = form?.observacao || "";
+    const horaInicio = (form?.hora_inicio || item.inicio?.hora_inicio || "").trim();
 
     if (!causa) {
       toast.warning("Selecione uma causa para a justificativa.");
@@ -471,11 +472,52 @@ const JustificativaDezHoras = () => {
 
       if (error) throw error;
 
+      // Salva também a hora de início do dia (upsert na base diária)
+      await upsertInicioDia(item, horaInicio);
+
       toast.success(`Justificativa de ${item.nome} salva e bloqueada com sucesso!`);
       loadData();
     } catch (err: any) {
       console.error("Erro ao salvar justificativa:", err);
       toast.error("Erro ao salvar a justificativa: " + err.message);
+    }
+  };
+
+  // Upsert helper: grava na tabela tecnicos_inicio_dia
+  const upsertInicioDia = async (item: typeof analysisList[0], horaInicio: string) => {
+    const payload: any = {
+      matricula_tt: item.tt,
+      nome_tecnico: item.nome,
+      supervisor: item.supervisor,
+      coordenador: item.coordenador,
+      setor: item.setor,
+      data_atividade: date,
+      hora_inicio: horaInicio || null,
+      fechou_antes_10h: item.closedBefore10,
+      created_by: profile?.nome || "Supervisor",
+      created_by_user: profile?.user_id || null,
+    };
+    const { error } = await supabase
+      .from("tecnicos_inicio_dia" as any)
+      .upsert(payload, { onConflict: "matricula_tt,data_atividade" });
+    if (error) throw error;
+  };
+
+  // Salva somente a hora de início do dia (para quem já fechou antes das 10h)
+  const handleSaveInicio = async (item: typeof analysisList[0]) => {
+    const form = formsState[item.tt];
+    const horaInicio = (form?.hora_inicio || item.inicio?.hora_inicio || "").trim();
+    if (!horaInicio) {
+      toast.warning("Informe a hora de início do dia.");
+      return;
+    }
+    try {
+      await upsertInicioDia(item, horaInicio);
+      toast.success(`Início do dia registrado para ${item.nome}.`);
+      loadData();
+    } catch (err: any) {
+      console.error("Erro ao salvar início do dia:", err);
+      toast.error("Erro ao salvar início do dia: " + err.message);
     }
   };
 
