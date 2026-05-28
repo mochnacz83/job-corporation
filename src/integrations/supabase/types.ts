@@ -1119,6 +1119,57 @@ export type Database = {
         }
         Relationships: []
       }
+      tecnicos_inicio_dia: {
+        Row: {
+          coordenador: string | null
+          created_at: string
+          created_by: string | null
+          created_by_user: string | null
+          data_atividade: string
+          fechou_antes_10h: boolean
+          hora_inicio: string | null
+          id: string
+          matricula_tt: string
+          nome_tecnico: string
+          observacao: string | null
+          setor: string | null
+          supervisor: string | null
+          updated_at: string
+        }
+        Insert: {
+          coordenador?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_user?: string | null
+          data_atividade: string
+          fechou_antes_10h?: boolean
+          hora_inicio?: string | null
+          id?: string
+          matricula_tt: string
+          nome_tecnico: string
+          observacao?: string | null
+          setor?: string | null
+          supervisor?: string | null
+          updated_at?: string
+        }
+        Update: {
+          coordenador?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_user?: string | null
+          data_atividade?: string
+          fechou_antes_10h?: boolean
+          hora_inicio?: string | null
+          id?: string
+          matricula_tt?: string
+          nome_tecnico?: string
+          observacao?: string | null
+          setor?: string | null
+          supervisor?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tecnicos_presenca: {
         Row: {
           coordenador: string | null
