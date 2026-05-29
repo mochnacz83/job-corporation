@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
 
 /* ============================================================
    Interfaces (alinhadas com os layouts reais das planilhas)
@@ -133,6 +134,32 @@ const readSheetAsJson = (workbook: XLSX.WorkBook, preferredSheets: string[] = []
   return [];
 };
 
+// Leitor que força um cabeçalho específico (linha 1-indexada). Usado p/ planilhas
+// do Gestech/Cruzamento que vêm do sistema com 2 linhas de título antes do header.
+const readSheetForcedHeader = (
+  workbook: XLSX.WorkBook,
+  headerRow: number,
+  preferredSheets: string[] = [],
+  strictPreferred = false,
+) => {
+  const tryNames = strictPreferred
+    ? preferredSheets.filter((n) => workbook.Sheets[n])
+    : [...preferredSheets, ...workbook.SheetNames];
+  for (const name of tryNames) {
+    if (!workbook.Sheets[name]) continue;
+    const ws = workbook.Sheets[name];
+    try {
+      const j = XLSX.utils.sheet_to_json<any>(ws, {
+        defval: "",
+        raw: false,
+        range: headerRow - 1, // sheet_to_json range numérico = índice 0 da linha do header
+      });
+      if (j.length > 0) return j;
+    } catch { /* tenta o próximo */ }
+  }
+  return [];
+};
+
 /* ============================================================
    Componente
    ============================================================ */
@@ -165,21 +192,29 @@ const RastreabilidadeOnt = () => {
   const [activeTab, setActiveTab] = useState("consultas");
 
   useEffect(() => {
-    const j = (k: string) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } };
-    setPresenca(j(KEY_PRESENCA) || []);
-    setSaldoGestech(j(KEY_GESTECH) || []);
-    setSaldoSap(j(KEY_SAP) || []);
-    setCruzamento(j(KEY_CRUZAMENTO) || []);
-    setAplicados(j(KEY_APLICADOS) || []);
-    setUploadTimestamps(j("ont_rastreabilidade_timestamps") || {});
+    (async () => {
+      // Carrega do IndexedDB (com fallback para localStorage legado)
+      const legacy = (k: string) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } };
+      const load = async (k: string) => (await ontGet<any>(k)) ?? legacy(k);
+      setPresenca((await load(KEY_PRESENCA)) || []);
+      setSaldoGestech((await load(KEY_GESTECH)) || []);
+      setSaldoSap((await load(KEY_SAP)) || []);
+      setCruzamento((await load(KEY_CRUZAMENTO)) || []);
+      setAplicados((await load(KEY_APLICADOS)) || []);
+      setUploadTimestamps((await load("ont_rastreabilidade_timestamps")) || {});
+    })();
   }, []);
 
-  const saveBase = (key: string, data: any, type: string) => {
-    localStorage.setItem(key, JSON.stringify(data));
-    const now = new Date().toLocaleString("pt-BR");
-    const updated = { ...uploadTimestamps, [type]: now };
-    setUploadTimestamps(updated);
-    localStorage.setItem("ont_rastreabilidade_timestamps", JSON.stringify(updated));
+  const saveBase = async (key: string, data: any, type: string) => {
+    try {
+      await ontSet(key, data);
+      const now = new Date().toLocaleString("pt-BR");
+      const updated = { ...uploadTimestamps, [type]: now };
+      setUploadTimestamps(updated);
+      await ontSet("ont_rastreabilidade_timestamps", updated);
+    } catch (err: any) {
+      toast.error("Erro ao gravar base local: " + (err?.message || "desconhecido"));
+    }
   };
 
   const handleClearBase = (type: string) => {
@@ -192,7 +227,7 @@ const RastreabilidadeOnt = () => {
       aplicados: [setAplicados, KEY_APLICADOS],
     };
     const [setter, key] = map[type] || [];
-    if (setter) { setter([]); localStorage.removeItem(key); }
+    if (setter) { setter([]); ontDel(key); }
     toast.success(`Base ${type.toUpperCase()} redefinida.`);
   };
 
@@ -257,7 +292,13 @@ const RastreabilidadeOnt = () => {
         const workbook = XLSX.read(data, { type: "array", cellDates: true });
 
         if (type === "presenca") {
-          const j = readSheetAsJson(workbook, ["Técnicos", "Tecnicos", "Presença", "Presenca"]);
+          // Conforme orientação: usar EXCLUSIVAMENTE a aba "Técnicos" da planilha Presença.
+          const hasTec = workbook.SheetNames.find((n) => upper(n) === "TÉCNICOS" || upper(n) === "TECNICOS");
+          if (!hasTec) {
+            toast.error("Aba 'Técnicos' não encontrada na planilha. Verifique se está enviando a Presença.xlsx correta.");
+            return;
+          }
+          const j = XLSX.utils.sheet_to_json<any>(workbook.Sheets[hasTec], { defval: "", raw: false });
           const parsed: DimPresenca[] = j.map((r: any) => ({
             tr: upper(pick(r, ["TR"])),
             tt: upper(pick(r, ["TT"])),
@@ -273,12 +314,13 @@ const RastreabilidadeOnt = () => {
             uf: norm(pick(r, ["UF"])),
           })).filter((p) => p.tt || p.tr);
           setPresenca(parsed); saveBase(KEY_PRESENCA, parsed, "presenca");
-          toast.success(`${parsed.length} colaboradores importados (Presença).`);
+          toast.success(`${parsed.length} colaboradores importados (aba Técnicos).`);
           return;
         }
 
         if (type === "gestech") {
-          const j = readSheetAsJson(workbook);
+          // Planilha vinda do sistema possui 2 linhas de título — header está na linha 3.
+          const j = readSheetForcedHeader(workbook, 3);
           // Mapeia linhas, filtra ONT/ROTEADOR
           const rows = j.map((r: any) => ({
             tt: upper(pick(r, ["codarmazem", "matricula", "matricula_tt", "Matrícula"])),
@@ -329,7 +371,8 @@ const RastreabilidadeOnt = () => {
         }
 
         if (type === "cruzamento") {
-          const j = readSheetAsJson(workbook);
+          // Planilha do sistema: 2 linhas de título; cabeçalho na linha 3.
+          const j = readSheetForcedHeader(workbook, 3);
           const parsed: CruzamentoSapGestech[] = j.map((r: any) => ({
             serial: upper(pick(r, ["serial", "Serial"])),
             codmat: norm(pick(r, ["codmat", "codigo_material", "Código"])),
@@ -585,6 +628,83 @@ const RastreabilidadeOnt = () => {
     toast.success("Excel gerado.");
   };
 
+  // Exporta a carga de UM técnico (materiais + seriais detalhados)
+  const handleExportTechnician = (tech: any) => {
+    if (!tech) return;
+    const wb = XLSX.utils.book_new();
+    const head = [{
+      "Matrícula TT": tech.matricula,
+      "TR": tech.tr,
+      "Nome": tech.nome,
+      "Supervisor": tech.supervisor,
+      "Coordenador": tech.coordenador,
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(head), "Resumo");
+
+    const mats = (tech.materials || []).map((m: any) => ({
+      "Matrícula TT": tech.matricula,
+      "Técnico": tech.nome,
+      "Código": m.codigo,
+      "Material": m.nome,
+      "Quantidade": m.quantidade,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mats), "Materiais");
+
+    const serials = (tech.serials || []).map((s: any) => ({
+      "Matrícula TT": tech.matricula,
+      "Técnico": tech.nome,
+      "Supervisor": tech.supervisor,
+      "Coordenador": tech.coordenador,
+      "Serial": s.serial,
+      "Código": s.codigo,
+      "Equipamento": s.modelo,
+      "Status": s.status,
+      "Operação": s.crossStatus,
+      "Depósito": s.deposito,
+      "Observações": s.obs,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serials), "Seriais");
+
+    const safe = (tech.nome || tech.matricula || "tecnico").toString().replace(/[^a-z0-9]+/gi, "_").slice(0, 40);
+    XLSX.writeFile(wb, `carga_${safe}_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("Carga do técnico exportada.");
+  };
+
+  // Exporta a carga de TODA uma equipe (supervisor/coordenador) com seriais consolidados
+  const handleExportSupervisor = () => {
+    if (!searchResults || searchResults.type !== "supervisor") return;
+    const techs: any[] = searchResults.technicians || [];
+    if (techs.length === 0) return;
+    const allMats: any[] = [];
+    const allSerials: any[] = [];
+    techs.forEach((t) => {
+      const full = runTechnicianResult(t.matricula);
+      if (!full || full.type !== "technician") return;
+      (full.materials || []).forEach((m: any) => allMats.push({
+        "Matrícula TT": full.matricula, "TR": full.tr, "Técnico": full.nome,
+        "Supervisor": full.supervisor, "Coordenador": full.coordenador,
+        "Código": m.codigo, "Material": m.nome, "Quantidade": m.quantidade,
+      }));
+      (full.serials || []).forEach((s: any) => allSerials.push({
+        "Matrícula TT": full.matricula, "TR": full.tr, "Técnico": full.nome,
+        "Supervisor": full.supervisor, "Coordenador": full.coordenador,
+        "Serial": s.serial, "Código": s.codigo, "Equipamento": s.modelo,
+        "Status": s.status, "Operação": s.crossStatus, "Depósito": s.deposito,
+        "Observações": s.obs,
+      }));
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(techs.map((t: any) => ({
+      "Matrícula TT": t.matricula, "TR": t.tr, "Técnico": t.nome,
+      "Supervisor": t.supervisor, "Coordenador": t.coordenador, "Itens (qtd)": t.materialsCount,
+    }))), "Equipe");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allMats), "Materiais");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allSerials), "Seriais");
+    const safe = (searchResults.supervisorName || "equipe").toString().replace(/[^a-z0-9]+/gi, "_").slice(0, 40);
+    XLSX.writeFile(wb, `carga_equipe_${safe}_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("Carga da equipe exportada.");
+  };
+
   /* ============================================================
      UI
      ============================================================ */
@@ -735,6 +855,11 @@ const RastreabilidadeOnt = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
+                    <div className="flex justify-end mb-4">
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={handleExportSupervisor}>
+                        <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga da Equipe (.xlsx)
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {searchResults.technicians.map((tech: any) => (
                         <div key={tech.matricula} className="p-4 rounded-xl border border-slate-100 hover:border-sky-200 bg-slate-50/50 hover:bg-white transition-all shadow-sm group cursor-pointer" onClick={() => handleSelectTechnician(tech.matricula)}>
@@ -812,8 +937,15 @@ const RastreabilidadeOnt = () => {
 
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
-                      <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
+                          <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                        </div>
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
+                          <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       {searchResults.serials.length === 0 ? (

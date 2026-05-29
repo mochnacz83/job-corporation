@@ -81,6 +81,12 @@ const CAUSAS_PERMITIDAS = [
   "Carro Quebrado",
   "Consulta Medica",
   "Exame Medico",
+  "Logistica",
+  "Terceiros",
+  "Tecnico Novato",
+  "Reagendamento",
+  "Duplado",
+  "Apoio Outra Região",
 ];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -863,13 +869,19 @@ const JustificativaDezHoras = () => {
 
                       {/* INÍCIO DO DIA — hora */}
                       <TableCell className="text-xs py-3">
-                        <Input
-                          type="time"
-                          step={60}
-                          className="bg-slate-50 border-slate-200 h-8 text-[11px] w-24 font-mono"
-                          value={horaInicioValue}
-                          onChange={(e) => handleFormChange(item.tt, "hora_inicio", e.target.value)}
-                        />
+                        {item.closedBefore10 ? (
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2 py-0.5 gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> OK
+                          </Badge>
+                        ) : (
+                          <Input
+                            type="time"
+                            step={60}
+                            className="bg-slate-50 border-slate-200 h-8 text-[11px] w-24 font-mono"
+                            value={horaInicioValue}
+                            onChange={(e) => handleFormChange(item.tt, "hora_inicio", e.target.value)}
+                          />
+                        )}
                       </TableCell>
                       
                       {/* CAUSE SELECT / READ-ONLY */}
@@ -903,7 +915,9 @@ const JustificativaDezHoras = () => {
                       {/* COMPLEMENTARY INFORMATION */}
                       <TableCell className="text-xs py-3">
                         {item.closedBefore10 ? (
-                          <span className="text-[11px] text-slate-400 italic">Não exige justificativa</span>
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2 py-0.5 gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> OK
+                          </Badge>
                         ) : isJustified ? (
                           <p className="text-[11px] text-slate-600 line-clamp-2 pr-4">{item.justification!.observacao || "Sem observações."}</p>
                         ) : (
@@ -920,16 +934,9 @@ const JustificativaDezHoras = () => {
                       {/* LOCK STATUS & ACTIONS */}
                       <TableCell className="text-xs py-3 pr-6 text-right">
                         {item.closedBefore10 ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 text-[11px] text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                            onClick={() => handleSaveInicio(item)}
-                            title="Salvar hora de início do dia"
-                          >
-                            <Save className="w-3.5 h-3.5 mr-1" />
-                            Salvar Hora
-                          </Button>
+                          <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2.5 py-0.5 gap-1.5">
+                            <CheckCircle2 className="w-3 h-3" /> ENCERRAMENTO OK
+                          </Badge>
                         ) : isJustified ? (
                           <div className="flex items-center justify-end gap-2">
                             <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold rounded-full px-2.5 py-0.5 gap-1.5">
