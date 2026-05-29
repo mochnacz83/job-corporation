@@ -855,6 +855,11 @@ const RastreabilidadeOnt = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
+                    <div className="flex justify-end mb-4">
+                      <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={handleExportSupervisor}>
+                        <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga da Equipe (.xlsx)
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {searchResults.technicians.map((tech: any) => (
                         <div key={tech.matricula} className="p-4 rounded-xl border border-slate-100 hover:border-sky-200 bg-slate-50/50 hover:bg-white transition-all shadow-sm group cursor-pointer" onClick={() => handleSelectTechnician(tech.matricula)}>
@@ -932,8 +937,15 @@ const RastreabilidadeOnt = () => {
 
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
-                      <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
+                          <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                        </div>
+                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
+                          <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       {searchResults.serials.length === 0 ? (
