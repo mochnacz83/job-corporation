@@ -81,6 +81,12 @@ const CAUSAS_PERMITIDAS = [
   "Carro Quebrado",
   "Consulta Medica",
   "Exame Medico",
+  "Logistica",
+  "Terceiros",
+  "Tecnico Novato",
+  "Reagendamento",
+  "Duplado",
+  "Apoio Outra Região",
 ];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
