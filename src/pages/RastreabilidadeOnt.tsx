@@ -628,6 +628,83 @@ const RastreabilidadeOnt = () => {
     toast.success("Excel gerado.");
   };
 
+  // Exporta a carga de UM técnico (materiais + seriais detalhados)
+  const handleExportTechnician = (tech: any) => {
+    if (!tech) return;
+    const wb = XLSX.utils.book_new();
+    const head = [{
+      "Matrícula TT": tech.matricula,
+      "TR": tech.tr,
+      "Nome": tech.nome,
+      "Supervisor": tech.supervisor,
+      "Coordenador": tech.coordenador,
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(head), "Resumo");
+
+    const mats = (tech.materials || []).map((m: any) => ({
+      "Matrícula TT": tech.matricula,
+      "Técnico": tech.nome,
+      "Código": m.codigo,
+      "Material": m.nome,
+      "Quantidade": m.quantidade,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mats), "Materiais");
+
+    const serials = (tech.serials || []).map((s: any) => ({
+      "Matrícula TT": tech.matricula,
+      "Técnico": tech.nome,
+      "Supervisor": tech.supervisor,
+      "Coordenador": tech.coordenador,
+      "Serial": s.serial,
+      "Código": s.codigo,
+      "Equipamento": s.modelo,
+      "Status": s.status,
+      "Operação": s.crossStatus,
+      "Depósito": s.deposito,
+      "Observações": s.obs,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(serials), "Seriais");
+
+    const safe = (tech.nome || tech.matricula || "tecnico").toString().replace(/[^a-z0-9]+/gi, "_").slice(0, 40);
+    XLSX.writeFile(wb, `carga_${safe}_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("Carga do técnico exportada.");
+  };
+
+  // Exporta a carga de TODA uma equipe (supervisor/coordenador) com seriais consolidados
+  const handleExportSupervisor = () => {
+    if (!searchResults || searchResults.type !== "supervisor") return;
+    const techs: any[] = searchResults.technicians || [];
+    if (techs.length === 0) return;
+    const allMats: any[] = [];
+    const allSerials: any[] = [];
+    techs.forEach((t) => {
+      const full = runTechnicianResult(t.matricula);
+      if (!full || full.type !== "technician") return;
+      (full.materials || []).forEach((m: any) => allMats.push({
+        "Matrícula TT": full.matricula, "TR": full.tr, "Técnico": full.nome,
+        "Supervisor": full.supervisor, "Coordenador": full.coordenador,
+        "Código": m.codigo, "Material": m.nome, "Quantidade": m.quantidade,
+      }));
+      (full.serials || []).forEach((s: any) => allSerials.push({
+        "Matrícula TT": full.matricula, "TR": full.tr, "Técnico": full.nome,
+        "Supervisor": full.supervisor, "Coordenador": full.coordenador,
+        "Serial": s.serial, "Código": s.codigo, "Equipamento": s.modelo,
+        "Status": s.status, "Operação": s.crossStatus, "Depósito": s.deposito,
+        "Observações": s.obs,
+      }));
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(techs.map((t: any) => ({
+      "Matrícula TT": t.matricula, "TR": t.tr, "Técnico": t.nome,
+      "Supervisor": t.supervisor, "Coordenador": t.coordenador, "Itens (qtd)": t.materialsCount,
+    }))), "Equipe");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allMats), "Materiais");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allSerials), "Seriais");
+    const safe = (searchResults.supervisorName || "equipe").toString().replace(/[^a-z0-9]+/gi, "_").slice(0, 40);
+    XLSX.writeFile(wb, `carga_equipe_${safe}_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success("Carga da equipe exportada.");
+  };
+
   /* ============================================================
      UI
      ============================================================ */
