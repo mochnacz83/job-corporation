@@ -1141,11 +1141,31 @@ const RastreabilidadeOnt = () => {
                         <TableBody>
                           {massResults.map((r, i) => (
                             <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                              <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">{r.serial}</TableCell>
+                              <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <span>{r.serial}</span>
+                                  <button
+                                    type="button"
+                                    title="Ver QR Code do serial"
+                                    onClick={(e) => { e.stopPropagation(); setQrSerial(String(r.serial)); }}
+                                    className="text-slate-300 hover:text-sky-600 transition-colors"
+                                  >
+                                    <QrCode className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </TableCell>
                               <TableCell className="text-xs text-slate-500 py-3">{r.equipamento}</TableCell>
                               <TableCell className="text-xs py-3">
-                                <Badge className={r.status === "aplicado" ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px]" : r.status === "tecnico" ? "bg-blue-50 text-blue-700 border-blue-200 border text-[10px]" : r.status === "cruzamento" ? "bg-amber-50 text-amber-700 border-amber-200 border text-[10px]" : "bg-rose-50 text-rose-700 border-rose-200 border text-[10px]"}>
-                                  {r.status === "aplicado" ? "Aplicado" : r.status === "tecnico" ? "Com Técnico" : r.status === "cruzamento" ? "Depósito SAP" : "Não Localizado"}
+                                <Badge className={
+                                  r.status === "aplicado" ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px]" :
+                                  r.status === "tecnico"  ? "bg-blue-50 text-blue-700 border-blue-200 border text-[10px]" :
+                                  r.status === "almox"    ? "bg-amber-50 text-amber-700 border-amber-200 border text-[10px]" :
+                                                            "bg-rose-50 text-rose-700 border-rose-200 border text-[10px]"
+                                }>
+                                  {r.status === "aplicado" ? "Aplicado" :
+                                   r.status === "tecnico"  ? "Com Técnico" :
+                                   r.status === "almox"    ? "Almox / SAP" :
+                                                             "Não Localizado"}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-[11px] text-slate-600 py-3 pr-6">{r.detalhes}</TableCell>
@@ -1177,6 +1197,24 @@ const RastreabilidadeOnt = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* QR Code do serial */}
+      <Dialog open={!!qrSerial} onOpenChange={(o) => !o && setQrSerial(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-sm">QR Code do Serial</DialogTitle>
+            <DialogDescription className="text-[11px] font-mono break-all">{qrSerial}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-2">
+            {qrSerial && (
+              <div className="p-4 bg-white rounded-lg border border-slate-200">
+                <QRCodeSVG value={qrSerial} size={200} level="M" includeMargin={false} />
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 text-center">Aponte o leitor para registrar o serial.</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
