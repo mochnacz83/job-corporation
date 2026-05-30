@@ -13,10 +13,13 @@ import {
   RefreshCw, Trash2, ArrowRight, User, Users, Network,
   CheckCircle2, AlertTriangle, AlertCircle, HelpCircle,
   Database, Eye, FileText, Layers, Check, Info, IdCard,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
+import { QRCodeSVG } from "qrcode.react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /* ============================================================
    Interfaces (alinhadas com os layouts reais das planilhas)
@@ -96,6 +99,11 @@ interface SerialAplicado {
    ============================================================ */
 const norm = (s: any) => String(s ?? "").trim();
 const upper = (s: any) => norm(s).toUpperCase();
+// Normaliza serial p/ comparação: maiúsculo, sem espaços e sem zeros à esquerda.
+const normSerial = (s: any) => {
+  const u = upper(s).replace(/\s+/g, "");
+  return u.replace(/^0+/, "") || u;
+};
 const numberOr0 = (v: any) => {
   const n = Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
@@ -275,9 +283,24 @@ const RastreabilidadeOnt = () => {
 
   const cruzBySerial = useMemo(() => {
     const m: Record<string, CruzamentoSapGestech> = {};
-    cruzamentoDedup.forEach((c) => { m[upper(c.serial)] = c; });
+    cruzamentoDedup.forEach((c) => { m[normSerial(c.serial)] = c; });
     return m;
   }, [cruzamentoDedup]);
+
+  // Índices normalizados (sem zeros à esquerda) para Aplicados e SAP — melhora o hit-rate da busca em massa.
+  const aplicadosBySerial = useMemo(() => {
+    const m: Record<string, SerialAplicado> = {};
+    aplicados.forEach((a) => { const k = normSerial(a.serial); if (k) m[k] = a; });
+    return m;
+  }, [aplicados]);
+  const sapBySerial = useMemo(() => {
+    const m: Record<string, SaldoSap> = {};
+    saldoSap.forEach((s) => { const k = normSerial(s.serial); if (k) m[k] = s; });
+    return m;
+  }, [saldoSap]);
+
+  // QR Code state — popup discreto ao clicar no botão ao lado do serial.
+  const [qrSerial, setQrSerial] = useState<string | null>(null);
 
   /* ============================================================
      Uploads
@@ -450,7 +473,11 @@ const RastreabilidadeOnt = () => {
   const runTechnicianResult = (tt: string) => {
     const dim = enrichByTT(tt);
     const techGestech = saldoGestech.filter((g) => upper(g.matricula_tt) === upper(tt));
-    if (techGestech.length === 0 && !dim) {
+    // Seriais associados via Cruzamento (última operação)
+    const seriaisTec = cruzamentoDedup.filter(
+      (c) => upper(c.codarm) === upper(tt) || upper(c.matricula) === upper(tt),
+    );
+    if (techGestech.length === 0 && seriaisTec.length === 0 && !dim) {
       return { type: "empty", message: "Nenhum técnico localizado com essa matrícula." };
     }
     const nome = dim?.funcionario || techGestech[0]?.nome_tecnico || tt;
@@ -458,15 +485,26 @@ const RastreabilidadeOnt = () => {
     const coordenador = dim?.coordenador || "—";
     const tr = dim?.tr || "—";
 
-    const materials = techGestech.map((i) => ({
+    let materials = techGestech.map((i) => ({
       codigo: i.codigo_material, nome: i.nome_material, quantidade: i.quantidade,
     }));
 
-    // Seriais associados via Cruzamento (última operação) onde codarm/matricula bate
-    const seriaisTec = cruzamentoDedup.filter((c) => upper(c.codarm) === upper(tt) || upper(c.matricula) === upper(tt));
+    // Fallback: se não houver carga consolidada do Gestech, deriva materiais agrupando os seriais do Cruzamento.
+    if (materials.length === 0 && seriaisTec.length > 0) {
+      const agg: Record<string, { codigo: string; nome: string; quantidade: number }> = {};
+      seriaisTec.forEach((c) => {
+        if (!isOntOrRoteador(c.material)) return;
+        const k = `${c.codmat}|${c.material}`;
+        if (!agg[k]) agg[k] = { codigo: c.codmat, nome: c.material, quantidade: 0 };
+        agg[k].quantidade += 1;
+      });
+      materials = Object.values(agg);
+    }
+
     const serials = seriaisTec.map((c) => {
-      const aplic = aplicados.find((a) => upper(a.serial) === upper(c.serial));
-      const sap = saldoSap.find((s) => upper(s.serial) === upper(c.serial));
+      const key = normSerial(c.serial);
+      const aplic = aplicadosBySerial[key];
+      const sap = sapBySerial[key];
       return {
         serial: c.serial,
         codigo: c.codmat,
@@ -522,9 +560,10 @@ const RastreabilidadeOnt = () => {
 
     if (searchType === "serial") {
       const S = upper(q);
-      const aplic = aplicados.find((a) => upper(a.serial) === S);
-      const sap = saldoSap.find((s) => upper(s.serial) === S);
-      const cross = cruzBySerial[S];
+      const K = normSerial(q);
+      const aplic = aplicadosBySerial[K];
+      const sap = sapBySerial[K];
+      const cross = cruzBySerial[K];
       if (!aplic && !sap && !cross) {
         setSearchResults({ type: "empty", message: "Serial não localizado em nenhuma das bases ativas." });
         return;
@@ -574,12 +613,13 @@ const RastreabilidadeOnt = () => {
     const seriais = Array.from(new Set(massInput.split(/[\n,; \t]+/).map(upper).filter(Boolean)));
     let wt = 0, ap = 0, nf = 0;
     const results = seriais.map((serial) => {
-      const aplic = aplicados.find((a) => upper(a.serial) === serial);
+      const key = normSerial(serial);
+      const aplic = aplicadosBySerial[key];
       if (aplic) {
         ap++;
         return { serial, status: "aplicado", equipamento: `${aplic.nome_material} (${aplic.codigo_material})`, detalhes: `Cliente: ${aplic.cliente} | GPON: ${aplic.gpon} | Alias: ${aplic.alias}` };
       }
-      const cross = cruzBySerial[serial];
+      const cross = cruzBySerial[key];
       if (cross) {
         const dim = enrichByTT(cross.codarm) || enrichByTT(cross.matricula);
         wt++;
@@ -594,13 +634,14 @@ const RastreabilidadeOnt = () => {
           detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "—"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
         };
       }
-      const sap = saldoSap.find((s) => upper(s.serial) === serial);
+      const sap = sapBySerial[key];
       if (sap) {
+        // Sem cruzamento => está no almoxarifado / depósito SAP, sem técnico atribuído.
         wt++;
-        return { serial, status: "cruzamento", equipamento: `${sap.nome_material} (${sap.codigo_material})`, detalhes: `Depósito SAP: ${sap.deposito} | Status: ${sap.status_sap}` };
+        return { serial, status: "almox", equipamento: `${sap.nome_material} (${sap.codigo_material})`, detalhes: `Almoxarifado SAP — Depósito: ${sap.deposito} | Centro: ${sap.centro} | Status: ${sap.status_sap}` };
       }
       nf++;
-      return { serial, status: "not_found", equipamento: "—", detalhes: "Não localizado nas bases ativas" };
+      return { serial, status: "not_found", equipamento: "—", detalhes: "Não localizado em nenhuma base (Aplicados / Cruzamento / SAP)" };
     });
     setMassResults(results);
     setMassStats({ total: seriais.length, withTech: wt, applied: ap, notFound: nf });
@@ -612,7 +653,11 @@ const RastreabilidadeOnt = () => {
     if (massResults.length === 0) return;
     const dataToExport = massResults.map((r) => ({
       "Número de Série": r.serial,
-      "Status Localização": r.status === "aplicado" ? "Aplicado no Sistema" : r.status === "tecnico" ? "Com Técnico (Físico)" : r.status === "cruzamento" ? "Depósito SAP" : "Não Encontrado",
+      "Status Localização":
+        r.status === "aplicado" ? "Aplicado no Sistema" :
+        r.status === "tecnico"  ? "Com Técnico (Físico)" :
+        r.status === "almox"    ? "Almoxarifado / Depósito SAP" :
+        "Não Encontrado",
       "Equipamento / Modelo": r.equipamento,
       "Matrícula TT": r.matricula || "",
       "TR": r.tr || "",
@@ -962,7 +1007,19 @@ const RastreabilidadeOnt = () => {
                           <TableBody>
                             {searchResults.serials.map((s: any, i: number) => (
                               <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">{s.serial}</TableCell>
+                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <span>{s.serial}</span>
+                                    <button
+                                      type="button"
+                                      title="Ver QR Code do serial"
+                                      onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
+                                      className="text-slate-300 hover:text-sky-600 transition-colors"
+                                    >
+                                      <QrCode className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
                                 <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
                                 <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
@@ -1085,11 +1142,31 @@ const RastreabilidadeOnt = () => {
                         <TableBody>
                           {massResults.map((r, i) => (
                             <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                              <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">{r.serial}</TableCell>
+                              <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                                <div className="inline-flex items-center gap-1.5">
+                                  <span>{r.serial}</span>
+                                  <button
+                                    type="button"
+                                    title="Ver QR Code do serial"
+                                    onClick={(e) => { e.stopPropagation(); setQrSerial(String(r.serial)); }}
+                                    className="text-slate-300 hover:text-sky-600 transition-colors"
+                                  >
+                                    <QrCode className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </TableCell>
                               <TableCell className="text-xs text-slate-500 py-3">{r.equipamento}</TableCell>
                               <TableCell className="text-xs py-3">
-                                <Badge className={r.status === "aplicado" ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px]" : r.status === "tecnico" ? "bg-blue-50 text-blue-700 border-blue-200 border text-[10px]" : r.status === "cruzamento" ? "bg-amber-50 text-amber-700 border-amber-200 border text-[10px]" : "bg-rose-50 text-rose-700 border-rose-200 border text-[10px]"}>
-                                  {r.status === "aplicado" ? "Aplicado" : r.status === "tecnico" ? "Com Técnico" : r.status === "cruzamento" ? "Depósito SAP" : "Não Localizado"}
+                                <Badge className={
+                                  r.status === "aplicado" ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px]" :
+                                  r.status === "tecnico"  ? "bg-blue-50 text-blue-700 border-blue-200 border text-[10px]" :
+                                  r.status === "almox"    ? "bg-amber-50 text-amber-700 border-amber-200 border text-[10px]" :
+                                                            "bg-rose-50 text-rose-700 border-rose-200 border text-[10px]"
+                                }>
+                                  {r.status === "aplicado" ? "Aplicado" :
+                                   r.status === "tecnico"  ? "Com Técnico" :
+                                   r.status === "almox"    ? "Almox / SAP" :
+                                                             "Não Localizado"}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-[11px] text-slate-600 py-3 pr-6">{r.detalhes}</TableCell>
@@ -1121,6 +1198,24 @@ const RastreabilidadeOnt = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* QR Code do serial */}
+      <Dialog open={!!qrSerial} onOpenChange={(o) => !o && setQrSerial(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-sm">QR Code do Serial</DialogTitle>
+            <DialogDescription className="text-[11px] font-mono break-all">{qrSerial}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-2">
+            {qrSerial && (
+              <div className="p-4 bg-white rounded-lg border border-slate-200">
+                <QRCodeSVG value={qrSerial} size={200} level="M" includeMargin={false} />
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 text-center">Aponte o leitor para registrar o serial.</p>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
