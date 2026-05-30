@@ -17,6 +17,8 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
+import { QRCodeSVG } from "qrcode.react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 /* ============================================================
    Interfaces (alinhadas com os layouts reais das planilhas)
@@ -96,6 +98,11 @@ interface SerialAplicado {
    ============================================================ */
 const norm = (s: any) => String(s ?? "").trim();
 const upper = (s: any) => norm(s).toUpperCase();
+// Normaliza serial p/ comparação: maiúsculo, sem espaços e sem zeros à esquerda.
+const normSerial = (s: any) => {
+  const u = upper(s).replace(/\s+/g, "");
+  return u.replace(/^0+/, "") || u;
+};
 const numberOr0 = (v: any) => {
   const n = Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
