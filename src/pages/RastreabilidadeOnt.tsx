@@ -559,9 +559,10 @@ const RastreabilidadeOnt = () => {
 
     if (searchType === "serial") {
       const S = upper(q);
-      const aplic = aplicados.find((a) => upper(a.serial) === S);
-      const sap = saldoSap.find((s) => upper(s.serial) === S);
-      const cross = cruzBySerial[S];
+      const K = normSerial(q);
+      const aplic = aplicadosBySerial[K];
+      const sap = sapBySerial[K];
+      const cross = cruzBySerial[K];
       if (!aplic && !sap && !cross) {
         setSearchResults({ type: "empty", message: "Serial não localizado em nenhuma das bases ativas." });
         return;
@@ -611,12 +612,13 @@ const RastreabilidadeOnt = () => {
     const seriais = Array.from(new Set(massInput.split(/[\n,; \t]+/).map(upper).filter(Boolean)));
     let wt = 0, ap = 0, nf = 0;
     const results = seriais.map((serial) => {
-      const aplic = aplicados.find((a) => upper(a.serial) === serial);
+      const key = normSerial(serial);
+      const aplic = aplicadosBySerial[key];
       if (aplic) {
         ap++;
         return { serial, status: "aplicado", equipamento: `${aplic.nome_material} (${aplic.codigo_material})`, detalhes: `Cliente: ${aplic.cliente} | GPON: ${aplic.gpon} | Alias: ${aplic.alias}` };
       }
-      const cross = cruzBySerial[serial];
+      const cross = cruzBySerial[key];
       if (cross) {
         const dim = enrichByTT(cross.codarm) || enrichByTT(cross.matricula);
         wt++;
@@ -631,13 +633,13 @@ const RastreabilidadeOnt = () => {
           detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "—"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
         };
       }
-      const sap = saldoSap.find((s) => upper(s.serial) === serial);
+      const sap = sapBySerial[key];
       if (sap) {
-        wt++;
-        return { serial, status: "cruzamento", equipamento: `${sap.nome_material} (${sap.codigo_material})`, detalhes: `Depósito SAP: ${sap.deposito} | Status: ${sap.status_sap}` };
+        // Sem cruzamento => está no almoxarifado / depósito SAP, sem técnico atribuído.
+        return { serial, status: "almox", equipamento: `${sap.nome_material} (${sap.codigo_material})`, detalhes: `Almoxarifado SAP — Depósito: ${sap.deposito} | Centro: ${sap.centro} | Status: ${sap.status_sap}` };
       }
       nf++;
-      return { serial, status: "not_found", equipamento: "—", detalhes: "Não localizado nas bases ativas" };
+      return { serial, status: "not_found", equipamento: "—", detalhes: "Não localizado em nenhuma base (Aplicados / Cruzamento / SAP)" };
     });
     setMassResults(results);
     setMassStats({ total: seriais.length, withTech: wt, applied: ap, notFound: nf });
