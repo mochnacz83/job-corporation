@@ -13,6 +13,7 @@ import {
   RefreshCw, Trash2, ArrowRight, User, Users, Network,
   CheckCircle2, AlertTriangle, AlertCircle, HelpCircle,
   Database, Eye, FileText, Layers, Check, Info, IdCard,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
