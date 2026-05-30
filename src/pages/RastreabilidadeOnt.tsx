@@ -637,6 +637,7 @@ const RastreabilidadeOnt = () => {
       const sap = sapBySerial[key];
       if (sap) {
         // Sem cruzamento => está no almoxarifado / depósito SAP, sem técnico atribuído.
+        wt++;
         return { serial, status: "almox", equipamento: `${sap.nome_material} (${sap.codigo_material})`, detalhes: `Almoxarifado SAP — Depósito: ${sap.deposito} | Centro: ${sap.centro} | Status: ${sap.status_sap}` };
       }
       nf++;
