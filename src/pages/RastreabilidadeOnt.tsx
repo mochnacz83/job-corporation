@@ -226,6 +226,10 @@ const RastreabilidadeOnt = () => {
   };
 
   const handleClearBase = (type: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem limpar bases.");
+      return;
+    }
     if (!window.confirm(`Deseja limpar todos os dados da base ${type.toUpperCase()}?`)) return;
     const map: Record<string, [any, string]> = {
       presenca: [setPresenca, KEY_PRESENCA],
@@ -306,6 +310,11 @@ const RastreabilidadeOnt = () => {
      Uploads
      ============================================================ */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem carregar/sobrepor bases.");
+      e.target.value = "";
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
