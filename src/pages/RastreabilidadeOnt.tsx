@@ -472,7 +472,11 @@ const RastreabilidadeOnt = () => {
   const runTechnicianResult = (tt: string) => {
     const dim = enrichByTT(tt);
     const techGestech = saldoGestech.filter((g) => upper(g.matricula_tt) === upper(tt));
-    if (techGestech.length === 0 && !dim) {
+    // Seriais associados via Cruzamento (última operação)
+    const seriaisTec = cruzamentoDedup.filter(
+      (c) => upper(c.codarm) === upper(tt) || upper(c.matricula) === upper(tt),
+    );
+    if (techGestech.length === 0 && seriaisTec.length === 0 && !dim) {
       return { type: "empty", message: "Nenhum técnico localizado com essa matrícula." };
     }
     const nome = dim?.funcionario || techGestech[0]?.nome_tecnico || tt;
@@ -480,15 +484,26 @@ const RastreabilidadeOnt = () => {
     const coordenador = dim?.coordenador || "—";
     const tr = dim?.tr || "—";
 
-    const materials = techGestech.map((i) => ({
+    let materials = techGestech.map((i) => ({
       codigo: i.codigo_material, nome: i.nome_material, quantidade: i.quantidade,
     }));
 
-    // Seriais associados via Cruzamento (última operação) onde codarm/matricula bate
-    const seriaisTec = cruzamentoDedup.filter((c) => upper(c.codarm) === upper(tt) || upper(c.matricula) === upper(tt));
+    // Fallback: se não houver carga consolidada do Gestech, deriva materiais agrupando os seriais do Cruzamento.
+    if (materials.length === 0 && seriaisTec.length > 0) {
+      const agg: Record<string, { codigo: string; nome: string; quantidade: number }> = {};
+      seriaisTec.forEach((c) => {
+        if (!isOntOrRoteador(c.material)) return;
+        const k = `${c.codmat}|${c.material}`;
+        if (!agg[k]) agg[k] = { codigo: c.codmat, nome: c.material, quantidade: 0 };
+        agg[k].quantidade += 1;
+      });
+      materials = Object.values(agg);
+    }
+
     const serials = seriaisTec.map((c) => {
-      const aplic = aplicados.find((a) => upper(a.serial) === upper(c.serial));
-      const sap = saldoSap.find((s) => upper(s.serial) === upper(c.serial));
+      const key = normSerial(c.serial);
+      const aplic = aplicadosBySerial[key];
+      const sap = sapBySerial[key];
       return {
         serial: c.serial,
         codigo: c.codmat,
