@@ -651,7 +651,11 @@ const RastreabilidadeOnt = () => {
     if (massResults.length === 0) return;
     const dataToExport = massResults.map((r) => ({
       "Número de Série": r.serial,
-      "Status Localização": r.status === "aplicado" ? "Aplicado no Sistema" : r.status === "tecnico" ? "Com Técnico (Físico)" : r.status === "cruzamento" ? "Depósito SAP" : "Não Encontrado",
+      "Status Localização":
+        r.status === "aplicado" ? "Aplicado no Sistema" :
+        r.status === "tecnico"  ? "Com Técnico (Físico)" :
+        r.status === "almox"    ? "Almoxarifado / Depósito SAP" :
+        "Não Encontrado",
       "Equipamento / Modelo": r.equipamento,
       "Matrícula TT": r.matricula || "",
       "TR": r.tr || "",
