@@ -226,6 +226,10 @@ const RastreabilidadeOnt = () => {
   };
 
   const handleClearBase = (type: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem limpar bases.");
+      return;
+    }
     if (!window.confirm(`Deseja limpar todos os dados da base ${type.toUpperCase()}?`)) return;
     const map: Record<string, [any, string]> = {
       presenca: [setPresenca, KEY_PRESENCA],
@@ -306,6 +310,11 @@ const RastreabilidadeOnt = () => {
      Uploads
      ============================================================ */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem carregar/sobrepor bases.");
+      e.target.value = "";
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -818,7 +827,9 @@ const RastreabilidadeOnt = () => {
         <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 w-full md:w-auto flex md:inline-flex">
           <TabsTrigger value="consultas" className="flex-1 md:flex-none rounded-lg text-xs py-2 px-4"><Search className="w-3.5 h-3.5 mr-2" />Consultas Dinâmicas</TabsTrigger>
           <TabsTrigger value="massa" className="flex-1 md:flex-none rounded-lg text-xs py-2 px-4"><Layers className="w-3.5 h-3.5 mr-2" />Busca em Massa</TabsTrigger>
-          <TabsTrigger value="bases" className="flex-1 md:flex-none rounded-lg text-xs py-2 px-4"><Database className="w-3.5 h-3.5 mr-2" />Gerenciamento de Bases</TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="bases" className="flex-1 md:flex-none rounded-lg text-xs py-2 px-4"><Database className="w-3.5 h-3.5 mr-2" />Gerenciamento de Bases</TabsTrigger>
+          )}
         </TabsList>
 
         {/* CONSULTAS */}
