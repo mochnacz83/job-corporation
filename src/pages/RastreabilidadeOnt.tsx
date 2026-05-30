@@ -1006,7 +1006,19 @@ const RastreabilidadeOnt = () => {
                           <TableBody>
                             {searchResults.serials.map((s: any, i: number) => (
                               <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">{s.serial}</TableCell>
+                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <span>{s.serial}</span>
+                                    <button
+                                      type="button"
+                                      title="Ver QR Code do serial"
+                                      onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
+                                      className="text-slate-300 hover:text-sky-600 transition-colors"
+                                    >
+                                      <QrCode className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
                                 <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
                                 <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
