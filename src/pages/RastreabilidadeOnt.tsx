@@ -282,9 +282,24 @@ const RastreabilidadeOnt = () => {
 
   const cruzBySerial = useMemo(() => {
     const m: Record<string, CruzamentoSapGestech> = {};
-    cruzamentoDedup.forEach((c) => { m[upper(c.serial)] = c; });
+    cruzamentoDedup.forEach((c) => { m[normSerial(c.serial)] = c; });
     return m;
   }, [cruzamentoDedup]);
+
+  // Índices normalizados (sem zeros à esquerda) para Aplicados e SAP — melhora o hit-rate da busca em massa.
+  const aplicadosBySerial = useMemo(() => {
+    const m: Record<string, SerialAplicado> = {};
+    aplicados.forEach((a) => { const k = normSerial(a.serial); if (k) m[k] = a; });
+    return m;
+  }, [aplicados]);
+  const sapBySerial = useMemo(() => {
+    const m: Record<string, SaldoSap> = {};
+    saldoSap.forEach((s) => { const k = normSerial(s.serial); if (k) m[k] = s; });
+    return m;
+  }, [saldoSap]);
+
+  // QR Code state — popup discreto ao clicar no botão ao lado do serial.
+  const [qrSerial, setQrSerial] = useState<string | null>(null);
 
   /* ============================================================
      Uploads
