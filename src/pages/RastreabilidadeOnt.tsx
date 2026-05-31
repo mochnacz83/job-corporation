@@ -364,14 +364,21 @@ const RastreabilidadeOnt = () => {
         if (type === "gestech") {
           // Planilha vinda do sistema possui 2 linhas de título — header está na linha 3.
           const j = readSheetForcedHeader(workbook, 3);
-          // Mapeia linhas, filtra ONT/ROTEADOR
+          // Mapeia linhas, filtra ONT/ROTEADOR/MESH/REPETIDOR
           const rows = j.map((r: any) => ({
             tt: upper(pick(r, ["codarmazem", "matricula", "matricula_tt", "Matrícula"])),
             nome: norm(pick(r, ["armazem", "nome_tecnico", "Nome Técnico", "Nome"])),
             codmat: norm(pick(r, ["codmaterial", "codigo_material", "Código"])),
             mat: norm(pick(r, ["material", "nome_material", "Material"])),
-            saldo: numberOr0(pick(r, ["saldo", "Quantidade", "quantidade", "Qtd"])),
-          })).filter((x) => x.tt && x.codmat && isOntOrRoteador(x.mat));
+            saldo: numberOr0(pick(r, ["saldo", "Saldo", "Quantidade", "quantidade", "Qtd"])),
+            disponivel: numberOr0(pick(r, ["disponivel", "Disponivel", "disponível", "Disponível"])),
+            reversa: numberOr0(pick(r, ["reversa", "Reversa"])),
+            devolucao: numberOr0(pick(r, ["devolucao", "Devolucao", "devolução", "Devolução"])),
+            defeito: numberOr0(pick(r, ["defeito", "Defeito"])),
+            bloqueado: numberOr0(pick(r, ["bloqueado", "Bloqueado"])),
+            achegar: numberOr0(pick(r, ["achegar", "a chegar", "A Chegar", "A_Chegar", "aChegar"])),
+            emtransito: numberOr0(pick(r, ["emtransito", "em transito", "Em Transito", "em_transito", "Em Trânsito", "emtrânsito"])),
+          })).filter((x) => x.tt && x.codmat && isAllowedMaterial(x.mat));
 
           // Soma por TT + codmaterial
           const agg: Record<string, SaldoGestech> = {};
@@ -385,13 +392,26 @@ const RastreabilidadeOnt = () => {
                 codigo_material: x.codmat,
                 nome_material: x.mat,
                 quantidade: 0,
+                saldo: 0, disponivel: 0, reversa: 0, devolucao: 0,
+                defeito: 0, bloqueado: 0, achegar: 0, emtransito: 0,
               };
             }
-            agg[k].quantidade += x.saldo;
+            agg[k].saldo       += x.saldo;
+            agg[k].disponivel  += x.disponivel;
+            agg[k].reversa     += x.reversa;
+            agg[k].devolucao   += x.devolucao;
+            agg[k].defeito     += x.defeito;
+            agg[k].bloqueado   += x.bloqueado;
+            agg[k].achegar     += x.achegar;
+            agg[k].emtransito  += x.emtransito;
+            // "quantidade" mantém o saldo total p/ compatibilidade com telas existentes
+            agg[k].quantidade = agg[k].saldo;
           });
-          const parsed = Object.values(agg).filter((x) => x.quantidade > 0);
+          const parsed = Object.values(agg).filter((x) =>
+            (x.saldo + x.disponivel + x.reversa + x.devolucao + x.defeito + x.bloqueado + x.achegar + x.emtransito) > 0,
+          );
           setSaldoGestech(parsed); saveBase(KEY_GESTECH, parsed, "gestech");
-          toast.success(`${parsed.length} itens consolidados (ONT/ROTEADOR) por técnico.`);
+          toast.success(`${parsed.length} itens consolidados (ONT/ROTEADOR/MESH/REPETIDOR) por técnico.`);
           return;
         }
 
