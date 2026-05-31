@@ -608,7 +608,9 @@ const RastreabilidadeOnt = () => {
         const total = saldoGestech.filter((g) => upper(g.matricula_tt) === upper(p.tt)).reduce((s, i) => s + i.quantidade, 0);
         return { matricula: p.tt, tr: p.tr, nome: p.funcionario, supervisor: p.supervisor, coordenador: p.coordenador, materialsCount: total };
       });
-      setSearchResults({ type: "supervisor", supervisorName: matched[0][field === "supervisor" ? "supervisor" : "coordenador"], technicians: techs });
+      const res = { type: "supervisor", supervisorName: matched[0][field === "supervisor" ? "supervisor" : "coordenador"], technicians: techs };
+      setSearchResults(res);
+      setSupervisorContext(res); // guarda contexto p/ "voltar à equipe"
       return;
     }
 
@@ -619,12 +621,13 @@ const RastreabilidadeOnt = () => {
       return;
     }
 
-    if (searchType === "matricula") { setSearchResults(runTechnicianResult(q)); return; }
+    if (searchType === "matricula") { setSupervisorContext(null); setSearchResults(runTechnicianResult(q)); return; }
 
     if (searchType === "nome") {
       const p = presenca.find((x) => x.funcionario.toLowerCase().includes(Q));
       const tt = p?.tt || saldoGestech.find((g) => g.nome_tecnico.toLowerCase().includes(Q))?.matricula_tt;
       if (!tt) { setSearchResults({ type: "empty", message: "Nenhum técnico encontrado pelo nome." }); return; }
+      setSupervisorContext(null);
       setSearchResults(runTechnicianResult(tt));
       return;
     }
@@ -666,13 +669,68 @@ const RastreabilidadeOnt = () => {
       setSearchResults({ type: "serial", serial: S, status, details });
       return;
     }
+
+    if (searchType === "codigo") {
+      const codes = Array.from(new Set(q.split(/[,;\n\t]+/).map((c) => c.trim()).filter(Boolean)));
+      if (codes.length === 0) { setSearchResults({ type: "empty", message: "Informe ao menos um código de material." }); return; }
+
+      // Por código: agrupar por Supervisor → Técnico (vindo de Cruzamento + Gestech) e por Depósito (vindo de SAP)
+      type TechAgg = { matricula: string; tr: string; nome: string; supervisor: string; coordenador: string; quantidade: number };
+      const bySupervisor: Record<string, { supervisor: string; total: number; techs: Record<string, TechAgg> }> = {};
+      const byDeposito: Record<string, number> = {};
+
+      // 1) Saldo Gestech por TT (somas confiáveis)
+      saldoGestech.forEach((g: any) => {
+        if (!codes.includes(String(g.codigo_material))) return;
+        const dim = enrichByTT(g.matricula_tt);
+        const sup = dim?.supervisor || "—";
+        const coord = dim?.coordenador || "—";
+        if (!bySupervisor[sup]) bySupervisor[sup] = { supervisor: sup, total: 0, techs: {} };
+        const tt = g.matricula_tt;
+        if (!bySupervisor[sup].techs[tt]) {
+          bySupervisor[sup].techs[tt] = { matricula: tt, tr: dim?.tr || "—", nome: dim?.funcionario || g.nome_tecnico, supervisor: sup, coordenador: coord, quantidade: 0 };
+        }
+        bySupervisor[sup].techs[tt].quantidade += g.quantidade || 0;
+        bySupervisor[sup].total += g.quantidade || 0;
+      });
+
+      // 2) Depósito a partir do SAP (almoxarifado) — somente para os códigos pedidos
+      saldoSap.forEach((x) => {
+        if (!codes.includes(String(x.codigo_material))) return;
+        const dep = x.deposito || "—";
+        byDeposito[dep] = (byDeposito[dep] || 0) + 1;
+      });
+
+      const supervisores = Object.values(bySupervisor)
+        .map((s) => ({ ...s, techs: Object.values(s.techs).sort((a, b) => b.quantidade - a.quantidade) }))
+        .sort((a, b) => b.total - a.total);
+      const depositos = Object.entries(byDeposito).map(([deposito, qtd]) => ({ deposito, qtd })).sort((a, b) => b.qtd - a.qtd);
+      const totalGeral = supervisores.reduce((s, x) => s + x.total, 0);
+
+      if (supervisores.length === 0 && depositos.length === 0) {
+        setSearchResults({ type: "empty", message: "Nenhum equipamento encontrado para os códigos informados." });
+        return;
+      }
+      setSupervisorContext(null);
+      setExpandedSupervisor(null);
+      setSearchResults({ type: "codigo", codes, supervisores, depositos, totalGeral });
+      return;
+    }
   };
 
   const handleSelectTechnician = (matricula: string) => {
     setSearchType("matricula");
     setSearchQuery(matricula);
     setHasSearched(true);
+    // mantém supervisorContext caso já exista — permite voltar
     setSearchResults(runTechnicianResult(matricula));
+  };
+
+  const handleBackToSupervisor = () => {
+    if (!supervisorContext) return;
+    setSearchType("supervisor");
+    setSearchQuery(supervisorContext.supervisorName || "");
+    setSearchResults(supervisorContext);
   };
 
   /* ============================================================
