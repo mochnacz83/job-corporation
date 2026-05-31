@@ -320,6 +320,31 @@ const RastreabilidadeOnt = () => {
     return m;
   }, [saldoSap]);
 
+  // Totais Gestech (somas das colunas), p/ painel "Bases ativas" e drilldown.
+  const gestechTotals = useMemo(() => {
+    const t = { saldo: 0, disponivel: 0, reversa: 0, devolucao: 0, defeito: 0, bloqueado: 0, achegar: 0, emtransito: 0 };
+    saldoGestech.forEach((g: any) => {
+      t.saldo       += g.saldo       || 0;
+      t.disponivel  += g.disponivel  || 0;
+      t.reversa     += g.reversa     || 0;
+      t.devolucao   += g.devolucao   || 0;
+      t.defeito     += g.defeito     || 0;
+      t.bloqueado   += g.bloqueado   || 0;
+      t.achegar     += g.achegar     || 0;
+      t.emtransito  += g.emtransito  || 0;
+    });
+    return t;
+  }, [saldoGestech]);
+
+  // Lista única de códigos de material disponíveis nas bases (p/ filtro por código)
+  const codigosDisponiveis = useMemo(() => {
+    const s = new Set<string>();
+    saldoGestech.forEach((g: any) => g.codigo_material && s.add(String(g.codigo_material)));
+    cruzamentoDedup.forEach((c) => c.codmat && s.add(String(c.codmat)));
+    saldoSap.forEach((x) => x.codigo_material && s.add(String(x.codigo_material)));
+    return Array.from(s).sort();
+  }, [saldoGestech, cruzamentoDedup, saldoSap]);
+
   // QR Code state — popup discreto ao clicar no botão ao lado do serial.
   const [qrSerial, setQrSerial] = useState<string | null>(null);
 
