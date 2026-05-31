@@ -197,10 +197,16 @@ const RastreabilidadeOnt = () => {
   const [cruzamento, setCruzamento] = useState<CruzamentoSapGestech[]>([]);
   const [aplicados, setAplicados] = useState<SerialAplicado[]>([]);
 
-  const [searchType, setSearchType] = useState<"matricula" | "nome" | "serial" | "supervisor" | "tr" | "coordenador">("matricula");
+  const [searchType, setSearchType] = useState<"matricula" | "nome" | "serial" | "supervisor" | "tr" | "coordenador" | "codigo">("matricula");
   const [searchQuery, setSearchQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [searchResults, setSearchResults] = useState<any>(null);
+  // Guarda último resultado de supervisor/coordenador p/ permitir voltar
+  const [supervisorContext, setSupervisorContext] = useState<any>(null);
+  // Drilldown do Saldo Gestech
+  const [showGestechDrill, setShowGestechDrill] = useState(false);
+  // Drilldown por código (supervisor expandido)
+  const [expandedSupervisor, setExpandedSupervisor] = useState<string | null>(null);
 
   const [massInput, setMassInput] = useState("");
   const [massResults, setMassResults] = useState<any[]>([]);
