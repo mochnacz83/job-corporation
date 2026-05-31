@@ -973,15 +973,49 @@ const RastreabilidadeOnt = () => {
                         <SelectItem value="serial" className="text-xs">Número de Série</SelectItem>
                         <SelectItem value="supervisor" className="text-xs">Supervisor</SelectItem>
                         <SelectItem value="coordenador" className="text-xs">Coordenador</SelectItem>
+                        <SelectItem value="codigo" className="text-xs">Código de Equipamento</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600">Termo de Busca:</label>
                     <div className="relative">
-                      <Input type="text" placeholder={searchType === "tr" ? "Ex: TR537702" : searchType === "matricula" ? "Ex: TT826817" : searchType === "serial" ? "Ex: 6658051" : "Digite o termo..."} className="bg-slate-50 border-slate-200 text-xs pr-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                      <Input
+                        type="text"
+                        placeholder={
+                          searchType === "tr" ? "Ex: TR000000" :
+                          searchType === "matricula" ? "Ex: TT000000" :
+                          searchType === "serial" ? "Ex: 0000000000" :
+                          searchType === "supervisor" ? "Ex: Nome do Supervisor" :
+                          searchType === "coordenador" ? "Ex: Nome do Coordenador" :
+                          searchType === "nome" ? "Ex: Nome do Técnico" :
+                          searchType === "codigo" ? "Ex: 0000000000, 0000000001" :
+                          "Digite o termo..."
+                        }
+                        className="bg-slate-50 border-slate-200 text-xs pr-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
                       <Search className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
                     </div>
+                    {searchType === "codigo" && codigosDisponiveis.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[10px] font-semibold text-slate-500">Adicionar código da lista:</label>
+                        <Select onValueChange={(code) => {
+                          const cur = searchQuery.split(/[,;\n]+/).map((c) => c.trim()).filter(Boolean);
+                          if (cur.includes(code)) return;
+                          setSearchQuery([...cur, code].join(", "));
+                        }}>
+                          <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs h-8"><SelectValue placeholder="Selecionar código..." /></SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {codigosDisponiveis.map((c) => (
+                              <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-slate-400">Você pode digitar vários códigos separados por vírgula.</p>
+                      </div>
+                    )}
                   </div>
                   <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs py-2.5 rounded-lg">
                     <Search className="w-3.5 h-3.5 mr-2" />Buscar Rastreabilidade
@@ -990,7 +1024,25 @@ const RastreabilidadeOnt = () => {
                 <div className="mt-6 pt-5 border-t border-slate-100 space-y-2 text-[11px] text-slate-500">
                   <h4 className="text-xs font-semibold text-slate-700 mb-2">Bases ativas:</h4>
                   <p>• Presença (dim): <strong>{presenca.length}</strong></p>
-                  <p>• Saldo Gestech: <strong>{saldoGestech.length}</strong></p>
+                  <p className="flex items-center gap-1">
+                    • Saldo Gestech: <strong>{gestechTotals.disponivel}</strong>
+                    <button type="button" onClick={() => setShowGestechDrill((v) => !v)} className="ml-1 text-[10px] text-sky-600 hover:underline">
+                      {showGestechDrill ? "ocultar" : "drill-down"}
+                    </button>
+                    <span className="text-slate-400">(linhas: {saldoGestech.length})</span>
+                  </p>
+                  {showGestechDrill && (
+                    <div className="ml-3 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] bg-slate-50/60 p-2 rounded border border-slate-100">
+                      <span>Saldo:</span>            <strong className="text-right">{gestechTotals.saldo}</strong>
+                      <span>Disponível:</span>       <strong className="text-right">{gestechTotals.disponivel}</strong>
+                      <span>Reversa:</span>          <strong className="text-right">{gestechTotals.reversa}</strong>
+                      <span>Devolução:</span>        <strong className="text-right">{gestechTotals.devolucao}</strong>
+                      <span>Defeito:</span>          <strong className="text-right">{gestechTotals.defeito}</strong>
+                      <span>Bloqueado:</span>        <strong className="text-right">{gestechTotals.bloqueado}</strong>
+                      <span>A Chegar:</span>         <strong className="text-right">{gestechTotals.achegar}</strong>
+                      <span>Em Trânsito:</span>      <strong className="text-right">{gestechTotals.emtransito}</strong>
+                    </div>
+                  )}
                   <p>• Saldo SAP: <strong>{saldoSap.length}</strong></p>
                   <p>• Cruzamento (deduplicado): <strong>{cruzamentoDedup.length}</strong> / bruto <strong>{cruzamento.length}</strong></p>
                   <p>• Aplicados: <strong>{aplicados.length}</strong></p>
