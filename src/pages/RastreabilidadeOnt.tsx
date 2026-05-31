@@ -47,7 +47,15 @@ interface SaldoGestech {
   nome_tecnico: string;  // armazem
   codigo_material: string; // codmaterial
   nome_material: string;   // material
-  quantidade: number;      // soma de saldo
+  quantidade: number;      // soma de "saldo" (mantido p/ compat)
+  saldo: number;
+  disponivel: number;
+  reversa: number;
+  devolucao: number;
+  defeito: number;
+  bloqueado: number;
+  achegar: number;
+  emtransito: number;
 }
 
 // 2. Saldo SAP (Saldo_Sap_PA_TA_SC) — granularidade serial
@@ -108,10 +116,13 @@ const numberOr0 = (v: any) => {
   const n = Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
-const isOntOrRoteador = (mat: string) => {
+// Filtro de materiais: ONT, ROTEADOR, MESH e REPETIDOR (chave do escopo de rastreabilidade).
+const isAllowedMaterial = (mat: string) => {
   const m = upper(mat);
-  return m.includes("ONT") || m.includes("ROTEADOR");
+  return m.includes("ONT") || m.includes("ROTEADOR") || m.includes("MESH") || m.includes("REPETIDOR");
 };
+// alias legado mantido para evitar quebra de referências
+const isOntOrRoteador = isAllowedMaterial;
 // Aceita várias variantes de chave do header
 const pick = (row: any, keys: string[]) => {
   const map: Record<string, any> = {};
