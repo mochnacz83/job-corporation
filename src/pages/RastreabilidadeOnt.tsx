@@ -964,7 +964,7 @@ const RastreabilidadeOnt = () => {
                 <form onSubmit={handleDynamicSearch} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600">Consultar por:</label>
-                    <Select value={searchType} onValueChange={(v: any) => { setSearchType(v); setSearchQuery(""); setHasSearched(false); setSearchResults(null); }}>
+                    <Select value={searchType} onValueChange={(v: any) => { setSearchType(v); setSearchQuery(""); setHasSearched(false); setSearchResults(null); setSupervisorContext(null); setExpandedSupervisor(null); }}>
                       <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="matricula" className="text-xs">Matrícula TT</SelectItem>
