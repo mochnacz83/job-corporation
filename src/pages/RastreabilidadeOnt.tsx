@@ -1111,6 +1111,13 @@ const RastreabilidadeOnt = () => {
                 </Card>
               ) : searchResults.type === "technician" ? (
                 <div className="space-y-6">
+                  {supervisorContext && (
+                    <div className="flex justify-start">
+                      <Button variant="outline" size="sm" className="text-xs border-slate-200" onClick={handleBackToSupervisor}>
+                        <ArrowRight className="w-3.5 h-3.5 mr-2 rotate-180" /> Voltar à equipe de {supervisorContext.supervisorName}
+                      </Button>
+                    </div>
+                  )}
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1136,7 +1143,7 @@ const RastreabilidadeOnt = () => {
 
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <CardTitle className="text-sm font-bold text-slate-800">Materiais (ONT/ROTEADOR) — Gestech</CardTitle>
+                      <CardTitle className="text-sm font-bold text-slate-800">Materiais (ONT/ROTEADOR/MESH/REPETIDOR) — Gestech</CardTitle>
                       <CardDescription className="text-xs">Soma de saldo por código de material</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -1162,58 +1169,101 @@ const RastreabilidadeOnt = () => {
                       )}
                     </CardContent>
                   </Card>
-
+                </div>
+              ) : searchResults.type === "codigo" ? (
+                <div className="space-y-6">
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
-                          <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                          <CardTitle className="text-sm font-bold text-slate-800">Equipamentos por Código</CardTitle>
+                          <CardDescription className="text-xs">Códigos consultados: <span className="font-mono">{searchResults.codes.join(", ")}</span></CardDescription>
                         </div>
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
-                          <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
-                        </Button>
+                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 rounded-full font-semibold">Total c/ técnico: {searchResults.totalGeral}</Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-0">
-                      {searchResults.serials.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-500">Nenhum serial associado nas bases de cruzamento.</div>
+                    <CardContent className="pt-4 space-y-2">
+                      <p className="text-[11px] font-semibold text-slate-600 mb-1">Por Supervisor (clique para ver técnicos):</p>
+                      {searchResults.supervisores.length === 0 ? (
+                        <p className="text-xs text-slate-500">Nenhum equipamento atribuído a técnicos para os códigos.</p>
                       ) : (
+                        <div className="space-y-2">
+                          {searchResults.supervisores.map((sup: any) => (
+                            <div key={sup.supervisor} className="border border-slate-100 rounded-lg overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSupervisor(expandedSupervisor === sup.supervisor ? null : sup.supervisor)}
+                                className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50/60 hover:bg-slate-100/60 text-left"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Users className="w-3.5 h-3.5 text-sky-500" />
+                                  <span className="text-xs font-semibold text-slate-700">{sup.supervisor}</span>
+                                  <Badge variant="outline" className="text-[10px] bg-white">{sup.techs.length} téc.</Badge>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-bold text-sky-700">{sup.total} itens</span>
+                                  <ArrowRight className={`w-3.5 h-3.5 text-slate-400 transition-transform ${expandedSupervisor === sup.supervisor ? "rotate-90" : ""}`} />
+                                </div>
+                              </button>
+                              {expandedSupervisor === sup.supervisor && (
+                                <div className="px-3 py-2 bg-white border-t border-slate-100">
+                                  <Table>
+                                    <TableHeader><TableRow className="border-b border-slate-100">
+                                      <TableHead className="text-[10px] py-2">Técnico</TableHead>
+                                      <TableHead className="text-[10px] py-2">TT</TableHead>
+                                      <TableHead className="text-[10px] py-2">TR</TableHead>
+                                      <TableHead className="text-[10px] py-2 text-right">Qtd</TableHead>
+                                      <TableHead className="text-[10px] py-2 w-16"></TableHead>
+                                    </TableRow></TableHeader>
+                                    <TableBody>
+                                      {sup.techs.map((t: any) => (
+                                        <TableRow key={t.matricula} className="border-b border-slate-100 hover:bg-slate-50/40">
+                                          <TableCell className="text-xs py-2">{t.nome}</TableCell>
+                                          <TableCell className="text-xs py-2 font-mono">{t.matricula}</TableCell>
+                                          <TableCell className="text-xs py-2 font-mono">{t.tr}</TableCell>
+                                          <TableCell className="text-xs py-2 text-right font-bold">{t.quantidade}</TableCell>
+                                          <TableCell className="text-xs py-2">
+                                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-sky-600" onClick={() => handleSelectTechnician(t.matricula)}>
+                                              Ver carga
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {searchResults.depositos.length > 0 && (
+                    <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
+                      <CardHeader className="pb-3 border-b border-slate-100">
+                        <CardTitle className="text-sm font-bold text-slate-800">Visão por Depósito (SAP)</CardTitle>
+                        <CardDescription className="text-xs">Quantidade de seriais no almoxarifado por depósito</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
                         <Table>
-                          <TableHeader className="bg-slate-50/50"><TableRow className="border-b border-slate-100">
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3 pl-6">Serial</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Equipamento</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Status</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Operação</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3 pr-6">Observações</TableHead>
+                          <TableHeader className="bg-slate-50/50"><TableRow>
+                            <TableHead className="text-xs py-2 pl-6">Depósito</TableHead>
+                            <TableHead className="text-xs py-2 text-right pr-6">Quantidade</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
-                            {searchResults.serials.map((s: any, i: number) => (
-                              <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <span>{s.serial}</span>
-                                    <button
-                                      type="button"
-                                      title="Ver QR Code do serial"
-                                      onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
-                                      className="text-slate-300 hover:text-sky-600 transition-colors"
-                                    >
-                                      <QrCode className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
-                                <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
-                                <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
-                                <TableCell className="text-[11px] text-slate-500 py-3 pr-6">{s.obs}</TableCell>
+                            {searchResults.depositos.map((d: any) => (
+                              <TableRow key={d.deposito} className="border-b border-slate-100">
+                                <TableCell className="text-xs py-2 pl-6 font-mono">{d.deposito}</TableCell>
+                                <TableCell className="text-xs py-2 text-right pr-6 font-bold">{d.qtd}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               ) : (
                 <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
@@ -1230,19 +1280,21 @@ const RastreabilidadeOnt = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-6 items-start">
+                      <div>
                     {searchResults.status === "Aplicado no Sistema" ? (
                       <div className="space-y-4">
                         <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex items-start gap-3">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-emerald-800">Aplicado em Cliente</h4></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Cliente</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.cliente}</p><p className="text-[10px] text-slate-500">Instalação: {searchResults.details.data_instalacao}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">GPON</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.gpon}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Alias</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.alias}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Cliente</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.cliente}</p><p className="text-[10px] text-slate-500">Instalação: {searchResults.details.data_instalacao}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">GPON</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5 truncate">{searchResults.details.gpon}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Alias</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5 truncate">{searchResults.details.alias}</p></div>
                         </div>
-                        <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /><span>Técnico: <strong>{searchResults.details.tecnico}</strong></span></div>
+                        <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /><span>Técnico: <strong>{searchResults.details.tecnico}</strong></span></div>
                       </div>
                     ) : searchResults.status === "Com Técnico (Físico)" ? (
                       <div className="space-y-4">
@@ -1250,13 +1302,13 @@ const RastreabilidadeOnt = () => {
                           <Info className="w-5 h-5 text-sky-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-sky-800">Em carga com colaborador</h4><p className="text-[11px] text-sky-700/80 mt-0.5">Última operação: {searchResults.details.ultimaOperacao} ({searchResults.details.tipoOperacao})</p></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Colaborador</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.tecnico}</p><p className="text-[10px] text-slate-500">TT: {searchResults.details.matricula} • TR: {searchResults.details.tr}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Supervisor</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.supervisor}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Coordenador</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.coordenador}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.deposito}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status SAP</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.statusSap}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Colaborador</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.tecnico}</p><p className="text-[10px] text-slate-500">TT: {searchResults.details.matricula} • TR: {searchResults.details.tr}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Supervisor</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.supervisor}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Coordenador</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.coordenador}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{searchResults.details.deposito}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status SAP</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.statusSap}</p></div>
                         </div>
                       </div>
                     ) : (
@@ -1265,19 +1317,84 @@ const RastreabilidadeOnt = () => {
                           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-amber-800">Disponível em Depósito SAP</h4></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.deposito}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.statusSap}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Modificado por</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modificadoPor}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{searchResults.details.deposito}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.statusSap}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Modificado por</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.modificadoPor}</p></div>
                         </div>
                       </div>
                     )}
+                      </div>
+                      {/* Coluna QR Code do serial */}
+                      <div className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50/40">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase">QR do Serial</span>
+                        <div className="p-2 bg-white rounded-lg border border-slate-200">
+                          <QRCodeSVG value={String(searchResults.serial)} size={140} level="M" includeMargin={false} />
+                        </div>
+                        <p className="text-[10px] font-mono text-slate-500 break-all text-center">{searchResults.serial}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
             </div>
           </div>
+
+          {/* Detalhamento de Seriais — full-width abaixo da grade do filtro */}
+          {searchResults?.type === "technician" && (
+            <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
+                    <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                  </div>
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
+                    <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {searchResults.serials.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">Nenhum serial associado nas bases de cruzamento.</div>
+                ) : (
+                  <Table>
+                    <TableHeader className="bg-slate-50/50"><TableRow className="border-b border-slate-100">
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3 pl-6">Serial</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3">Equipamento</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3" title="Tipo da última movimentação no Cruzamento. 'No Cruzamento' indica que o serial existe apenas na base de cruzamento e não foi localizado no SAP nem em Aplicados.">Operação</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3 pr-6">Observações</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {searchResults.serials.map((s: any, i: number) => (
+                        <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
+                          <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>{s.serial}</span>
+                              <button
+                                type="button"
+                                title="Ver QR Code do serial"
+                                onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
+                                className="text-slate-300 hover:text-sky-600 transition-colors"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
+                          <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
+                          <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
+                          <TableCell className="text-[11px] text-slate-500 py-3 pr-6">{s.obs}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* MASSA */}
