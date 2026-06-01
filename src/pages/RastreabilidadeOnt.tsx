@@ -407,6 +407,71 @@ const RastreabilidadeOnt = () => {
     }
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Caso especial: ALL_GPON_ONU.ZIP — várias CSVs empilhadas (header na linha 10)
+    if (type === "aplicados" && /\.zip$/i.test(file.name)) {
+      (async () => {
+        try {
+          toast.info("Processando ZIP de Ativos na Planta… pode levar alguns segundos.");
+          const buf = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(buf);
+          const csvEntries = Object.values(zip.files).filter(
+            (f) => !f.dir && /\.csv$/i.test(f.name),
+          );
+          if (csvEntries.length === 0) {
+            toast.error("Nenhum CSV encontrado dentro do ZIP.");
+            return;
+          }
+          const parsed: SerialAplicado[] = [];
+          for (const entry of csvEntries) {
+            const text = await entry.async("string");
+            // Detecta separador (na maioria das vezes vírgula; alguns sistemas usam ; ou tab)
+            const firstLines = text.split(/\r?\n/).slice(0, 15).join("\n");
+            let delim: string = ",";
+            if ((firstLines.match(/;/g) || []).length > (firstLines.match(/,/g) || []).length) delim = ";";
+            else if ((firstLines.match(/\t/g) || []).length > (firstLines.match(/,/g) || []).length) delim = "\t";
+
+            // Pula primeiras 9 linhas; usa a 10ª como cabeçalho.
+            const wb = XLSX.read(text, { type: "string", FS: delim, raw: false });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: "", raw: false, range: 9 });
+            rows.forEach((r: any) => {
+              const sn = norm(pick(r, ["SN", "sn", "Serial Number", "SERIAL NUMBER"]));
+              // SN normalmente vem como "VENDOR1234 (REALSERIAL)" — extrai o que está entre parênteses
+              const m = sn.match(/\(([^)]+)\)/);
+              const serial = upper(m ? m[1] : sn);
+              if (!serial) return;
+              const alias = norm(pick(r, ["Alias", "ALIAS"]));
+              const deviceName = norm(pick(r, ["DEVICE NAME", "Device Name", "DeviceName"]));
+              const onuLocation = norm(pick(r, ["NAME", "Name"]));
+              parsed.push({
+                serial,
+                codigo_material: norm(pick(r, ["EQUIP TYPE", "Equip Type", "EQUIPMENT TYPE", "VENDOR"])),
+                nome_material: deviceName || norm(pick(r, ["MODEL", "Model"])),
+                cliente: alias, // identificação do cliente (GPON)
+                gpon: onuLocation, // ONU/frame/slot/port/onuID
+                alias,
+                data_instalacao: norm(pick(r, ["DATE", "Date", "INSTALL DATE", "Install Date"])),
+                tecnico_instalador: "",
+              });
+            });
+          }
+          // Dedup por serial (mantém última ocorrência)
+          const map: Record<string, SerialAplicado> = {};
+          parsed.forEach((p) => { map[upper(p.serial)] = p; });
+          const finalRows = Object.values(map);
+          setAplicados(finalRows);
+          await saveBase(KEY_APLICADOS, finalRows, "aplicados");
+          toast.success(`${finalRows.length} seriais aplicados importados do ZIP (${csvEntries.length} CSV(s)).`);
+        } catch (err: any) {
+          toast.error("Erro ao processar ZIP: " + (err?.message || "desconhecido"));
+        } finally {
+          e.target.value = "";
+        }
+      })();
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
