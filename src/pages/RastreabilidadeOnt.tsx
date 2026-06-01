@@ -422,22 +422,48 @@ const RastreabilidadeOnt = () => {
             toast.error("Nenhum CSV encontrado dentro do ZIP.");
             return;
           }
+          // Parser CSV manual (suporta campos entre aspas com vírgulas e quebras de linha).
+          const parseCSV = (text: string, delim: string): string[][] => {
+            const out: string[][] = [];
+            let row: string[] = [];
+            let cur = "";
+            let inQ = false;
+            for (let i = 0; i < text.length; i++) {
+              const c = text[i];
+              if (inQ) {
+                if (c === '"') {
+                  if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
+                } else cur += c;
+              } else {
+                if (c === '"') inQ = true;
+                else if (c === delim) { row.push(cur); cur = ""; }
+                else if (c === "\n") { row.push(cur); out.push(row); row = []; cur = ""; }
+                else if (c === "\r") { /* skip */ }
+                else cur += c;
+              }
+            }
+            if (cur.length > 0 || row.length > 0) { row.push(cur); out.push(row); }
+            return out;
+          };
+
           const parsed: SerialAplicado[] = [];
+          const perFile: { name: string; rows: number }[] = [];
           for (const entry of csvEntries) {
             const text = await entry.async("string");
-            // Detecta separador (na maioria das vezes vírgula; alguns sistemas usam ; ou tab)
-            const firstLines = text.split(/\r?\n/).slice(0, 15).join("\n");
+            const sample = text.split(/\r?\n/).slice(0, 15).join("\n");
             let delim: string = ",";
-            if ((firstLines.match(/;/g) || []).length > (firstLines.match(/,/g) || []).length) delim = ";";
-            else if ((firstLines.match(/\t/g) || []).length > (firstLines.match(/,/g) || []).length) delim = "\t";
+            if ((sample.match(/;/g) || []).length > (sample.match(/,/g) || []).length) delim = ";";
+            else if ((sample.match(/\t/g) || []).length > (sample.match(/,/g) || []).length) delim = "\t";
 
-            // Pula primeiras 9 linhas; usa a 10ª como cabeçalho.
-            const wb = XLSX.read(text, { type: "string", FS: delim, raw: false });
-            const sheet = wb.Sheets[wb.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: "", raw: false, range: 9 });
-            rows.forEach((r: any) => {
+            const all = parseCSV(text, delim);
+            if (all.length <= 10) { perFile.push({ name: entry.name, rows: 0 }); continue; }
+            const header = all[9].map((h) => String(h || "").trim());
+            const dataRows = all.slice(10).filter((r) => r.some((c) => String(c || "").trim() !== ""));
+            let added = 0;
+            dataRows.forEach((rr) => {
+              const r: Record<string, string> = {};
+              header.forEach((h, i) => { r[h] = rr[i] ?? ""; });
               const sn = norm(pick(r, ["SN", "sn", "Serial Number", "SERIAL NUMBER"]));
-              // SN normalmente vem como "VENDOR1234 (REALSERIAL)" — extrai o que está entre parênteses
               const m = sn.match(/\(([^)]+)\)/);
               const serial = upper(m ? m[1] : sn);
               if (!serial) return;
@@ -454,15 +480,22 @@ const RastreabilidadeOnt = () => {
                 data_instalacao: norm(pick(r, ["DATE", "Date", "INSTALL DATE", "Install Date"])),
                 tecnico_instalador: "",
               });
+              added++;
             });
+            perFile.push({ name: entry.name, rows: added });
           }
           // Dedup por serial (mantém última ocorrência)
           const map: Record<string, SerialAplicado> = {};
           parsed.forEach((p) => { map[upper(p.serial)] = p; });
           const finalRows = Object.values(map);
+          console.log("[ONT ZIP] CSVs:", perFile, "bruto:", parsed.length, "após dedup:", finalRows.length);
           setAplicados(finalRows);
           await saveBase(KEY_APLICADOS, finalRows, "aplicados");
-          toast.success(`${finalRows.length} seriais aplicados importados do ZIP (${csvEntries.length} CSV(s)).`);
+          const detalhe = perFile.map((p) => `${p.name.split("/").pop()}: ${p.rows.toLocaleString("pt-BR")}`).join(" | ");
+          toast.success(
+            `ZIP processado: ${csvEntries.length} CSV(s) · ${parsed.length.toLocaleString("pt-BR")} linhas brutas · ${finalRows.length.toLocaleString("pt-BR")} seriais únicos. ${detalhe}`,
+            { duration: 15000 },
+          );
         } catch (err: any) {
           toast.error("Erro ao processar ZIP: " + (err?.message || "desconhecido"));
         } finally {
