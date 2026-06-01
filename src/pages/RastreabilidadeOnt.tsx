@@ -18,6 +18,13 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
+import JSZip from "jszip";
+import {
+  fetchSharedBase, uploadSharedBase, deleteSharedBase,
+  fetchAllMeta, upsertMeta, cacheLocal, readLocalCache,
+  type OntBaseType,
+} from "@/lib/ontSharedBases";
+import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
