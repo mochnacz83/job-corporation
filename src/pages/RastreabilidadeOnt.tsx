@@ -665,7 +665,7 @@ const RastreabilidadeOnt = () => {
       return { type: "empty", message: "Nenhum técnico localizado com essa matrícula." };
     }
     const nome = dim?.funcionario || techGestech[0]?.nome_tecnico || tt;
-    const supervisor = dim?.supervisor || "—";
+    const supervisor = dim?.supervisor || "Desligados";
     const coordenador = dim?.coordenador || "—";
     const tr = dim?.tr || "—";
 
@@ -766,7 +766,7 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor || "—",
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
           deposito: sap?.deposito || cross.deposito || "—",
           statusSap: sap?.status_sap || "—",
@@ -796,7 +796,7 @@ const RastreabilidadeOnt = () => {
       saldoGestech.forEach((g: any) => {
         if (!codes.includes(String(g.codigo_material))) return;
         const dim = enrichByTT(g.matricula_tt);
-        const sup = dim?.supervisor || "—";
+        const sup = dim?.supervisor || "Desligados";
         const coord = dim?.coordenador || "—";
         if (!bySupervisor[sup]) bySupervisor[sup] = { supervisor: sup, total: 0, techs: {} };
         const tt = g.matricula_tt;
@@ -871,9 +871,9 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor,
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
-          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "—"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
+          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "Desligados"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
         };
       }
       const sap = sapBySerial[key];
