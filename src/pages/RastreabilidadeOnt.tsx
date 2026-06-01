@@ -1612,8 +1612,8 @@ const RastreabilidadeOnt = () => {
               longDesc="Importe a planilha 'Saldo SAP PA TA SC'. Mantém colunas Material, Texto breve, Nº de série, Centro, Depósito, Modificado em/por, Status, Lote — filtrado para ONT/ROTEADOR." />
             <BaseCard color="bg-amber-500" title="3. Cruzamento SAP x Gestech" desc="Histórico de operações por serial (última prevalece)" count={cruzamentoDedup.length} ts={uploadTimestamps.cruzamento} type="cruzamento"
               longDesc="Importe a planilha 'Consulta Serial SAP X Gestech'. O sistema deduplica por serial mantendo a última 'ultimaoperacaoem'. Cruza por 'serial' (SAP) e 'codmat' + 'matricula' (Gestech)." />
-            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aguardando base oficial" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
-              longDesc="Estrutura preparada para receber a base 'Ativos na Planta'. Sem dados fictícios para não atravessar a informação — importe quando disponível." />
+            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aceita ZIP ALL_GPON_ONU (vários CSVs)" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
+              longDesc="Pode importar o ZIP original ALL_GPON_ONU.ZIP — o sistema descompacta, empilha todos os CSVs, pula as 9 primeiras linhas e usa a linha 10 como cabeçalho. Extrai o serial do campo SN (entre parênteses), Alias (cliente/GPON), DEVICE NAME (ONU) e NAME (frame/slot/porta/onuID)." />
           </div>
         </TabsContent>
       </Tabs>
