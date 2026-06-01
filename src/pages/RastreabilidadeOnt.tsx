@@ -1018,7 +1018,13 @@ const RastreabilidadeOnt = () => {
         <p className="text-xs text-slate-500 leading-relaxed">{longDesc}</p>
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <div className="flex-1 relative">
-            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" id={`upload-${type}`} onChange={(e) => handleFileUpload(e, type)} />
+            <input
+              type="file"
+              accept={type === "aplicados" ? ".xlsx, .xls, .csv, .zip" : ".xlsx, .xls, .csv"}
+              className="hidden"
+              id={`upload-${type}`}
+              onChange={(e) => handleFileUpload(e, type)}
+            />
             <label htmlFor={`upload-${type}`}>
               <Button asChild variant="outline" className="w-full text-xs border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer">
                 <span><Upload className="w-3.5 h-3.5 mr-2" />Importar Planilha</span>
@@ -1051,7 +1057,7 @@ const RastreabilidadeOnt = () => {
             <Users className="w-3 h-3 mr-1.5" /> {presenca.length} colaboradores ativos
           </Badge>
           <Badge variant="secondary" className="px-3 py-1 bg-slate-100 text-slate-700 font-medium text-xs rounded-full">
-            <Database className="w-3 h-3 mr-1.5" /> Local Cache
+            <Database className="w-3 h-3 mr-1.5" /> Bases compartilhadas
           </Badge>
         </div>
       </div>
