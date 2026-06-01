@@ -18,6 +18,13 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
+import JSZip from "jszip";
+import {
+  fetchSharedBase, uploadSharedBase, deleteSharedBase,
+  fetchAllMeta, upsertMeta, cacheLocal, readLocalCache,
+  type OntBaseType,
+} from "@/lib/ontSharedBases";
+import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -218,31 +225,63 @@ const RastreabilidadeOnt = () => {
 
   useEffect(() => {
     (async () => {
-      // Carrega do IndexedDB (com fallback para localStorage legado)
+      // 1) cache local primeiro (UI imediata) — versão antiga (legacy) inclusive.
       const legacy = (k: string) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } };
-      const load = async (k: string) => (await ontGet<any>(k)) ?? legacy(k);
-      setPresenca((await load(KEY_PRESENCA)) || []);
-      setSaldoGestech((await load(KEY_GESTECH)) || []);
-      setSaldoSap((await load(KEY_SAP)) || []);
-      setCruzamento((await load(KEY_CRUZAMENTO)) || []);
-      setAplicados((await load(KEY_APLICADOS)) || []);
-      setUploadTimestamps((await load("ont_rastreabilidade_timestamps")) || {});
+      const loadLocal = async (type: OntBaseType, legacyKey: string) =>
+        (await readLocalCache<any>(type)) ?? (await ontGet<any>(legacyKey)) ?? legacy(legacyKey) ?? [];
+
+      setPresenca(await loadLocal("presenca", KEY_PRESENCA));
+      setSaldoGestech(await loadLocal("gestech", KEY_GESTECH));
+      setSaldoSap(await loadLocal("sap", KEY_SAP));
+      setCruzamento(await loadLocal("cruzamento", KEY_CRUZAMENTO));
+      setAplicados(await loadLocal("aplicados", KEY_APLICADOS));
+
+      // 2) bases compartilhadas (fonte de verdade)
+      try {
+        const types: OntBaseType[] = ["presenca", "gestech", "sap", "cruzamento", "aplicados"];
+        const [pr, ge, sa, cr, ap, meta] = await Promise.all([
+          fetchSharedBase("presenca"),
+          fetchSharedBase("gestech"),
+          fetchSharedBase("sap"),
+          fetchSharedBase("cruzamento"),
+          fetchSharedBase("aplicados"),
+          fetchAllMeta(),
+        ]);
+        if (pr) { setPresenca(pr as any); cacheLocal("presenca", pr); }
+        if (ge) { setSaldoGestech(ge as any); cacheLocal("gestech", ge); }
+        if (sa) { setSaldoSap(sa as any); cacheLocal("sap", sa); }
+        if (cr) { setCruzamento(cr as any); cacheLocal("cruzamento", cr); }
+        if (ap) { setAplicados(ap as any); cacheLocal("aplicados", ap); }
+
+        const ts: Record<string, string> = {};
+        types.forEach((t) => {
+          if (meta[t]?.updated_at) ts[t] = new Date(meta[t].updated_at).toLocaleString("pt-BR");
+        });
+        if (Object.keys(ts).length) setUploadTimestamps(ts);
+      } catch (err) {
+        console.warn("Falha ao baixar bases compartilhadas:", err);
+      }
     })();
   }, []);
 
-  const saveBase = async (key: string, data: any, type: string) => {
+  const saveBase = async (_legacyKey: string, data: any, type: string) => {
     try {
-      await ontSet(key, data);
+      // 1) Sobrepõe a base compartilhada no Supabase (RLS limita a admins)
+      await uploadSharedBase(type as OntBaseType, data);
+      // 2) Atualiza metadata (qtd + usuário + data)
+      const { data: u } = await supabase.auth.getUser();
+      await upsertMeta(type as OntBaseType, data.length, u.user?.email ?? null);
+      // 3) Cache local
+      await cacheLocal(type as OntBaseType, data);
       const now = new Date().toLocaleString("pt-BR");
-      const updated = { ...uploadTimestamps, [type]: now };
-      setUploadTimestamps(updated);
-      await ontSet("ont_rastreabilidade_timestamps", updated);
+      setUploadTimestamps((prev) => ({ ...prev, [type]: now }));
+      toast.success("Base sobreposta e disponível para todos os usuários autorizados.");
     } catch (err: any) {
-      toast.error("Erro ao gravar base local: " + (err?.message || "desconhecido"));
+      toast.error("Erro ao gravar base compartilhada: " + (err?.message || "desconhecido"));
     }
   };
 
-  const handleClearBase = (type: string) => {
+  const handleClearBase = async (type: string) => {
     if (!isAdmin) {
       toast.error("Apenas administradores podem limpar bases.");
       return;
@@ -257,6 +296,15 @@ const RastreabilidadeOnt = () => {
     };
     const [setter, key] = map[type] || [];
     if (setter) { setter([]); ontDel(key); }
+    try {
+      await deleteSharedBase(type as OntBaseType);
+      await (supabase.from("ont_bases_meta" as any) as any).delete().eq("base_type", type);
+      await cacheLocal(type as OntBaseType, []);
+      setUploadTimestamps((prev) => { const c = { ...prev }; delete c[type]; return c; });
+    } catch (err: any) {
+      toast.error("Erro ao remover base compartilhada: " + (err?.message || "desconhecido"));
+      return;
+    }
     toast.success(`Base ${type.toUpperCase()} redefinida.`);
   };
 
@@ -359,6 +407,71 @@ const RastreabilidadeOnt = () => {
     }
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Caso especial: ALL_GPON_ONU.ZIP — várias CSVs empilhadas (header na linha 10)
+    if (type === "aplicados" && /\.zip$/i.test(file.name)) {
+      (async () => {
+        try {
+          toast.info("Processando ZIP de Ativos na Planta… pode levar alguns segundos.");
+          const buf = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(buf);
+          const csvEntries = Object.values(zip.files).filter(
+            (f) => !f.dir && /\.csv$/i.test(f.name),
+          );
+          if (csvEntries.length === 0) {
+            toast.error("Nenhum CSV encontrado dentro do ZIP.");
+            return;
+          }
+          const parsed: SerialAplicado[] = [];
+          for (const entry of csvEntries) {
+            const text = await entry.async("string");
+            // Detecta separador (na maioria das vezes vírgula; alguns sistemas usam ; ou tab)
+            const firstLines = text.split(/\r?\n/).slice(0, 15).join("\n");
+            let delim: string = ",";
+            if ((firstLines.match(/;/g) || []).length > (firstLines.match(/,/g) || []).length) delim = ";";
+            else if ((firstLines.match(/\t/g) || []).length > (firstLines.match(/,/g) || []).length) delim = "\t";
+
+            // Pula primeiras 9 linhas; usa a 10ª como cabeçalho.
+            const wb = XLSX.read(text, { type: "string", FS: delim, raw: false });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: "", raw: false, range: 9 });
+            rows.forEach((r: any) => {
+              const sn = norm(pick(r, ["SN", "sn", "Serial Number", "SERIAL NUMBER"]));
+              // SN normalmente vem como "VENDOR1234 (REALSERIAL)" — extrai o que está entre parênteses
+              const m = sn.match(/\(([^)]+)\)/);
+              const serial = upper(m ? m[1] : sn);
+              if (!serial) return;
+              const alias = norm(pick(r, ["Alias", "ALIAS"]));
+              const deviceName = norm(pick(r, ["DEVICE NAME", "Device Name", "DeviceName"]));
+              const onuLocation = norm(pick(r, ["NAME", "Name"]));
+              parsed.push({
+                serial,
+                codigo_material: norm(pick(r, ["EQUIP TYPE", "Equip Type", "EQUIPMENT TYPE", "VENDOR"])),
+                nome_material: deviceName || norm(pick(r, ["MODEL", "Model"])),
+                cliente: alias, // identificação do cliente (GPON)
+                gpon: onuLocation, // ONU/frame/slot/port/onuID
+                alias,
+                data_instalacao: norm(pick(r, ["DATE", "Date", "INSTALL DATE", "Install Date"])),
+                tecnico_instalador: "",
+              });
+            });
+          }
+          // Dedup por serial (mantém última ocorrência)
+          const map: Record<string, SerialAplicado> = {};
+          parsed.forEach((p) => { map[upper(p.serial)] = p; });
+          const finalRows = Object.values(map);
+          setAplicados(finalRows);
+          await saveBase(KEY_APLICADOS, finalRows, "aplicados");
+          toast.success(`${finalRows.length} seriais aplicados importados do ZIP (${csvEntries.length} CSV(s)).`);
+        } catch (err: any) {
+          toast.error("Erro ao processar ZIP: " + (err?.message || "desconhecido"));
+        } finally {
+          e.target.value = "";
+        }
+      })();
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -552,7 +665,7 @@ const RastreabilidadeOnt = () => {
       return { type: "empty", message: "Nenhum técnico localizado com essa matrícula." };
     }
     const nome = dim?.funcionario || techGestech[0]?.nome_tecnico || tt;
-    const supervisor = dim?.supervisor || "—";
+    const supervisor = dim?.supervisor || "Desligados";
     const coordenador = dim?.coordenador || "—";
     const tr = dim?.tr || "—";
 
@@ -653,7 +766,7 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor || "—",
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
           deposito: sap?.deposito || cross.deposito || "—",
           statusSap: sap?.status_sap || "—",
@@ -683,7 +796,7 @@ const RastreabilidadeOnt = () => {
       saldoGestech.forEach((g: any) => {
         if (!codes.includes(String(g.codigo_material))) return;
         const dim = enrichByTT(g.matricula_tt);
-        const sup = dim?.supervisor || "—";
+        const sup = dim?.supervisor || "Desligados";
         const coord = dim?.coordenador || "—";
         if (!bySupervisor[sup]) bySupervisor[sup] = { supervisor: sup, total: 0, techs: {} };
         const tt = g.matricula_tt;
@@ -758,9 +871,9 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor,
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
-          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "—"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
+          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "Desligados"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
         };
       }
       const sap = sapBySerial[key];
@@ -905,7 +1018,13 @@ const RastreabilidadeOnt = () => {
         <p className="text-xs text-slate-500 leading-relaxed">{longDesc}</p>
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <div className="flex-1 relative">
-            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" id={`upload-${type}`} onChange={(e) => handleFileUpload(e, type)} />
+            <input
+              type="file"
+              accept={type === "aplicados" ? ".xlsx, .xls, .csv, .zip" : ".xlsx, .xls, .csv"}
+              className="hidden"
+              id={`upload-${type}`}
+              onChange={(e) => handleFileUpload(e, type)}
+            />
             <label htmlFor={`upload-${type}`}>
               <Button asChild variant="outline" className="w-full text-xs border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer">
                 <span><Upload className="w-3.5 h-3.5 mr-2" />Importar Planilha</span>
@@ -938,7 +1057,7 @@ const RastreabilidadeOnt = () => {
             <Users className="w-3 h-3 mr-1.5" /> {presenca.length} colaboradores ativos
           </Badge>
           <Badge variant="secondary" className="px-3 py-1 bg-slate-100 text-slate-700 font-medium text-xs rounded-full">
-            <Database className="w-3 h-3 mr-1.5" /> Local Cache
+            <Database className="w-3 h-3 mr-1.5" /> Bases compartilhadas
           </Badge>
         </div>
       </div>
@@ -1493,8 +1612,8 @@ const RastreabilidadeOnt = () => {
               longDesc="Importe a planilha 'Saldo SAP PA TA SC'. Mantém colunas Material, Texto breve, Nº de série, Centro, Depósito, Modificado em/por, Status, Lote — filtrado para ONT/ROTEADOR." />
             <BaseCard color="bg-amber-500" title="3. Cruzamento SAP x Gestech" desc="Histórico de operações por serial (última prevalece)" count={cruzamentoDedup.length} ts={uploadTimestamps.cruzamento} type="cruzamento"
               longDesc="Importe a planilha 'Consulta Serial SAP X Gestech'. O sistema deduplica por serial mantendo a última 'ultimaoperacaoem'. Cruza por 'serial' (SAP) e 'codmat' + 'matricula' (Gestech)." />
-            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aguardando base oficial" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
-              longDesc="Estrutura preparada para receber a base 'Ativos na Planta'. Sem dados fictícios para não atravessar a informação — importe quando disponível." />
+            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aceita ZIP ALL_GPON_ONU (vários CSVs)" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
+              longDesc="Pode importar o ZIP original ALL_GPON_ONU.ZIP — o sistema descompacta, empilha todos os CSVs, pula as 9 primeiras linhas e usa a linha 10 como cabeçalho. Extrai o serial do campo SN (entre parênteses), Alias (cliente/GPON), DEVICE NAME (ONU) e NAME (frame/slot/porta/onuID)." />
           </div>
         </TabsContent>
       </Tabs>
