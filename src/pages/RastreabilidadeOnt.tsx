@@ -225,31 +225,63 @@ const RastreabilidadeOnt = () => {
 
   useEffect(() => {
     (async () => {
-      // Carrega do IndexedDB (com fallback para localStorage legado)
+      // 1) cache local primeiro (UI imediata) — versão antiga (legacy) inclusive.
       const legacy = (k: string) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } };
-      const load = async (k: string) => (await ontGet<any>(k)) ?? legacy(k);
-      setPresenca((await load(KEY_PRESENCA)) || []);
-      setSaldoGestech((await load(KEY_GESTECH)) || []);
-      setSaldoSap((await load(KEY_SAP)) || []);
-      setCruzamento((await load(KEY_CRUZAMENTO)) || []);
-      setAplicados((await load(KEY_APLICADOS)) || []);
-      setUploadTimestamps((await load("ont_rastreabilidade_timestamps")) || {});
+      const loadLocal = async (type: OntBaseType, legacyKey: string) =>
+        (await readLocalCache<any>(type)) ?? (await ontGet<any>(legacyKey)) ?? legacy(legacyKey) ?? [];
+
+      setPresenca(await loadLocal("presenca", KEY_PRESENCA));
+      setSaldoGestech(await loadLocal("gestech", KEY_GESTECH));
+      setSaldoSap(await loadLocal("sap", KEY_SAP));
+      setCruzamento(await loadLocal("cruzamento", KEY_CRUZAMENTO));
+      setAplicados(await loadLocal("aplicados", KEY_APLICADOS));
+
+      // 2) bases compartilhadas (fonte de verdade)
+      try {
+        const types: OntBaseType[] = ["presenca", "gestech", "sap", "cruzamento", "aplicados"];
+        const [pr, ge, sa, cr, ap, meta] = await Promise.all([
+          fetchSharedBase("presenca"),
+          fetchSharedBase("gestech"),
+          fetchSharedBase("sap"),
+          fetchSharedBase("cruzamento"),
+          fetchSharedBase("aplicados"),
+          fetchAllMeta(),
+        ]);
+        if (pr) { setPresenca(pr as any); cacheLocal("presenca", pr); }
+        if (ge) { setSaldoGestech(ge as any); cacheLocal("gestech", ge); }
+        if (sa) { setSaldoSap(sa as any); cacheLocal("sap", sa); }
+        if (cr) { setCruzamento(cr as any); cacheLocal("cruzamento", cr); }
+        if (ap) { setAplicados(ap as any); cacheLocal("aplicados", ap); }
+
+        const ts: Record<string, string> = {};
+        types.forEach((t) => {
+          if (meta[t]?.updated_at) ts[t] = new Date(meta[t].updated_at).toLocaleString("pt-BR");
+        });
+        if (Object.keys(ts).length) setUploadTimestamps(ts);
+      } catch (err) {
+        console.warn("Falha ao baixar bases compartilhadas:", err);
+      }
     })();
   }, []);
 
-  const saveBase = async (key: string, data: any, type: string) => {
+  const saveBase = async (_legacyKey: string, data: any, type: string) => {
     try {
-      await ontSet(key, data);
+      // 1) Sobrepõe a base compartilhada no Supabase (RLS limita a admins)
+      await uploadSharedBase(type as OntBaseType, data);
+      // 2) Atualiza metadata (qtd + usuário + data)
+      const { data: u } = await supabase.auth.getUser();
+      await upsertMeta(type as OntBaseType, data.length, u.user?.email ?? null);
+      // 3) Cache local
+      await cacheLocal(type as OntBaseType, data);
       const now = new Date().toLocaleString("pt-BR");
-      const updated = { ...uploadTimestamps, [type]: now };
-      setUploadTimestamps(updated);
-      await ontSet("ont_rastreabilidade_timestamps", updated);
+      setUploadTimestamps((prev) => ({ ...prev, [type]: now }));
+      toast.success("Base sobreposta e disponível para todos os usuários autorizados.");
     } catch (err: any) {
-      toast.error("Erro ao gravar base local: " + (err?.message || "desconhecido"));
+      toast.error("Erro ao gravar base compartilhada: " + (err?.message || "desconhecido"));
     }
   };
 
-  const handleClearBase = (type: string) => {
+  const handleClearBase = async (type: string) => {
     if (!isAdmin) {
       toast.error("Apenas administradores podem limpar bases.");
       return;
@@ -264,6 +296,15 @@ const RastreabilidadeOnt = () => {
     };
     const [setter, key] = map[type] || [];
     if (setter) { setter([]); ontDel(key); }
+    try {
+      await deleteSharedBase(type as OntBaseType);
+      await (supabase.from("ont_bases_meta" as any) as any).delete().eq("base_type", type);
+      await cacheLocal(type as OntBaseType, []);
+      setUploadTimestamps((prev) => { const c = { ...prev }; delete c[type]; return c; });
+    } catch (err: any) {
+      toast.error("Erro ao remover base compartilhada: " + (err?.message || "desconhecido"));
+      return;
+    }
     toast.success(`Base ${type.toUpperCase()} redefinida.`);
   };
 
