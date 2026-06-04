@@ -1068,6 +1068,7 @@ type DinamicaProps = {
   cidades: [string, number][];
   bairros: [string, number][];
   cdos: [string, number][];
+  cdoMeta: Map<string, { estacao: string; cidade: string }>;
   comPotencia: number;
   semPotencia: number;
   totalAberto: number;
@@ -1088,7 +1089,7 @@ type DinamicaProps = {
 };
 
 const DinamicaPanel = ({
-  cidades, bairros, cdos, comPotencia, semPotencia, totalAberto,
+  cidades, bairros, cdos, cdoMeta, comPotencia, semPotencia, totalAberto,
   chartDataDay, chartDataHour, selectedDay, setSelectedDay,
   municipioFilter, setMunicipioFilter,
   bairroFilter, setBairroFilter,
