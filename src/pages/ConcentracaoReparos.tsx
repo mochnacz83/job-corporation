@@ -1268,9 +1268,30 @@ const DinamicaPanel = ({
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topCdos} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+            <BarChart data={topCdos} layout="vertical" margin={{ left: 30, right: 20, top: 5, bottom: 5 }}>
               <XAxis type="number" hide={true} />
-              <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={180}
+                tick={(props: any) => {
+                  const { x, y, payload } = props;
+                  const meta = cdoMeta.get(String(payload.value)) || { estacao: "", cidade: "" };
+                  const sub = [meta.estacao, meta.cidade].filter(Boolean).join(" · ");
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text x={-5} y={-2} fontSize={10} textAnchor="end" fontWeight="600" fill="hsl(var(--foreground))">
+                        {payload.value}
+                      </text>
+                      {sub && (
+                        <text x={-5} y={10} fontSize={8} textAnchor="end" opacity={0.6} fill="hsl(var(--foreground))">
+                          {sub}
+                        </text>
+                      )}
+                    </g>
+                  );
+                }}
+              />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Bar
                 dataKey="value"
