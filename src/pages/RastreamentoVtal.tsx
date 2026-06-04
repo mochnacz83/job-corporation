@@ -147,7 +147,7 @@ const RastreamentoVtal = () => {
             srcDoc={htmlContent}
             title={title}
             className="w-full h-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-downloads"
+            sandbox="allow-scripts allow-popups allow-forms allow-downloads"
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground p-4 text-center">
