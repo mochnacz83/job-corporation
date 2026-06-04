@@ -401,6 +401,19 @@ const ConcentracaoReparos = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredBase, bairroOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]);
 
+  // Meta info por CDO: estação (sigla) + cidade — apenas para exibição no gráfico
+  const cdoMeta = useMemo(() => {
+    const m = new Map<string, { estacao: string; cidade: string }>();
+    filteredBase.forEach((r) => {
+      const c = getRaw(r, ["cdo"]).toUpperCase();
+      if (!c || m.has(c)) return;
+      const estacao = getRaw(r, ["cd_estacao"]).toUpperCase();
+      const cidade = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
+      m.set(c, { estacao, cidade });
+    });
+    return m;
+  }, [filteredBase]);
+
   const cidadesConcentradas = useMemo(() => {
     const m = new Map<string, number>();
     applyCardToggles({ cidade: true }).forEach((r) => {
@@ -1023,6 +1036,7 @@ const ConcentracaoReparos = () => {
             cidades={cidadesConcentradas}
             bairros={bairrosConcentrados}
             cdos={cdosConcentradas}
+            cdoMeta={cdoMeta}
             comPotencia={comPotenciaCount}
             semPotencia={semPotenciaCount}
             totalAberto={totalAberto}
