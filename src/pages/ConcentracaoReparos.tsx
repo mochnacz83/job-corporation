@@ -1213,7 +1213,25 @@ const DinamicaPanel = ({
                   );
                 }} 
               />
-              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Tooltip
+                cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
+                content={({ active, payload }: any) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const name = String(payload[0]?.payload?.name ?? "");
+                  const value = payload[0]?.value;
+                  const meta = cdoMeta.get(name) || { estacao: "", cidade: "" };
+                  const sub = [meta.estacao, meta.cidade].filter(Boolean).join(" · ");
+                  return (
+                    <div className="rounded-md border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                      <div className="font-semibold text-foreground">{name}</div>
+                      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+                      <div className="mt-1 text-foreground">
+                        Atividades abertas: <span className="font-mono font-medium">{value}</span>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
               <Bar
                 dataKey="value"
                 radius={[0, 4, 4, 0]}
