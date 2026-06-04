@@ -1147,7 +1147,25 @@ const DinamicaPanel = ({
             <BarChart data={topCidades} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
               <XAxis type="number" hide={true} />
               <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{ fontSize: 11 }} />
+              <Tooltip
+                contentStyle={{ fontSize: 11 }}
+                content={({ active, payload }: any) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const p = payload[0];
+                  const name = String(p?.payload?.name ?? "");
+                  const meta = cdoMeta.get(name) || { estacao: "", cidade: "" };
+                  const sub = [meta.estacao, meta.cidade].filter(Boolean).join(" · ");
+                  return (
+                    <div className="rounded-md border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                      <div className="font-semibold text-foreground">{name}</div>
+                      {sub && <div className="text-[10px] text-muted-foreground mt-0.5">{sub}</div>}
+                      <div className="mt-1 text-foreground">
+                        Atividades abertas: <span className="font-mono font-medium">{p.value}</span>
+                      </div>
+                    </div>
+                  );
+                }}
+              />
               <Bar
                 dataKey="value"
                 radius={[0, 4, 4, 0]}
