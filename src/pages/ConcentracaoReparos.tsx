@@ -401,6 +401,19 @@ const ConcentracaoReparos = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredBase, bairroOnlyConc, cidadeOnlyConc, comPotenciaOnly, semPotenciaOnly, timOnly, nioOnly, bairroCount, cdoCount, cidadeCount]);
 
+  // Meta info por CDO: estação (sigla) + cidade — apenas para exibição no gráfico
+  const cdoMeta = useMemo(() => {
+    const m = new Map<string, { estacao: string; cidade: string }>();
+    filteredBase.forEach((r) => {
+      const c = getRaw(r, ["cdo"]).toUpperCase();
+      if (!c || m.has(c)) return;
+      const estacao = getRaw(r, ["cd_estacao"]).toUpperCase();
+      const cidade = cleanLocal(getRaw(r, ["ds_municipio"])).toUpperCase();
+      m.set(c, { estacao, cidade });
+    });
+    return m;
+  }, [filteredBase]);
+
   const cidadesConcentradas = useMemo(() => {
     const m = new Map<string, number>();
     applyCardToggles({ cidade: true }).forEach((r) => {
@@ -1023,6 +1036,7 @@ const ConcentracaoReparos = () => {
             cidades={cidadesConcentradas}
             bairros={bairrosConcentrados}
             cdos={cdosConcentradas}
+            cdoMeta={cdoMeta}
             comPotencia={comPotenciaCount}
             semPotencia={semPotenciaCount}
             totalAberto={totalAberto}
@@ -1054,6 +1068,7 @@ type DinamicaProps = {
   cidades: [string, number][];
   bairros: [string, number][];
   cdos: [string, number][];
+  cdoMeta: Map<string, { estacao: string; cidade: string }>;
   comPotencia: number;
   semPotencia: number;
   totalAberto: number;
@@ -1074,7 +1089,7 @@ type DinamicaProps = {
 };
 
 const DinamicaPanel = ({
-  cidades, bairros, cdos, comPotencia, semPotencia, totalAberto,
+  cidades, bairros, cdos, cdoMeta, comPotencia, semPotencia, totalAberto,
   chartDataDay, chartDataHour, selectedDay, setSelectedDay,
   municipioFilter, setMunicipioFilter,
   bairroFilter, setBairroFilter,
@@ -1253,9 +1268,30 @@ const DinamicaPanel = ({
           <div className="h-full flex items-center justify-center text-xs text-muted-foreground">Sem dados</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topCdos} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+            <BarChart data={topCdos} layout="vertical" margin={{ left: 30, right: 20, top: 5, bottom: 5 }}>
               <XAxis type="number" hide={true} />
-              <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 10 }} />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={180}
+                tick={(props: any) => {
+                  const { x, y, payload } = props;
+                  const meta = cdoMeta.get(String(payload.value)) || { estacao: "", cidade: "" };
+                  const sub = [meta.estacao, meta.cidade].filter(Boolean).join(" · ");
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text x={-5} y={-2} fontSize={10} textAnchor="end" fontWeight="600" fill="hsl(var(--foreground))">
+                        {payload.value}
+                      </text>
+                      {sub && (
+                        <text x={-5} y={10} fontSize={8} textAnchor="end" opacity={0.6} fill="hsl(var(--foreground))">
+                          {sub}
+                        </text>
+                      )}
+                    </g>
+                  );
+                }}
+              />
               <Tooltip contentStyle={{ fontSize: 11 }} />
               <Bar
                 dataKey="value"
