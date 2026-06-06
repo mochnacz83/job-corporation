@@ -1828,14 +1828,16 @@ const AtividadesEncerramento = () => {
               </Badge>
             );
           })()}
-          <Badge
-            variant={schedule.enabled ? "default" : "outline"}
-            className="text-[10px] gap-1"
-            title={`Cron: ${cronPreview}`}
-          >
-            <Clock className="w-3 h-3" />
-            {schedule.enabled ? scheduleSummary : "Auto: desativado"}
-          </Badge>
+          {!schedule.enabled && (
+            <Badge
+              variant="outline"
+              className="text-[10px] gap-1"
+              title={`Cron: ${cronPreview}`}
+            >
+              <Clock className="w-3 h-3" />
+              Auto: desativado
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="dt" className="text-xs">Data:</Label>
