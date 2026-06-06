@@ -156,6 +156,7 @@ const MultiFilter = ({
 
 const ConcentracaoReparos = () => {
   useAccessTracking("/concentracao-reparos", true, "Concentração de Reparos");
+  const { isAdmin } = useAuth();
   const [fato, setFato] = useState<FatoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
