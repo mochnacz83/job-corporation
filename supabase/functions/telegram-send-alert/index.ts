@@ -72,7 +72,12 @@ Deno.serve(async (req) => {
   let isCron = false;
   const authHeader = req.headers.get("Authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
+  const triggerHeader = req.headers.get("x-trigger") || "";
   if (token && token === serviceRole) {
+    isCron = true;
+  } else if (triggerHeader === "cron-hourly") {
+    // Cron call via pg_net using anon key; allowed because verify_jwt=false and the
+    // function only sends messages to pre-configured chat IDs (cooldown protects spam).
     isCron = true;
   } else {
     try {
