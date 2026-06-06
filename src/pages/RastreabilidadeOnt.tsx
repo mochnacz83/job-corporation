@@ -18,6 +18,13 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { ontGet, ontSet, ontDel } from "@/lib/ontStorage";
+import JSZip from "jszip";
+import {
+  fetchSharedBase, uploadSharedBase, deleteSharedBase,
+  fetchAllMeta, upsertMeta, cacheLocal, readLocalCache,
+  type OntBaseType,
+} from "@/lib/ontSharedBases";
+import { supabase } from "@/integrations/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -47,7 +54,15 @@ interface SaldoGestech {
   nome_tecnico: string;  // armazem
   codigo_material: string; // codmaterial
   nome_material: string;   // material
-  quantidade: number;      // soma de saldo
+  quantidade: number;      // soma de "saldo" (mantido p/ compat)
+  saldo: number;
+  disponivel: number;
+  reversa: number;
+  devolucao: number;
+  defeito: number;
+  bloqueado: number;
+  achegar: number;
+  emtransito: number;
 }
 
 // 2. Saldo SAP (Saldo_Sap_PA_TA_SC) — granularidade serial
@@ -108,10 +123,13 @@ const numberOr0 = (v: any) => {
   const n = Number(String(v ?? "0").replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 };
-const isOntOrRoteador = (mat: string) => {
+// Filtro de materiais: ONT, ROTEADOR, MESH e REPETIDOR (chave do escopo de rastreabilidade).
+const isAllowedMaterial = (mat: string) => {
   const m = upper(mat);
-  return m.includes("ONT") || m.includes("ROTEADOR");
+  return m.includes("ONT") || m.includes("ROTEADOR") || m.includes("MESH") || m.includes("REPETIDOR");
 };
+// alias legado mantido para evitar quebra de referências
+const isOntOrRoteador = isAllowedMaterial;
 // Aceita várias variantes de chave do header
 const pick = (row: any, keys: string[]) => {
   const map: Record<string, any> = {};
@@ -186,10 +204,16 @@ const RastreabilidadeOnt = () => {
   const [cruzamento, setCruzamento] = useState<CruzamentoSapGestech[]>([]);
   const [aplicados, setAplicados] = useState<SerialAplicado[]>([]);
 
-  const [searchType, setSearchType] = useState<"matricula" | "nome" | "serial" | "supervisor" | "tr" | "coordenador">("matricula");
+  const [searchType, setSearchType] = useState<"matricula" | "nome" | "serial" | "supervisor" | "tr" | "coordenador" | "codigo">("matricula");
   const [searchQuery, setSearchQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
   const [searchResults, setSearchResults] = useState<any>(null);
+  // Guarda último resultado de supervisor/coordenador p/ permitir voltar
+  const [supervisorContext, setSupervisorContext] = useState<any>(null);
+  // Drilldown do Saldo Gestech
+  const [showGestechDrill, setShowGestechDrill] = useState(false);
+  // Drilldown por código (supervisor expandido)
+  const [expandedSupervisor, setExpandedSupervisor] = useState<string | null>(null);
 
   const [massInput, setMassInput] = useState("");
   const [massResults, setMassResults] = useState<any[]>([]);
@@ -201,31 +225,63 @@ const RastreabilidadeOnt = () => {
 
   useEffect(() => {
     (async () => {
-      // Carrega do IndexedDB (com fallback para localStorage legado)
+      // 1) cache local primeiro (UI imediata) — versão antiga (legacy) inclusive.
       const legacy = (k: string) => { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch { return null; } };
-      const load = async (k: string) => (await ontGet<any>(k)) ?? legacy(k);
-      setPresenca((await load(KEY_PRESENCA)) || []);
-      setSaldoGestech((await load(KEY_GESTECH)) || []);
-      setSaldoSap((await load(KEY_SAP)) || []);
-      setCruzamento((await load(KEY_CRUZAMENTO)) || []);
-      setAplicados((await load(KEY_APLICADOS)) || []);
-      setUploadTimestamps((await load("ont_rastreabilidade_timestamps")) || {});
+      const loadLocal = async (type: OntBaseType, legacyKey: string) =>
+        (await readLocalCache<any>(type)) ?? (await ontGet<any>(legacyKey)) ?? legacy(legacyKey) ?? [];
+
+      setPresenca(await loadLocal("presenca", KEY_PRESENCA));
+      setSaldoGestech(await loadLocal("gestech", KEY_GESTECH));
+      setSaldoSap(await loadLocal("sap", KEY_SAP));
+      setCruzamento(await loadLocal("cruzamento", KEY_CRUZAMENTO));
+      setAplicados(await loadLocal("aplicados", KEY_APLICADOS));
+
+      // 2) bases compartilhadas (fonte de verdade)
+      try {
+        const types: OntBaseType[] = ["presenca", "gestech", "sap", "cruzamento", "aplicados"];
+        const [pr, ge, sa, cr, ap, meta] = await Promise.all([
+          fetchSharedBase("presenca"),
+          fetchSharedBase("gestech"),
+          fetchSharedBase("sap"),
+          fetchSharedBase("cruzamento"),
+          fetchSharedBase("aplicados"),
+          fetchAllMeta(),
+        ]);
+        if (pr) { setPresenca(pr as any); cacheLocal("presenca", pr); }
+        if (ge) { setSaldoGestech(ge as any); cacheLocal("gestech", ge); }
+        if (sa) { setSaldoSap(sa as any); cacheLocal("sap", sa); }
+        if (cr) { setCruzamento(cr as any); cacheLocal("cruzamento", cr); }
+        if (ap) { setAplicados(ap as any); cacheLocal("aplicados", ap); }
+
+        const ts: Record<string, string> = {};
+        types.forEach((t) => {
+          if (meta[t]?.updated_at) ts[t] = new Date(meta[t].updated_at).toLocaleString("pt-BR");
+        });
+        if (Object.keys(ts).length) setUploadTimestamps(ts);
+      } catch (err) {
+        console.warn("Falha ao baixar bases compartilhadas:", err);
+      }
     })();
   }, []);
 
-  const saveBase = async (key: string, data: any, type: string) => {
+  const saveBase = async (_legacyKey: string, data: any, type: string) => {
     try {
-      await ontSet(key, data);
+      // 1) Sobrepõe a base compartilhada no Supabase (RLS limita a admins)
+      await uploadSharedBase(type as OntBaseType, data);
+      // 2) Atualiza metadata (qtd + usuário + data)
+      const { data: u } = await supabase.auth.getUser();
+      await upsertMeta(type as OntBaseType, data.length, u.user?.email ?? null);
+      // 3) Cache local
+      await cacheLocal(type as OntBaseType, data);
       const now = new Date().toLocaleString("pt-BR");
-      const updated = { ...uploadTimestamps, [type]: now };
-      setUploadTimestamps(updated);
-      await ontSet("ont_rastreabilidade_timestamps", updated);
+      setUploadTimestamps((prev) => ({ ...prev, [type]: now }));
+      toast.success("Base sobreposta e disponível para todos os usuários autorizados.");
     } catch (err: any) {
-      toast.error("Erro ao gravar base local: " + (err?.message || "desconhecido"));
+      toast.error("Erro ao gravar base compartilhada: " + (err?.message || "desconhecido"));
     }
   };
 
-  const handleClearBase = (type: string) => {
+  const handleClearBase = async (type: string) => {
     if (!isAdmin) {
       toast.error("Apenas administradores podem limpar bases.");
       return;
@@ -240,6 +296,15 @@ const RastreabilidadeOnt = () => {
     };
     const [setter, key] = map[type] || [];
     if (setter) { setter([]); ontDel(key); }
+    try {
+      await deleteSharedBase(type as OntBaseType);
+      await (supabase.from("ont_bases_meta" as any) as any).delete().eq("base_type", type);
+      await cacheLocal(type as OntBaseType, []);
+      setUploadTimestamps((prev) => { const c = { ...prev }; delete c[type]; return c; });
+    } catch (err: any) {
+      toast.error("Erro ao remover base compartilhada: " + (err?.message || "desconhecido"));
+      return;
+    }
     toast.success(`Base ${type.toUpperCase()} redefinida.`);
   };
 
@@ -303,6 +368,31 @@ const RastreabilidadeOnt = () => {
     return m;
   }, [saldoSap]);
 
+  // Totais Gestech (somas das colunas), p/ painel "Bases ativas" e drilldown.
+  const gestechTotals = useMemo(() => {
+    const t = { saldo: 0, disponivel: 0, reversa: 0, devolucao: 0, defeito: 0, bloqueado: 0, achegar: 0, emtransito: 0 };
+    saldoGestech.forEach((g: any) => {
+      t.saldo       += g.saldo       || 0;
+      t.disponivel  += g.disponivel  || 0;
+      t.reversa     += g.reversa     || 0;
+      t.devolucao   += g.devolucao   || 0;
+      t.defeito     += g.defeito     || 0;
+      t.bloqueado   += g.bloqueado   || 0;
+      t.achegar     += g.achegar     || 0;
+      t.emtransito  += g.emtransito  || 0;
+    });
+    return t;
+  }, [saldoGestech]);
+
+  // Lista única de códigos de material disponíveis nas bases (p/ filtro por código)
+  const codigosDisponiveis = useMemo(() => {
+    const s = new Set<string>();
+    saldoGestech.forEach((g: any) => g.codigo_material && s.add(String(g.codigo_material)));
+    cruzamentoDedup.forEach((c) => c.codmat && s.add(String(c.codmat)));
+    saldoSap.forEach((x) => x.codigo_material && s.add(String(x.codigo_material)));
+    return Array.from(s).sort();
+  }, [saldoGestech, cruzamentoDedup, saldoSap]);
+
   // QR Code state — popup discreto ao clicar no botão ao lado do serial.
   const [qrSerial, setQrSerial] = useState<string | null>(null);
 
@@ -317,6 +407,104 @@ const RastreabilidadeOnt = () => {
     }
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Caso especial: ALL_GPON_ONU.ZIP — várias CSVs empilhadas (header na linha 10)
+    if (type === "aplicados" && /\.zip$/i.test(file.name)) {
+      (async () => {
+        try {
+          toast.info("Processando ZIP de Ativos na Planta… pode levar alguns segundos.");
+          const buf = await file.arrayBuffer();
+          const zip = await JSZip.loadAsync(buf);
+          const csvEntries = Object.values(zip.files).filter(
+            (f) => !f.dir && /\.csv$/i.test(f.name),
+          );
+          if (csvEntries.length === 0) {
+            toast.error("Nenhum CSV encontrado dentro do ZIP.");
+            return;
+          }
+          // Parser CSV manual (suporta campos entre aspas com vírgulas e quebras de linha).
+          const parseCSV = (text: string, delim: string): string[][] => {
+            const out: string[][] = [];
+            let row: string[] = [];
+            let cur = "";
+            let inQ = false;
+            for (let i = 0; i < text.length; i++) {
+              const c = text[i];
+              if (inQ) {
+                if (c === '"') {
+                  if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
+                } else cur += c;
+              } else {
+                if (c === '"') inQ = true;
+                else if (c === delim) { row.push(cur); cur = ""; }
+                else if (c === "\n") { row.push(cur); out.push(row); row = []; cur = ""; }
+                else if (c === "\r") { /* skip */ }
+                else cur += c;
+              }
+            }
+            if (cur.length > 0 || row.length > 0) { row.push(cur); out.push(row); }
+            return out;
+          };
+
+          const parsed: SerialAplicado[] = [];
+          const perFile: { name: string; rows: number }[] = [];
+          for (const entry of csvEntries) {
+            const text = await entry.async("string");
+            const sample = text.split(/\r?\n/).slice(0, 15).join("\n");
+            let delim: string = ",";
+            if ((sample.match(/;/g) || []).length > (sample.match(/,/g) || []).length) delim = ";";
+            else if ((sample.match(/\t/g) || []).length > (sample.match(/,/g) || []).length) delim = "\t";
+
+            const all = parseCSV(text, delim);
+            if (all.length <= 10) { perFile.push({ name: entry.name, rows: 0 }); continue; }
+            const header = all[9].map((h) => String(h || "").trim());
+            const dataRows = all.slice(10).filter((r) => r.some((c) => String(c || "").trim() !== ""));
+            let added = 0;
+            dataRows.forEach((rr) => {
+              const r: Record<string, string> = {};
+              header.forEach((h, i) => { r[h] = rr[i] ?? ""; });
+              const sn = norm(pick(r, ["SN", "sn", "Serial Number", "SERIAL NUMBER"]));
+              const m = sn.match(/\(([^)]+)\)/);
+              const serial = upper(m ? m[1] : sn);
+              if (!serial) return;
+              const alias = norm(pick(r, ["Alias", "ALIAS"]));
+              const deviceName = norm(pick(r, ["DEVICE NAME", "Device Name", "DeviceName"]));
+              const onuLocation = norm(pick(r, ["NAME", "Name"]));
+              parsed.push({
+                serial,
+                codigo_material: norm(pick(r, ["EQUIP TYPE", "Equip Type", "EQUIPMENT TYPE", "VENDOR"])),
+                nome_material: deviceName || norm(pick(r, ["MODEL", "Model"])),
+                cliente: alias, // identificação do cliente (GPON)
+                gpon: onuLocation, // ONU/frame/slot/port/onuID
+                alias,
+                data_instalacao: norm(pick(r, ["DATE", "Date", "INSTALL DATE", "Install Date"])),
+                tecnico_instalador: "",
+              });
+              added++;
+            });
+            perFile.push({ name: entry.name, rows: added });
+          }
+          // Dedup por serial (mantém última ocorrência)
+          const map: Record<string, SerialAplicado> = {};
+          parsed.forEach((p) => { map[upper(p.serial)] = p; });
+          const finalRows = Object.values(map);
+          console.log("[ONT ZIP] CSVs:", perFile, "bruto:", parsed.length, "após dedup:", finalRows.length);
+          setAplicados(finalRows);
+          await saveBase(KEY_APLICADOS, finalRows, "aplicados");
+          const detalhe = perFile.map((p) => `${p.name.split("/").pop()}: ${p.rows.toLocaleString("pt-BR")}`).join(" | ");
+          toast.success(
+            `ZIP processado: ${csvEntries.length} CSV(s) · ${parsed.length.toLocaleString("pt-BR")} linhas brutas · ${finalRows.length.toLocaleString("pt-BR")} seriais únicos. ${detalhe}`,
+            { duration: 15000 },
+          );
+        } catch (err: any) {
+          toast.error("Erro ao processar ZIP: " + (err?.message || "desconhecido"));
+        } finally {
+          e.target.value = "";
+        }
+      })();
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -353,14 +541,21 @@ const RastreabilidadeOnt = () => {
         if (type === "gestech") {
           // Planilha vinda do sistema possui 2 linhas de título — header está na linha 3.
           const j = readSheetForcedHeader(workbook, 3);
-          // Mapeia linhas, filtra ONT/ROTEADOR
+          // Mapeia linhas, filtra ONT/ROTEADOR/MESH/REPETIDOR
           const rows = j.map((r: any) => ({
             tt: upper(pick(r, ["codarmazem", "matricula", "matricula_tt", "Matrícula"])),
             nome: norm(pick(r, ["armazem", "nome_tecnico", "Nome Técnico", "Nome"])),
             codmat: norm(pick(r, ["codmaterial", "codigo_material", "Código"])),
             mat: norm(pick(r, ["material", "nome_material", "Material"])),
-            saldo: numberOr0(pick(r, ["saldo", "Quantidade", "quantidade", "Qtd"])),
-          })).filter((x) => x.tt && x.codmat && isOntOrRoteador(x.mat));
+            saldo: numberOr0(pick(r, ["saldo", "Saldo", "Quantidade", "quantidade", "Qtd"])),
+            disponivel: numberOr0(pick(r, ["disponivel", "Disponivel", "disponível", "Disponível"])),
+            reversa: numberOr0(pick(r, ["reversa", "Reversa"])),
+            devolucao: numberOr0(pick(r, ["devolucao", "Devolucao", "devolução", "Devolução"])),
+            defeito: numberOr0(pick(r, ["defeito", "Defeito"])),
+            bloqueado: numberOr0(pick(r, ["bloqueado", "Bloqueado"])),
+            achegar: numberOr0(pick(r, ["achegar", "a chegar", "A Chegar", "A_Chegar", "aChegar"])),
+            emtransito: numberOr0(pick(r, ["emtransito", "em transito", "Em Transito", "em_transito", "Em Trânsito", "emtrânsito"])),
+          })).filter((x) => x.tt && x.codmat && isAllowedMaterial(x.mat));
 
           // Soma por TT + codmaterial
           const agg: Record<string, SaldoGestech> = {};
@@ -374,13 +569,26 @@ const RastreabilidadeOnt = () => {
                 codigo_material: x.codmat,
                 nome_material: x.mat,
                 quantidade: 0,
+                saldo: 0, disponivel: 0, reversa: 0, devolucao: 0,
+                defeito: 0, bloqueado: 0, achegar: 0, emtransito: 0,
               };
             }
-            agg[k].quantidade += x.saldo;
+            agg[k].saldo       += x.saldo;
+            agg[k].disponivel  += x.disponivel;
+            agg[k].reversa     += x.reversa;
+            agg[k].devolucao   += x.devolucao;
+            agg[k].defeito     += x.defeito;
+            agg[k].bloqueado   += x.bloqueado;
+            agg[k].achegar     += x.achegar;
+            agg[k].emtransito  += x.emtransito;
+            // "quantidade" mantém o saldo total p/ compatibilidade com telas existentes
+            agg[k].quantidade = agg[k].saldo;
           });
-          const parsed = Object.values(agg).filter((x) => x.quantidade > 0);
+          const parsed = Object.values(agg).filter((x) =>
+            (x.saldo + x.disponivel + x.reversa + x.devolucao + x.defeito + x.bloqueado + x.achegar + x.emtransito) > 0,
+          );
           setSaldoGestech(parsed); saveBase(KEY_GESTECH, parsed, "gestech");
-          toast.success(`${parsed.length} itens consolidados (ONT/ROTEADOR) por técnico.`);
+          toast.success(`${parsed.length} itens consolidados (ONT/ROTEADOR/MESH/REPETIDOR) por técnico.`);
           return;
         }
 
@@ -490,7 +698,7 @@ const RastreabilidadeOnt = () => {
       return { type: "empty", message: "Nenhum técnico localizado com essa matrícula." };
     }
     const nome = dim?.funcionario || techGestech[0]?.nome_tecnico || tt;
-    const supervisor = dim?.supervisor || "—";
+    const supervisor = dim?.supervisor || "Desligados";
     const coordenador = dim?.coordenador || "—";
     const tr = dim?.tr || "—";
 
@@ -546,7 +754,9 @@ const RastreabilidadeOnt = () => {
         const total = saldoGestech.filter((g) => upper(g.matricula_tt) === upper(p.tt)).reduce((s, i) => s + i.quantidade, 0);
         return { matricula: p.tt, tr: p.tr, nome: p.funcionario, supervisor: p.supervisor, coordenador: p.coordenador, materialsCount: total };
       });
-      setSearchResults({ type: "supervisor", supervisorName: matched[0][field === "supervisor" ? "supervisor" : "coordenador"], technicians: techs });
+      const res = { type: "supervisor", supervisorName: matched[0][field === "supervisor" ? "supervisor" : "coordenador"], technicians: techs };
+      setSearchResults(res);
+      setSupervisorContext(res); // guarda contexto p/ "voltar à equipe"
       return;
     }
 
@@ -557,12 +767,13 @@ const RastreabilidadeOnt = () => {
       return;
     }
 
-    if (searchType === "matricula") { setSearchResults(runTechnicianResult(q)); return; }
+    if (searchType === "matricula") { setSupervisorContext(null); setSearchResults(runTechnicianResult(q)); return; }
 
     if (searchType === "nome") {
       const p = presenca.find((x) => x.funcionario.toLowerCase().includes(Q));
       const tt = p?.tt || saldoGestech.find((g) => g.nome_tecnico.toLowerCase().includes(Q))?.matricula_tt;
       if (!tt) { setSearchResults({ type: "empty", message: "Nenhum técnico encontrado pelo nome." }); return; }
+      setSupervisorContext(null);
       setSearchResults(runTechnicianResult(tt));
       return;
     }
@@ -588,7 +799,7 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor || "—",
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
           deposito: sap?.deposito || cross.deposito || "—",
           statusSap: sap?.status_sap || "—",
@@ -604,13 +815,68 @@ const RastreabilidadeOnt = () => {
       setSearchResults({ type: "serial", serial: S, status, details });
       return;
     }
+
+    if (searchType === "codigo") {
+      const codes = Array.from(new Set(q.split(/[,;\n\t]+/).map((c) => c.trim()).filter(Boolean)));
+      if (codes.length === 0) { setSearchResults({ type: "empty", message: "Informe ao menos um código de material." }); return; }
+
+      // Por código: agrupar por Supervisor → Técnico (vindo de Cruzamento + Gestech) e por Depósito (vindo de SAP)
+      type TechAgg = { matricula: string; tr: string; nome: string; supervisor: string; coordenador: string; quantidade: number };
+      const bySupervisor: Record<string, { supervisor: string; total: number; techs: Record<string, TechAgg> }> = {};
+      const byDeposito: Record<string, number> = {};
+
+      // 1) Saldo Gestech por TT (somas confiáveis)
+      saldoGestech.forEach((g: any) => {
+        if (!codes.includes(String(g.codigo_material))) return;
+        const dim = enrichByTT(g.matricula_tt);
+        const sup = dim?.supervisor || "Desligados";
+        const coord = dim?.coordenador || "—";
+        if (!bySupervisor[sup]) bySupervisor[sup] = { supervisor: sup, total: 0, techs: {} };
+        const tt = g.matricula_tt;
+        if (!bySupervisor[sup].techs[tt]) {
+          bySupervisor[sup].techs[tt] = { matricula: tt, tr: dim?.tr || "—", nome: dim?.funcionario || g.nome_tecnico, supervisor: sup, coordenador: coord, quantidade: 0 };
+        }
+        bySupervisor[sup].techs[tt].quantidade += g.quantidade || 0;
+        bySupervisor[sup].total += g.quantidade || 0;
+      });
+
+      // 2) Depósito a partir do SAP (almoxarifado) — somente para os códigos pedidos
+      saldoSap.forEach((x) => {
+        if (!codes.includes(String(x.codigo_material))) return;
+        const dep = x.deposito || "—";
+        byDeposito[dep] = (byDeposito[dep] || 0) + 1;
+      });
+
+      const supervisores = Object.values(bySupervisor)
+        .map((s) => ({ ...s, techs: Object.values(s.techs).sort((a, b) => b.quantidade - a.quantidade) }))
+        .sort((a, b) => b.total - a.total);
+      const depositos = Object.entries(byDeposito).map(([deposito, qtd]) => ({ deposito, qtd })).sort((a, b) => b.qtd - a.qtd);
+      const totalGeral = supervisores.reduce((s, x) => s + x.total, 0);
+
+      if (supervisores.length === 0 && depositos.length === 0) {
+        setSearchResults({ type: "empty", message: "Nenhum equipamento encontrado para os códigos informados." });
+        return;
+      }
+      setSupervisorContext(null);
+      setExpandedSupervisor(null);
+      setSearchResults({ type: "codigo", codes, supervisores, depositos, totalGeral });
+      return;
+    }
   };
 
   const handleSelectTechnician = (matricula: string) => {
     setSearchType("matricula");
     setSearchQuery(matricula);
     setHasSearched(true);
+    // mantém supervisorContext caso já exista — permite voltar
     setSearchResults(runTechnicianResult(matricula));
+  };
+
+  const handleBackToSupervisor = () => {
+    if (!supervisorContext) return;
+    setSearchType("supervisor");
+    setSearchQuery(supervisorContext.supervisorName || "");
+    setSearchResults(supervisorContext);
   };
 
   /* ============================================================
@@ -638,9 +904,9 @@ const RastreabilidadeOnt = () => {
           tecnico: dim?.funcionario || cross.armazem || cross.efetuadapor,
           matricula: cross.codarm || cross.matricula,
           tr: dim?.tr || "—",
-          supervisor: dim?.supervisor || "—",
+          supervisor: dim?.supervisor || "Desligados",
           coordenador: dim?.coordenador || "—",
-          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "—"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
+          detalhes: `Com: ${dim?.funcionario || cross.armazem || "—"} | TT: ${cross.codarm || cross.matricula} | Sup: ${dim?.supervisor || "Desligados"} | Coord: ${dim?.coordenador || "—"} | Última op.: ${cross.ultimaoperacaoem}`,
         };
       }
       const sap = sapBySerial[key];
@@ -785,7 +1051,13 @@ const RastreabilidadeOnt = () => {
         <p className="text-xs text-slate-500 leading-relaxed">{longDesc}</p>
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <div className="flex-1 relative">
-            <input type="file" accept=".xlsx, .xls, .csv" className="hidden" id={`upload-${type}`} onChange={(e) => handleFileUpload(e, type)} />
+            <input
+              type="file"
+              accept={type === "aplicados" ? ".xlsx, .xls, .csv, .zip" : ".xlsx, .xls, .csv"}
+              className="hidden"
+              id={`upload-${type}`}
+              onChange={(e) => handleFileUpload(e, type)}
+            />
             <label htmlFor={`upload-${type}`}>
               <Button asChild variant="outline" className="w-full text-xs border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer">
                 <span><Upload className="w-3.5 h-3.5 mr-2" />Importar Planilha</span>
@@ -818,7 +1090,7 @@ const RastreabilidadeOnt = () => {
             <Users className="w-3 h-3 mr-1.5" /> {presenca.length} colaboradores ativos
           </Badge>
           <Badge variant="secondary" className="px-3 py-1 bg-slate-100 text-slate-700 font-medium text-xs rounded-full">
-            <Database className="w-3 h-3 mr-1.5" /> Local Cache
+            <Database className="w-3 h-3 mr-1.5" /> Bases compartilhadas
           </Badge>
         </div>
       </div>
@@ -844,7 +1116,7 @@ const RastreabilidadeOnt = () => {
                 <form onSubmit={handleDynamicSearch} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600">Consultar por:</label>
-                    <Select value={searchType} onValueChange={(v: any) => { setSearchType(v); setSearchQuery(""); setHasSearched(false); setSearchResults(null); }}>
+                    <Select value={searchType} onValueChange={(v: any) => { setSearchType(v); setSearchQuery(""); setHasSearched(false); setSearchResults(null); setSupervisorContext(null); setExpandedSupervisor(null); }}>
                       <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="matricula" className="text-xs">Matrícula TT</SelectItem>
@@ -853,15 +1125,49 @@ const RastreabilidadeOnt = () => {
                         <SelectItem value="serial" className="text-xs">Número de Série</SelectItem>
                         <SelectItem value="supervisor" className="text-xs">Supervisor</SelectItem>
                         <SelectItem value="coordenador" className="text-xs">Coordenador</SelectItem>
+                        <SelectItem value="codigo" className="text-xs">Código de Equipamento</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-slate-600">Termo de Busca:</label>
                     <div className="relative">
-                      <Input type="text" placeholder={searchType === "tr" ? "Ex: TR537702" : searchType === "matricula" ? "Ex: TT826817" : searchType === "serial" ? "Ex: 6658051" : "Digite o termo..."} className="bg-slate-50 border-slate-200 text-xs pr-10" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                      <Input
+                        type="text"
+                        placeholder={
+                          searchType === "tr" ? "Ex: TR000000" :
+                          searchType === "matricula" ? "Ex: TT000000" :
+                          searchType === "serial" ? "Ex: 0000000000" :
+                          searchType === "supervisor" ? "Ex: Nome do Supervisor" :
+                          searchType === "coordenador" ? "Ex: Nome do Coordenador" :
+                          searchType === "nome" ? "Ex: Nome do Técnico" :
+                          searchType === "codigo" ? "Ex: 0000000000, 0000000001" :
+                          "Digite o termo..."
+                        }
+                        className="bg-slate-50 border-slate-200 text-xs pr-10"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
                       <Search className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
                     </div>
+                    {searchType === "codigo" && codigosDisponiveis.length > 0 && (
+                      <div className="space-y-1.5 pt-1">
+                        <label className="text-[10px] font-semibold text-slate-500">Adicionar código da lista:</label>
+                        <Select onValueChange={(code) => {
+                          const cur = searchQuery.split(/[,;\n]+/).map((c) => c.trim()).filter(Boolean);
+                          if (cur.includes(code)) return;
+                          setSearchQuery([...cur, code].join(", "));
+                        }}>
+                          <SelectTrigger className="w-full bg-slate-50 border-slate-200 text-xs h-8"><SelectValue placeholder="Selecionar código..." /></SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            {codigosDisponiveis.map((c) => (
+                              <SelectItem key={c} value={c} className="text-xs font-mono">{c}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-slate-400">Você pode digitar vários códigos separados por vírgula.</p>
+                      </div>
+                    )}
                   </div>
                   <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs py-2.5 rounded-lg">
                     <Search className="w-3.5 h-3.5 mr-2" />Buscar Rastreabilidade
@@ -870,7 +1176,25 @@ const RastreabilidadeOnt = () => {
                 <div className="mt-6 pt-5 border-t border-slate-100 space-y-2 text-[11px] text-slate-500">
                   <h4 className="text-xs font-semibold text-slate-700 mb-2">Bases ativas:</h4>
                   <p>• Presença (dim): <strong>{presenca.length}</strong></p>
-                  <p>• Saldo Gestech: <strong>{saldoGestech.length}</strong></p>
+                  <p className="flex items-center gap-1">
+                    • Saldo Gestech: <strong>{gestechTotals.disponivel}</strong>
+                    <button type="button" onClick={() => setShowGestechDrill((v) => !v)} className="ml-1 text-[10px] text-sky-600 hover:underline">
+                      {showGestechDrill ? "ocultar" : "drill-down"}
+                    </button>
+                    <span className="text-slate-400">(linhas: {saldoGestech.length})</span>
+                  </p>
+                  {showGestechDrill && (
+                    <div className="ml-3 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] bg-slate-50/60 p-2 rounded border border-slate-100">
+                      <span>Saldo:</span>            <strong className="text-right">{gestechTotals.saldo}</strong>
+                      <span>Disponível:</span>       <strong className="text-right">{gestechTotals.disponivel}</strong>
+                      <span>Reversa:</span>          <strong className="text-right">{gestechTotals.reversa}</strong>
+                      <span>Devolução:</span>        <strong className="text-right">{gestechTotals.devolucao}</strong>
+                      <span>Defeito:</span>          <strong className="text-right">{gestechTotals.defeito}</strong>
+                      <span>Bloqueado:</span>        <strong className="text-right">{gestechTotals.bloqueado}</strong>
+                      <span>A Chegar:</span>         <strong className="text-right">{gestechTotals.achegar}</strong>
+                      <span>Em Trânsito:</span>      <strong className="text-right">{gestechTotals.emtransito}</strong>
+                    </div>
+                  )}
                   <p>• Saldo SAP: <strong>{saldoSap.length}</strong></p>
                   <p>• Cruzamento (deduplicado): <strong>{cruzamentoDedup.length}</strong> / bruto <strong>{cruzamento.length}</strong></p>
                   <p>• Aplicados: <strong>{aplicados.length}</strong></p>
@@ -939,6 +1263,13 @@ const RastreabilidadeOnt = () => {
                 </Card>
               ) : searchResults.type === "technician" ? (
                 <div className="space-y-6">
+                  {supervisorContext && (
+                    <div className="flex justify-start">
+                      <Button variant="outline" size="sm" className="text-xs border-slate-200" onClick={handleBackToSupervisor}>
+                        <ArrowRight className="w-3.5 h-3.5 mr-2 rotate-180" /> Voltar à equipe de {supervisorContext.supervisorName}
+                      </Button>
+                    </div>
+                  )}
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -964,7 +1295,7 @@ const RastreabilidadeOnt = () => {
 
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <CardTitle className="text-sm font-bold text-slate-800">Materiais (ONT/ROTEADOR) — Gestech</CardTitle>
+                      <CardTitle className="text-sm font-bold text-slate-800">Materiais (ONT/ROTEADOR/MESH/REPETIDOR) — Gestech</CardTitle>
                       <CardDescription className="text-xs">Soma de saldo por código de material</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -990,58 +1321,101 @@ const RastreabilidadeOnt = () => {
                       )}
                     </CardContent>
                   </Card>
-
+                </div>
+              ) : searchResults.type === "codigo" ? (
+                <div className="space-y-6">
                   <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
                     <CardHeader className="pb-3 border-b border-slate-100">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
-                          <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                          <CardTitle className="text-sm font-bold text-slate-800">Equipamentos por Código</CardTitle>
+                          <CardDescription className="text-xs">Códigos consultados: <span className="font-mono">{searchResults.codes.join(", ")}</span></CardDescription>
                         </div>
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
-                          <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
-                        </Button>
+                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 rounded-full font-semibold">Total c/ técnico: {searchResults.totalGeral}</Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-0">
-                      {searchResults.serials.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-500">Nenhum serial associado nas bases de cruzamento.</div>
+                    <CardContent className="pt-4 space-y-2">
+                      <p className="text-[11px] font-semibold text-slate-600 mb-1">Por Supervisor (clique para ver técnicos):</p>
+                      {searchResults.supervisores.length === 0 ? (
+                        <p className="text-xs text-slate-500">Nenhum equipamento atribuído a técnicos para os códigos.</p>
                       ) : (
+                        <div className="space-y-2">
+                          {searchResults.supervisores.map((sup: any) => (
+                            <div key={sup.supervisor} className="border border-slate-100 rounded-lg overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => setExpandedSupervisor(expandedSupervisor === sup.supervisor ? null : sup.supervisor)}
+                                className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50/60 hover:bg-slate-100/60 text-left"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Users className="w-3.5 h-3.5 text-sky-500" />
+                                  <span className="text-xs font-semibold text-slate-700">{sup.supervisor}</span>
+                                  <Badge variant="outline" className="text-[10px] bg-white">{sup.techs.length} téc.</Badge>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs font-bold text-sky-700">{sup.total} itens</span>
+                                  <ArrowRight className={`w-3.5 h-3.5 text-slate-400 transition-transform ${expandedSupervisor === sup.supervisor ? "rotate-90" : ""}`} />
+                                </div>
+                              </button>
+                              {expandedSupervisor === sup.supervisor && (
+                                <div className="px-3 py-2 bg-white border-t border-slate-100">
+                                  <Table>
+                                    <TableHeader><TableRow className="border-b border-slate-100">
+                                      <TableHead className="text-[10px] py-2">Técnico</TableHead>
+                                      <TableHead className="text-[10px] py-2">TT</TableHead>
+                                      <TableHead className="text-[10px] py-2">TR</TableHead>
+                                      <TableHead className="text-[10px] py-2 text-right">Qtd</TableHead>
+                                      <TableHead className="text-[10px] py-2 w-16"></TableHead>
+                                    </TableRow></TableHeader>
+                                    <TableBody>
+                                      {sup.techs.map((t: any) => (
+                                        <TableRow key={t.matricula} className="border-b border-slate-100 hover:bg-slate-50/40">
+                                          <TableCell className="text-xs py-2">{t.nome}</TableCell>
+                                          <TableCell className="text-xs py-2 font-mono">{t.matricula}</TableCell>
+                                          <TableCell className="text-xs py-2 font-mono">{t.tr}</TableCell>
+                                          <TableCell className="text-xs py-2 text-right font-bold">{t.quantidade}</TableCell>
+                                          <TableCell className="text-xs py-2">
+                                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] text-sky-600" onClick={() => handleSelectTechnician(t.matricula)}>
+                                              Ver carga
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {searchResults.depositos.length > 0 && (
+                    <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
+                      <CardHeader className="pb-3 border-b border-slate-100">
+                        <CardTitle className="text-sm font-bold text-slate-800">Visão por Depósito (SAP)</CardTitle>
+                        <CardDescription className="text-xs">Quantidade de seriais no almoxarifado por depósito</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
                         <Table>
-                          <TableHeader className="bg-slate-50/50"><TableRow className="border-b border-slate-100">
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3 pl-6">Serial</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Equipamento</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Status</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3">Operação</TableHead>
-                            <TableHead className="text-xs font-semibold text-slate-600 py-3 pr-6">Observações</TableHead>
+                          <TableHeader className="bg-slate-50/50"><TableRow>
+                            <TableHead className="text-xs py-2 pl-6">Depósito</TableHead>
+                            <TableHead className="text-xs py-2 text-right pr-6">Quantidade</TableHead>
                           </TableRow></TableHeader>
                           <TableBody>
-                            {searchResults.serials.map((s: any, i: number) => (
-                              <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
-                                <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
-                                  <div className="inline-flex items-center gap-1.5">
-                                    <span>{s.serial}</span>
-                                    <button
-                                      type="button"
-                                      title="Ver QR Code do serial"
-                                      onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
-                                      className="text-slate-300 hover:text-sky-600 transition-colors"
-                                    >
-                                      <QrCode className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
-                                <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
-                                <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
-                                <TableCell className="text-[11px] text-slate-500 py-3 pr-6">{s.obs}</TableCell>
+                            {searchResults.depositos.map((d: any) => (
+                              <TableRow key={d.deposito} className="border-b border-slate-100">
+                                <TableCell className="text-xs py-2 pl-6 font-mono">{d.deposito}</TableCell>
+                                <TableCell className="text-xs py-2 text-right pr-6 font-bold">{d.qtd}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
                         </Table>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               ) : (
                 <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
@@ -1058,19 +1432,21 @@ const RastreabilidadeOnt = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-6 items-start">
+                      <div>
                     {searchResults.status === "Aplicado no Sistema" ? (
                       <div className="space-y-4">
                         <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex items-start gap-3">
                           <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-emerald-800">Aplicado em Cliente</h4></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Cliente</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.cliente}</p><p className="text-[10px] text-slate-500">Instalação: {searchResults.details.data_instalacao}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">GPON</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.gpon}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Alias</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.alias}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Cliente</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.cliente}</p><p className="text-[10px] text-slate-500">Instalação: {searchResults.details.data_instalacao}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">GPON</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5 truncate">{searchResults.details.gpon}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Alias</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5 truncate">{searchResults.details.alias}</p></div>
                         </div>
-                        <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /><span>Técnico: <strong>{searchResults.details.tecnico}</strong></span></div>
+                        <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 flex items-center gap-1"><User className="w-3.5 h-3.5" /><span>Técnico: <strong>{searchResults.details.tecnico}</strong></span></div>
                       </div>
                     ) : searchResults.status === "Com Técnico (Físico)" ? (
                       <div className="space-y-4">
@@ -1078,13 +1454,13 @@ const RastreabilidadeOnt = () => {
                           <Info className="w-5 h-5 text-sky-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-sky-800">Em carga com colaborador</h4><p className="text-[11px] text-sky-700/80 mt-0.5">Última operação: {searchResults.details.ultimaOperacao} ({searchResults.details.tipoOperacao})</p></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Colaborador</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.tecnico}</p><p className="text-[10px] text-slate-500">TT: {searchResults.details.matricula} • TR: {searchResults.details.tr}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Supervisor</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.supervisor}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Coordenador</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.coordenador}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.deposito}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status SAP</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.statusSap}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Colaborador</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.tecnico}</p><p className="text-[10px] text-slate-500">TT: {searchResults.details.matricula} • TR: {searchResults.details.tr}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Supervisor</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.supervisor}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Coordenador</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.coordenador}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{searchResults.details.deposito}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status SAP</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.statusSap}</p></div>
                         </div>
                       </div>
                     ) : (
@@ -1093,19 +1469,84 @@ const RastreabilidadeOnt = () => {
                           <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
                           <div><h4 className="text-xs font-bold text-amber-800">Disponível em Depósito SAP</h4></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-1">{searchResults.details.deposito}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.statusSap}</p></div>
-                          <div className="p-4 rounded-xl border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Modificado por</span><p className="text-xs font-bold text-slate-800 mt-1">{searchResults.details.modificadoPor}</p></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Equipamento</span><p className="text-xs font-bold text-slate-800 mt-0.5 truncate">{searchResults.details.modelo}</p><p className="text-[10px] text-slate-500">Cód: {searchResults.details.codigo}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Depósito</span><p className="text-xs font-bold text-slate-800 font-mono mt-0.5">{searchResults.details.deposito}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Status</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.statusSap}</p></div>
+                          <div className="p-3 rounded-lg border border-slate-100"><span className="text-[10px] font-semibold text-slate-500 uppercase">Modificado por</span><p className="text-xs font-bold text-slate-800 mt-0.5">{searchResults.details.modificadoPor}</p></div>
                         </div>
                       </div>
                     )}
+                      </div>
+                      {/* Coluna QR Code do serial */}
+                      <div className="flex flex-col items-center gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50/40">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase">QR do Serial</span>
+                        <div className="p-2 bg-white rounded-lg border border-slate-200">
+                          <QRCodeSVG value={String(searchResults.serial)} size={140} level="M" includeMargin={false} />
+                        </div>
+                        <p className="text-[10px] font-mono text-slate-500 break-all text-center">{searchResults.serial}</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
             </div>
           </div>
+
+          {/* Detalhamento de Seriais — full-width abaixo da grade do filtro */}
+          {searchResults?.type === "technician" && (
+            <Card className="border-slate-100 shadow-sm rounded-xl bg-white">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800">Detalhamento de Seriais</CardTitle>
+                    <CardDescription className="text-xs">Cruzamento (última operação) + SAP + Aplicados</CardDescription>
+                  </div>
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs" onClick={() => handleExportTechnician(searchResults)}>
+                    <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />Exportar Carga (.xlsx)
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {searchResults.serials.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-500">Nenhum serial associado nas bases de cruzamento.</div>
+                ) : (
+                  <Table>
+                    <TableHeader className="bg-slate-50/50"><TableRow className="border-b border-slate-100">
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3 pl-6">Serial</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3">Equipamento</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3">Status</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3" title="Tipo da última movimentação no Cruzamento. 'No Cruzamento' indica que o serial existe apenas na base de cruzamento e não foi localizado no SAP nem em Aplicados.">Operação</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600 py-3 pr-6">Observações</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                      {searchResults.serials.map((s: any, i: number) => (
+                        <TableRow key={i} className="border-b border-slate-100 hover:bg-slate-50/20">
+                          <TableCell className="text-xs font-bold text-slate-800 py-3 pl-6 font-mono">
+                            <div className="inline-flex items-center gap-1.5">
+                              <span>{s.serial}</span>
+                              <button
+                                type="button"
+                                title="Ver QR Code do serial"
+                                onClick={(e) => { e.stopPropagation(); setQrSerial(String(s.serial)); }}
+                                className="text-slate-300 hover:text-sky-600 transition-colors"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-[11px] text-slate-500 py-3">{s.modelo}</TableCell>
+                          <TableCell className="text-xs py-3"><Badge className={s.status.includes("Aplicado") ? "bg-emerald-50 text-emerald-700 border-emerald-200 border text-[10px] font-semibold" : "bg-blue-50 text-blue-700 border-blue-200 border text-[10px] font-semibold"}>{s.status}</Badge></TableCell>
+                          <TableCell className="text-xs py-3"><Badge variant="outline" className="text-slate-600 border-slate-200">{s.crossStatus}</Badge></TableCell>
+                          <TableCell className="text-[11px] text-slate-500 py-3 pr-6">{s.obs}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* MASSA */}
@@ -1204,8 +1645,8 @@ const RastreabilidadeOnt = () => {
               longDesc="Importe a planilha 'Saldo SAP PA TA SC'. Mantém colunas Material, Texto breve, Nº de série, Centro, Depósito, Modificado em/por, Status, Lote — filtrado para ONT/ROTEADOR." />
             <BaseCard color="bg-amber-500" title="3. Cruzamento SAP x Gestech" desc="Histórico de operações por serial (última prevalece)" count={cruzamentoDedup.length} ts={uploadTimestamps.cruzamento} type="cruzamento"
               longDesc="Importe a planilha 'Consulta Serial SAP X Gestech'. O sistema deduplica por serial mantendo a última 'ultimaoperacaoem'. Cruza por 'serial' (SAP) e 'codmat' + 'matricula' (Gestech)." />
-            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aguardando base oficial" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
-              longDesc="Estrutura preparada para receber a base 'Ativos na Planta'. Sem dados fictícios para não atravessar a informação — importe quando disponível." />
+            <BaseCard color="bg-emerald-500" title="4. Seriais Aplicados (Ativos na Planta)" desc="Aceita ZIP ALL_GPON_ONU (vários CSVs)" count={aplicados.length} ts={uploadTimestamps.aplicados} type="aplicados"
+              longDesc="Pode importar o ZIP original ALL_GPON_ONU.ZIP — o sistema descompacta, empilha todos os CSVs, pula as 9 primeiras linhas e usa a linha 10 como cabeçalho. Extrai o serial do campo SN (entre parênteses), Alias (cliente/GPON), DEVICE NAME (ONU) e NAME (frame/slot/porta/onuID)." />
           </div>
         </TabsContent>
       </Tabs>
