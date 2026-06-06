@@ -1236,6 +1236,126 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_alert_config: {
+        Row: {
+          cooldown_minutes: number
+          created_at: string
+          enabled: boolean
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          cooldown_minutes?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          cooldown_minutes?: number
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_alert_log: {
+        Row: {
+          cidade: string | null
+          error_message: string | null
+          id: string
+          message_text: string | null
+          novos_ultima_hora: number | null
+          payload: Json | null
+          recipients_count: number | null
+          sent_at: string
+          success: boolean
+          total_reparos: number | null
+          triggered_by: string | null
+        }
+        Insert: {
+          cidade?: string | null
+          error_message?: string | null
+          id?: string
+          message_text?: string | null
+          novos_ultima_hora?: number | null
+          payload?: Json | null
+          recipients_count?: number | null
+          sent_at?: string
+          success?: boolean
+          total_reparos?: number | null
+          triggered_by?: string | null
+        }
+        Update: {
+          cidade?: string | null
+          error_message?: string | null
+          id?: string
+          message_text?: string | null
+          novos_ultima_hora?: number | null
+          payload?: Json | null
+          recipients_count?: number | null
+          sent_at?: string
+          success?: boolean
+          total_reparos?: number | null
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
+      telegram_alert_recipients: {
+        Row: {
+          active: boolean
+          chat_id: string
+          created_at: string
+          id: string
+          label: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          chat_id: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          chat_id?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_alert_thresholds: {
+        Row: {
+          active: boolean
+          cidade: string
+          created_at: string
+          id: string
+          limite: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          cidade: string
+          created_at?: string
+          id?: string
+          limite: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          cidade?: string
+          created_at?: string
+          id?: string
+          limite?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_presence: {
         Row: {
           current_page: string | null

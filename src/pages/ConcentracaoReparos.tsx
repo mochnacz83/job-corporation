@@ -11,6 +11,8 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import TelegramAlertsTab from "@/components/TelegramAlertsTab";
+import { useAuth } from "@/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   ResponsiveContainer,
@@ -154,6 +156,7 @@ const MultiFilter = ({
 
 const ConcentracaoReparos = () => {
   useAccessTracking("/concentracao-reparos", true, "Concentração de Reparos");
+  const { isAdmin } = useAuth();
   const [fato, setFato] = useState<FatoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -941,6 +944,7 @@ const ConcentracaoReparos = () => {
         <TabsList className="self-start h-9">
           <TabsTrigger value="tabela" className="text-xs">Tabela</TabsTrigger>
           <TabsTrigger value="dinamica" className="text-xs">Dinâmica</TabsTrigger>
+          {isAdmin && <TabsTrigger value="alertas" className="text-xs">Alertas Telegram</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="tabela" className="flex-1 min-h-0 mt-2">
@@ -1056,6 +1060,11 @@ const ConcentracaoReparos = () => {
             setSemPotenciaOnly={setSemPotenciaOnly}
           />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="alertas" className="flex-1 min-h-0 mt-2 overflow-auto scroll-hover">
+            <TelegramAlertsTab isAdmin={isAdmin} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
