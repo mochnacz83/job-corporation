@@ -944,6 +944,7 @@ const ConcentracaoReparos = () => {
         <TabsList className="self-start h-9">
           <TabsTrigger value="tabela" className="text-xs">Tabela</TabsTrigger>
           <TabsTrigger value="dinamica" className="text-xs">Dinâmica</TabsTrigger>
+          {isAdmin && <TabsTrigger value="alertas" className="text-xs">Alertas Telegram</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="tabela" className="flex-1 min-h-0 mt-2">
