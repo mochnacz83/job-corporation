@@ -1060,6 +1060,11 @@ const ConcentracaoReparos = () => {
             setSemPotenciaOnly={setSemPotenciaOnly}
           />
         </TabsContent>
+        {isAdmin && (
+          <TabsContent value="alertas" className="flex-1 min-h-0 mt-2 overflow-auto scroll-hover">
+            <TelegramAlertsTab isAdmin={isAdmin} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
