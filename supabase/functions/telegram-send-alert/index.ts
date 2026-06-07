@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-trigger",
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
@@ -55,6 +55,15 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let requestBody: Record<string, unknown> = {};
+  try {
+    if (req.method !== "GET") {
+      requestBody = await req.json();
+    }
+  } catch {
+    requestBody = {};
+  }
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
@@ -62,9 +71,10 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceRole);
 
   const url = new URL(req.url);
-  const isTest = url.searchParams.get("test") === "true";
+  const isTest = url.searchParams.get("test") === "true" || requestBody.test === true;
   const triggeredBy =
     req.headers.get("x-trigger") ||
+    String(requestBody.trigger || "") ||
     url.searchParams.get("trigger") ||
     (isTest ? "manual-test" : "cron");
 
@@ -317,6 +327,30 @@ Deno.serve(async (req) => {
     const allOk = results.every((r) => r.ok);
     const errors = results.filter((r) => !r.ok).map((r) => `${r.chat_id}: ${r.error}`).join(" | ");
 
+    let userFacingError: string | null = null;
+    const chatNotFound = results.find((r) => !r.ok && (r.error || "").includes("chat not found"));
+    if (chatNotFound) {
+      let botUsername = "";
+      try {
+        const meResp = await fetch(`${GATEWAY_URL}/getMe`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableKey}`,
+            "X-Connection-Api-Key": telegramKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+        const meJson = await meResp.json();
+        botUsername = meJson?.result?.username ? ` (@${meJson.result.username})` : "";
+      } catch {
+        botUsername = "";
+      }
+      userFacingError = `O Telegram não encontrou o Chat ID ${chatNotFound.chat_id} no bot conectado${botUsername}. Abra esse bot no Telegram e envie /start, ou informe o chat_id correto desse mesmo bot.`;
+    } else if (!allOk) {
+      userFacingError = results.find((r) => !r.ok)?.error || "Falha ao enviar mensagem no Telegram.";
+    }
+
     await supabase.from("telegram_alert_log").insert({
       cidade: cidadeAlerta,
       total_reparos: totalReparosAlerta || null,
@@ -330,7 +364,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ ok: allOk, results, message: messageText }),
+      JSON.stringify({ ok: allOk, results, message: messageText, error: userFacingError }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {

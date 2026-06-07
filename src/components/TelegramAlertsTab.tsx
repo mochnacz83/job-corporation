@@ -117,27 +117,20 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("telegram-send-alert", {
-        body: {}, headers: { "x-trigger": "manual-test" },
-      } as any);
-      // fallback to direct fetch with query param if invoke ignores it
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const sess = (await supabase.auth.getSession()).data.session;
-      const resp = await fetch(`https://${projectId}.supabase.co/functions/v1/telegram-send-alert?test=true`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${sess?.access_token || ""}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          "Content-Type": "application/json",
-        },
+        body: { test: true, trigger: "manual-test" },
       });
-      const j = await resp.json();
-      if (!resp.ok || !j.ok) {
-        toast({ title: "Erro no envio", description: j.error || "Falha", variant: "destructive" });
+
+      if (error) {
+        toast({ title: "Erro no envio", description: error.message || "Falha", variant: "destructive" });
+      } else if (!data?.ok) {
+        toast({
+          title: "Erro no envio",
+          description: data?.error || "Falha",
+          variant: "destructive",
+        });
       } else {
         toast({ title: "Teste enviado", description: `Enviado para ${recipients.filter(r => r.active).length} destinatário(s).` });
       }
-      // suppress unused
-      void data; void error;
     } catch (e) {
       toast({ title: "Erro", description: String(e), variant: "destructive" });
     } finally {
