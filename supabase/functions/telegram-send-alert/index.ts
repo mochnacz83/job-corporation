@@ -128,7 +128,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    const activeRecipients = (recipients || []).filter((r: any) => r.chat_id);
+    // Sanitize chat IDs: keep only digits, preserving an optional leading "-" for groups.
+    const sanitizeChat = (s: string) => {
+      const v = String(s || "").trim();
+      const neg = v.startsWith("-");
+      const digits = v.replace(/[^0-9]/g, "");
+      return digits ? (neg ? `-${digits}` : digits) : "";
+    };
+    const activeRecipients = (recipients || [])
+      .map((r: any) => ({ ...r, chat_id: sanitizeChat(r.chat_id) }))
+      .filter((r: any) => r.chat_id);
     if (activeRecipients.length === 0) {
       const err = "Nenhum destinatário ativo cadastrado.";
       await supabase.from("telegram_alert_log").insert({

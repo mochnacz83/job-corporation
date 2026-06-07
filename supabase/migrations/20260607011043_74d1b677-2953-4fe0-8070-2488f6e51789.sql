@@ -1,0 +1,1 @@
+UPDATE public.telegram_alert_recipients SET chat_id = regexp_replace(chat_id, '[^0-9\-]', '', 'g') WHERE chat_id ~ '[^0-9\-]';
