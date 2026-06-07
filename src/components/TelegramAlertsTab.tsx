@@ -68,8 +68,15 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const addRecipient = async () => {
-    const chat = newChat.trim();
-    if (!chat) { toast({ title: "Informe o Chat ID", variant: "destructive" }); return; }
+    // Sanitiza: mantém apenas dígitos e o sinal de menos inicial (grupos).
+    const raw = newChat.trim();
+    const negative = raw.startsWith("-");
+    const digits = raw.replace(/[^0-9]/g, "");
+    const chat = digits ? (negative ? `-${digits}` : digits) : "";
+    if (!chat) {
+      toast({ title: "Chat ID inválido", description: "Use apenas números (ex.: 157607005) ou -100... para grupos.", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("telegram_alert_recipients").insert({ chat_id: chat, label: newLabel.trim() || null });
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setNewChat(""); setNewLabel("");
