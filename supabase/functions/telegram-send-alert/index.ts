@@ -726,11 +726,22 @@ Deno.serve(async (req) => {
     }
   }
 
-  const isTest = url.searchParams.get("test") === "true";
+  let requestBody: Record<string, unknown> = {};
+  if (req.method === "POST" && !isWebhook) {
+    try {
+      requestBody = await req.json();
+    } catch {
+      // not json or already read
+    }
+  }
+
+  const isTest = url.searchParams.get("test") === "true" || requestBody.test === true;
+  const isForce = url.searchParams.get("force") === "true" || requestBody.force === true;
   const triggeredBy =
     req.headers.get("x-trigger") ||
+    String(requestBody.trigger || "") ||
     url.searchParams.get("trigger") ||
-    (isTest ? "manual-test" : "cron");
+    (isTest ? "manual-test" : isForce ? "manual-force" : "cron");
 
   try {
     if (!lovableKey || !telegramKey) {
@@ -764,7 +775,7 @@ Deno.serve(async (req) => {
         supabase.from("telegram_alert_thresholds").select("*").eq("active", true),
       ]);
 
-    if (!isTest && !configRow?.enabled) {
+    if (!isTest && !isForce && !configRow?.enabled) {
       return new Response(
         JSON.stringify({ ok: true, skipped: "alerts disabled" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -917,7 +928,7 @@ Deno.serve(async (req) => {
       const cooldownMin = configRow?.cooldown_minutes ?? 60;
       const cooldownAgo = new Date(Date.now() - cooldownMin * 60 * 1000).toISOString();
       const totalNovos = alerting.reduce((s, a) => s + a.acc.novosHora, 0);
-      if (totalNovos === 0) {
+      if (!isForce && totalNovos === 0) {
         const { data: recent } = await supabase
           .from("telegram_alert_log")
           .select("id")
