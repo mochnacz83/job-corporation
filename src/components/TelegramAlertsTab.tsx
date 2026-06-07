@@ -139,32 +139,6 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  const sendForce = async () => {
-    setSending(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("telegram-send-alert", {
-        body: { force: true, trigger: "manual-force" },
-      });
-
-      if (error) {
-        toast({ title: "Erro no envio", description: error.message || "Falha", variant: "destructive" });
-      } else if (!data?.ok) {
-        toast({
-          title: "Erro no envio",
-          description: data?.error || "Falha",
-          variant: "destructive",
-        });
-      } else {
-        toast({ title: "Alertas forçados", description: `Envio de alertas disparado com sucesso.` });
-      }
-    } catch (e) {
-      toast({ title: "Erro", description: String(e), variant: "destructive" });
-    } finally {
-      setSending(false);
-      loadAll();
-    }
-  };
-
   if (!isAdmin) {
     return <div className="p-6 text-sm text-muted-foreground">Acesso restrito a administradores.</div>;
   }
@@ -180,10 +154,6 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
             <span>Configuração Geral</span>
             <div className="flex items-center gap-3">
               <Button size="sm" variant="outline" onClick={loadAll}><RefreshCw className="h-3 w-3 mr-1" />Atualizar</Button>
-              <Button size="sm" variant="secondary" onClick={sendForce} disabled={sending || recipients.filter(r=>r.active).length===0}>
-                {sending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}
-                Forçar envio de alertas
-              </Button>
               <Button size="sm" onClick={sendTest} disabled={sending || recipients.filter(r=>r.active).length===0}>
                 {sending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
                 Enviar teste agora
