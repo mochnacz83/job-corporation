@@ -669,19 +669,127 @@ Deno.serve(async (req) => {
       }
 
       if (text) {
-        const textMsg = "Olá! Bem-vindo ao bot de Concentração de Reparos da Ability Tecnologia. 🤖\n\nAqui você pode consultar ordens de serviço (SA) e aplicar filtros com a mesma regra de negócio do site.";
-        const replyMarkup = {
-          inline_keyboard: [
-            [
-              { "text": "🔍 Filtrar e Consultar", "callback_data": "menu:all:all:all" },
-              { "text": "📊 Resumo de Alertas", "callback_data": "alerts_summary" }
-            ],
-            [
-              { "text": "📥 Baixar Relatório (.xlsx)", "callback_data": "down:all:all:all" }
+        const trimmed = text.trim();
+        const isCommand = /^\/(start|menu|ajuda|help)\b/i.test(trimmed);
+
+        // Check AI flag
+        const { data: cfgRow } = await supabase
+          .from("telegram_alert_config")
+          .select("ai_enabled")
+          .limit(1)
+          .maybeSingle();
+        const aiOn = cfgRow?.ai_enabled !== false;
+
+        const showMenu = async () => {
+          const textMsg = "Olá! Bem-vindo ao bot de Concentração de Reparos da Ability Tecnologia. 🤖\n\nVocê pode <b>conversar comigo em português</b> (ex.: <i>“quantos reparos abertos em Itajaí com sem potência?”</i>) ou usar os botões abaixo.";
+          const replyMarkup = {
+            inline_keyboard: [
+              [
+                { "text": "🔍 Filtrar e Consultar", "callback_data": "menu:all:all:all" },
+                { "text": "📊 Resumo de Alertas", "callback_data": "alerts_summary" }
+              ],
+              [
+                { "text": "📥 Baixar Relatório (.xlsx)", "callback_data": "down:all:all:all" }
+              ]
             ]
-          ]
+          };
+          await sendMessage(chatId, textMsg, replyMarkup);
         };
-        await sendMessage(chatId, textMsg, replyMarkup);
+
+        if (isCommand || !aiOn) {
+          await showMenu();
+        } else {
+          // ====== AI mode (Lovable AI Gateway) ======
+          try {
+            // Compute current full snapshot once
+            const { data: fatoData } = await supabase
+              .from("atividades_fato")
+              .select("ds_estado, ds_macro_atividade, raw")
+              .eq("ds_macro_atividade", "REP-FTTH");
+
+            const base = (fatoData || []).filter((r: any) => {
+              const raw = r.raw || {};
+              const uf = getRaw(raw, ["cd_uf", "uf"]).trim().toUpperCase();
+              if (uf !== "SC") return false;
+              const pe = getRaw(raw, ["in_pronto_execucao", "pronto_execucao"]).trim().toUpperCase();
+              if (pe !== "SIM") return false;
+              const estadoKey = norm(fixEstado(r.ds_estado || ""));
+              if (!STATUS_ABERTO.has(estadoKey)) return false;
+              return true;
+            });
+
+            const stats: any = {
+              total: base.length,
+              por_cidade: {} as Record<string, number>,
+              por_operadora: {} as Record<string, number>,
+              por_status_potencia: {} as Record<string, number>,
+              top_bairros: {} as Record<string, number>,
+              top_olts: {} as Record<string, number>,
+              top_cdos: {} as Record<string, number>,
+            };
+            base.forEach((r: any) => {
+              const raw = r.raw || {};
+              const mun = cleanLocal(getRaw(raw, ["ds_municipio"])).toUpperCase() || "—";
+              const cp = getRaw(raw, ["cp", "cd_cp"]).trim().toUpperCase() || "—";
+              const sn = getRaw(raw, ["status_naf"]);
+              const sp = computeStatusPot(sn, getRaw(raw, ["potencia_na_olt"]), getRaw(raw, ["potencia_na_ont"])) || "—";
+              const bairro = (getRaw(raw, ["ds_bairro"]) || "—").toUpperCase().trim();
+              const olt = (getRaw(raw, ["olt"]) || "—").toUpperCase().trim();
+              const cdo = (getRaw(raw, ["cdo"]) || "—").toUpperCase().trim();
+              stats.por_cidade[mun] = (stats.por_cidade[mun] || 0) + 1;
+              stats.por_operadora[cp] = (stats.por_operadora[cp] || 0) + 1;
+              stats.por_status_potencia[sp] = (stats.por_status_potencia[sp] || 0) + 1;
+              stats.top_bairros[bairro] = (stats.top_bairros[bairro] || 0) + 1;
+              stats.top_olts[olt] = (stats.top_olts[olt] || 0) + 1;
+              stats.top_cdos[cdo] = (stats.top_cdos[cdo] || 0) + 1;
+            });
+            const topK = (obj: Record<string, number>, k = 10) =>
+              Object.fromEntries(Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, k));
+            stats.top_bairros = topK(stats.top_bairros, 15);
+            stats.top_olts = topK(stats.top_olts, 10);
+            stats.top_cdos = topK(stats.top_cdos, 15);
+
+            const sysPrompt =
+              "Você é o assistente do módulo Concentração de Reparos da Ability Tecnologia. " +
+              "Responda sempre em português do Brasil, de forma curta, direta e usando os dados do JSON fornecido. " +
+              "Se a pergunta for sobre quantidades por cidade, operadora, status de potência, bairros, OLTs ou CDOs, use o JSON. " +
+              "Se faltar dado, diga claramente que não está disponível no momento. " +
+              "Quando fizer sentido, sugira que o usuário use o menu (/start) para baixar a planilha Excel completa. " +
+              "Use emojis com moderação e formate com HTML simples (apenas <b> e <i>).";
+            const userPrompt = `Pergunta do usuário: ${trimmed}\n\nDados atuais (snapshot):\n${JSON.stringify(stats)}`;
+
+            const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${lovableKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [
+                  { role: "system", content: sysPrompt },
+                  { role: "user", content: userPrompt },
+                ],
+              }),
+            });
+            const aiJson = await aiResp.json();
+            const reply = aiJson?.choices?.[0]?.message?.content?.toString().trim();
+            if (reply) {
+              const replyMarkup = {
+                inline_keyboard: [[
+                  { text: "🔍 Menu", callback_data: "start" },
+                  { text: "📥 Baixar Excel", callback_data: "down:all:all:all" },
+                ]],
+              };
+              await sendMessage(chatId, reply, replyMarkup);
+            } else {
+              await showMenu();
+            }
+          } catch (e) {
+            console.error("AI error:", e);
+            await showMenu();
+          }
+        }
       }
 
       return new Response("ok", { headers: corsHeaders });
@@ -769,6 +877,57 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: true, skipped: "alerts disabled" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // Janela de horário (apenas para envio automático/cron; testes ignoram)
+    if (!isTest) {
+      const startH = configRow?.start_hour ?? 8;
+      const endH = configRow?.end_hour ?? 20;
+      const weekdays: number[] = Array.isArray(configRow?.weekdays)
+        ? configRow.weekdays
+        : [0, 1, 2, 3, 4, 5, 6];
+      const intervalMin = configRow?.interval_minutes ?? 60;
+
+      const nowSP = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }),
+      );
+      const dow = nowSP.getDay(); // 0=dom, 6=sab
+      const hour = nowSP.getHours();
+      const minute = nowSP.getMinutes();
+
+      const dowOk = weekdays.includes(dow);
+      // janela [startH, endH) — se end<=start, considera atravessando meia-noite
+      const hourOk = endH > startH
+        ? hour >= startH && hour < endH
+        : hour >= startH || hour < endH;
+
+      // controle de intervalo: só envia se o último envio bem-sucedido foi há >= intervalMin
+      if (dowOk && hourOk && intervalMin > 1) {
+        const sinceIso = new Date(Date.now() - (intervalMin - 1) * 60 * 1000).toISOString();
+        const { data: recentSent } = await supabase
+          .from("telegram_alert_log")
+          .select("id")
+          .eq("success", true)
+          .gte("sent_at", sinceIso)
+          .not("cidade", "is", null)
+          .limit(1);
+        if (recentSent && recentSent.length > 0) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: `interval ${intervalMin}min not elapsed` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+
+      if (!dowOk || !hourOk) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            skipped: `outside schedule (dow=${dow}, hour=${hour}:${String(minute).padStart(2,"0")}, window=${startH}-${endH}h, days=${weekdays.join(",")})`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
     }
 
     const sanitizeChat = (s: string) => {
@@ -941,35 +1100,40 @@ Deno.serve(async (req) => {
         month: "2-digit",
       });
       
-      const parts: string[] = [`🚨 <b>Concentração de Reparos</b> — ${nowStr}`];
+      const blocks: string[] = [`🚨 <b>Concentração de Reparos</b> — ${nowStr}`];
       for (const { cidade, acc, limite } of alerting) {
         const delta = acc.novosHora > 0 ? ` | <b>+${acc.novosHora}</b> na última hora` : "";
-        
-        // Build list of Bairros and their CDOs
+        const lines: string[] = [];
+        lines.push(`\n📍 <b>${cidade}</b> — ${acc.total} abertos (limite ${limite})${delta}`);
+
         const sortedBairros = [...acc.bairros.values()]
           .sort((a, b) => b.total - a.total)
-          .slice(0, 3); // top 3 bairros
-
-        let bairrosSection = "";
+          .slice(0, 3);
         for (const bInfo of sortedBairros) {
+          lines.push(`🏘 <b>${bInfo.nome}</b> (${bInfo.total} abertos)`);
           const sortedCDOs = [...bInfo.cdos.entries()]
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([cdoName, cdoCount]) => `${cdoName} (${cdoCount})`)
-            .join(", ");
-
-          bairrosSection += `\n   🏘️ <b>${bInfo.nome}</b> (${bInfo.total} abertos)\n      └── 🔌 CDOs: ${sortedCDOs || "—"}`;
+            .slice(0, 3);
+          if (sortedCDOs.length > 0) {
+            lines.push(`└── 🔌 CDOs:`);
+            sortedCDOs.forEach(([cdoName, cdoCount]) => {
+              lines.push(`           <code>${cdoName}</code> (${cdoCount})`);
+            });
+          }
         }
 
-        const olts = topN(acc.olts, 3).map(([k, v]) => `${k} (${v})`).join(", ") || "—";
-        parts.push(
-          `\n📍 <b>${cidade}</b> — ${acc.total} abertos (limite ${limite})${delta}` +
-          bairrosSection +
-          `\n   ⚡ OLTs: ${olts}`,
-        );
+        const olts = topN(acc.olts, 3);
+        if (olts.length > 0) {
+          lines.push(`⚡️ OLTs:`);
+          olts.forEach(([k, v]) => {
+            lines.push(`        <code>${k}</code> (${v})`);
+          });
+        }
+
+        blocks.push(lines.join("\n"));
       }
-      
-      messageText = parts.join("\n");
+
+      messageText = blocks.join("\n");
       cidadeAlerta = alerting.map((a) => a.cidade).join(", ");
       totalReparosAlerta = alerting.reduce((s, a) => s + a.acc.total, 0);
       novosUltimaHoraAlerta = totalNovos;

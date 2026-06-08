@@ -1,111 +1,129 @@
-# Integração Telegram — Alertas de Concentração de Reparos
+# Ajustes no Bot Telegram — Concentração de Reparos
 
-## Objetivo
-Enviar automaticamente mensagens no Telegram (a cada hora) quando determinadas cidades ultrapassarem os limites de reparos abertos, detalhando bairros, CDOs, OLTs e quantidade de reparos novos na última hora.
-
----
-
-## Como vai funcionar (visão geral)
-
-1. Você cria um bot no Telegram via **@BotFather** (passo a passo abaixo).
-2. Conecta o Telegram no Lovable (via Connector — eu vou solicitar quando estiver pronto).
-3. Eu crio uma tela administrativa **"Alertas Telegram"** onde você cadastra:
-   - **Chat IDs destinatários** (pessoas/grupos que recebem o alerta)
-   - **Limites por cidade** (Itajaí >30, Blumenau >35, Joinville >35, Florianópolis >20, Brusque >20) — editáveis
-   - Liga/desliga alertas e botão "Enviar teste agora"
-4. Um **cron a cada hora** executa uma Edge Function que:
-   - Lê `fato_reparos` (reparos abertos = sem `data_fechamento`)
-   - Agrupa por cidade, compara com limites
-   - Para cada cidade acima do limite, calcula:
-     - Total de reparos abertos
-     - **Novos reparos na última hora** (delta)
-     - Top bairros (com qtd)
-     - Top CDOs (com qtd)
-     - Top OLTs (com qtd)
-   - Monta mensagem formatada e envia para cada destinatário via Telegram Bot API (gateway Lovable)
-   - Registra log em `telegram_alert_log` para auditoria e evitar duplicidade
+Tudo fica **só no bot/edge functions**. As regras de negócio da página `ConcentracaoReparos` não serão alteradas.
 
 ---
 
-## Passo a passo para você (usuário)
+## 1. Novo layout hierárquico das mensagens automáticas
 
-### 1. Criar o bot no Telegram
-1. No Telegram, busque **@BotFather** e abra a conversa.
-2. Envie `/newbot` → escolha um nome (ex: "Alertas Reparos SC") → escolha um username terminando em `bot` (ex: `alertas_reparos_sc_bot`).
-3. O BotFather devolve um **token** (algo como `123456:ABC-DEF...`). **Copie e guarde.**
+Cada cidade acima do limite vai sair assim (HTML do Telegram):
 
-### 2. Descobrir o Chat ID de cada destinatário
-- **Para pessoa individual:** a pessoa precisa abrir o bot e enviar `/start`. Depois acesse `https://api.telegram.org/bot<SEU_TOKEN>/getUpdates` no navegador — pegue o `chat.id` (número).
-- **Para grupo:** adicione o bot ao grupo, envie qualquer mensagem, acesse o mesmo URL e pegue o `chat.id` do grupo (geralmente negativo, ex: `-1001234567890`).
-- Salve esses Chat IDs — você vai colá-los na tela de configuração.
-
-### 3. Conectar o Telegram no Lovable
-Quando eu pedir, clique no botão de conectar e cole o **token do bot**. Após isso, o Lovable cuida da autenticação automaticamente — o token não fica exposto no código.
-
-### 4. Cadastrar destinatários e limites
-Vá em **Concentração de Reparos → aba "Alertas Telegram"** (vou criar) e:
-- Adicione um Chat ID por linha com label (ex: "Grupo Operação SC").
-- Ajuste os limites por cidade.
-- Ative o alerta.
-- Clique **"Enviar teste"** para validar.
-
----
-
-## O que vou implementar (técnico)
-
-### Banco
-Migração criando:
-- `telegram_alert_config` — config global (1 linha): `enabled`, `cooldown_minutes` (padrão 60)
-- `telegram_alert_recipients` — `chat_id`, `label`, `active`
-- `telegram_alert_thresholds` — `cidade`, `limite` (seed: Itajaí 30, Blumenau 35, Joinville 35, Florianópolis 20, Brusque 20)
-- `telegram_alert_log` — `cidade`, `total_reparos`, `novos_ultima_hora`, `sent_at`, `success`, `error_message`, `payload`
-- RLS: leitura/escrita apenas para `admin`; GRANTs corretos.
-
-### Edge Functions
-1. **`telegram-send-alert`** (`verify_jwt = true`, admin-only)
-   - Calcula concentrações em `fato_reparos` (cidades acima do limite, top bairros/CDOs/OLTs, delta última hora).
-   - Envia mensagem formatada via gateway `https://connector-gateway.lovable.dev/telegram/sendMessage` para cada destinatário ativo.
-   - Aceita `?test=true` para forçar envio de mensagem de teste.
-   - Grava em `telegram_alert_log`.
-
-2. **Cron horário (pg_cron + pg_net)** — agendado via `supabase--insert` para chamar a função a cada hora cheia.
-
-### Frontend
-- Nova aba **"Alertas Telegram"** em `ConcentracaoReparos.tsx` (admin-only) com:
-  - Switch "Alertas ativos"
-  - Tabela de destinatários (CRUD: chat_id, label, ativo)
-  - Tabela de limites por cidade (editáveis)
-  - Botão "Enviar teste agora"
-  - Histórico dos últimos 20 envios (`telegram_alert_log`)
-  - Instruções resumidas de como obter chat_id
-
-### Formato da mensagem (exemplo)
 ```text
-🚨 Concentração de Reparos — 14:00
+📍 BLUMENAU — 46 abertos (limite 35) | +4 na última hora
 
-📍 ITAJAÍ — 42 abertos (limite 30) | +5 na última hora
-   Bairros: Centro (12), Fazenda (8), Cordeiros (6)
-   CDOs: CDOE-1234 (9), CDOE-5678 (7)
-   OLTs: OLT-ITJ-01 (15), OLT-ITJ-02 (10)
+🏘 ITOUPAVA CENTRAL (5 abertos)
+└── 🔌 CDOs:
+        CDOE-4427M (2)
+        CDOI-316 (1)
+        CDOE-4424M (1)
 
-📍 BLUMENAU — 38 abertos (limite 35) | +3 na última hora
-   ...
+🏘 ITOUPAVAZINHA (5 abertos)
+└── 🔌 CDOs:
+        CDOE-9707 (2)
+        CDOE-3314 (1)
+        CDOE-3901 (1)
+
+⚡️ OLTs:
+     SC-ITSC1-GHUA (8)
+     SC-AGVY1-GHUA (6)
+     SC-ITSC2-GHUA (6)
 ```
 
----
-
-## Ordem de execução
-1. Migração do banco (espera sua aprovação).
-2. Solicito a conexão do Telegram (você cola o token).
-3. Crio Edge Function + cron.
-4. Crio a aba de configuração no frontend.
-5. Você cadastra destinatários, clica "Enviar teste" e confirma recebimento.
+- Top 3 bairros (com top 3 CDOs **dentro de cada bairro**).
+- Bloco único de top 3 OLTs ao final da cidade.
+- Reescrevo a função `telegram-send-alert` para montar esse formato.
 
 ---
 
-## Observações
-- Regras de negócio existentes em `ConcentracaoReparos` **não serão alteradas** — apenas adiciono uma aba nova.
-- Tudo restrito a admin (consistente com o padrão do app).
-- O cooldown evita spam: se a cidade já alertou na última hora e o delta novo é 0, não reenvia.
+## 2. Janela de horários (em vez de só cooldown em minutos)
 
-Aprovar para eu começar?
+Substituo a configuração atual por uma agenda semanal simples:
+
+- `enabled` (liga/desliga geral)
+- `start_hour` (ex.: 08) e `end_hour` (ex.: 20) — só envia automaticamente dentro dessa janela
+- `weekdays` (segunda a domingo, multi-seleção)
+- `interval_minutes` (15/30/60) — frequência dentro da janela
+- `cooldown_minutes` mantido como anti-spam por cidade
+
+Na UI da aba **Alertas Telegram**:
+- Card "Janela de envio" com sliders/selects para início/fim, dias da semana, intervalo.
+- Indicador "Próximo envio previsto: HH:MM" e "Status agora: ATIVO/FORA DA JANELA".
+- O cron continua de hora em hora, mas a função **só dispara** se a hora atual estiver dentro da janela.
+
+---
+
+## 3. Bot interativo com IA + Excel
+
+Crio um segundo edge function **`telegram-webhook`** (`verify_jwt=false`) que recebe mensagens do Telegram, com:
+
+### Comandos diretos (rápidos, sem IA)
+- `/start` — boas-vindas + menu inline
+- `/totais` — total de reparos abertos por cidade
+- `/cidade <nome>` — resumo da cidade (bairros, CDOs, OLTs)
+- `/potencia` — reparos com causa relacionada a potência ótica
+- `/operadora <nome>` — reparos por operadora (produto/cliente)
+- `/excel <filtro>` — gera planilha XLSX e envia como documento
+- `/ajuda` — lista de comandos
+
+### Modo conversa com IA
+Qualquer mensagem em texto livre é enviada ao **Lovable AI Gateway** (`google/gemini-2.5-flash`) com **function calling**. As funções expostas para a IA:
+- `consultar_reparos({cidade?, bairro?, cdo?, olt?, operadora?, causa?, tecnologia?})`
+- `top_concentracoes({por: 'cidade'|'bairro'|'cdo'|'olt', limite?})`
+- `exportar_excel({filtros})` → devolve link/arquivo
+
+A IA interpreta perguntas como *"quantos reparos abertos por potência em Itajaí hoje?"* e chama a função certa. Resposta volta formatada e, quando aplicável, com botão inline **"📊 Exportar Excel"**.
+
+### Exportação Excel
+- Geração do XLSX dentro do edge function (`xlsx` via esm.sh).
+- Colunas pré-definidas: Protocolo, Designação, Cliente, Produto, Cidade, Bairro, CDO, OLT, Causa N1/N2/N3, TMR, Data Abertura.
+- Enviado como `sendDocument` pelo gateway Telegram.
+
+### Registro do webhook
+Faço o `setWebhook` automaticamente após o deploy (chamada via gateway, com `secret_token` derivado do `TELEGRAM_API_KEY`, conforme padrão Lovable).
+
+---
+
+## 4. Banco — nova tabela de agenda
+
+```sql
+ALTER TABLE telegram_alert_config
+  ADD COLUMN start_hour int DEFAULT 8,
+  ADD COLUMN end_hour int DEFAULT 20,
+  ADD COLUMN weekdays int[] DEFAULT '{1,2,3,4,5,6,0}',
+  ADD COLUMN interval_minutes int DEFAULT 60;
+```
+
+Tabela nova `telegram_chat_sessions` (opcional, para guardar contexto curto da conversa por chat_id).
+
+---
+
+## 5. Arquivos afetados
+
+**Criar:**
+- `supabase/functions/telegram-webhook/index.ts` (interativo + IA + Excel)
+- `supabase/migrations/<timestamp>_telegram_schedule.sql`
+
+**Editar:**
+- `supabase/functions/telegram-send-alert/index.ts` — novo layout + checagem de janela
+- `supabase/config.toml` — adicionar `[functions.telegram-webhook] verify_jwt=false`
+- `src/components/TelegramAlertsTab.tsx` — UI da janela de horários, dias da semana, intervalo, status atual, prévia do novo layout
+- `.lovable/plan.md` — atualizar com este novo escopo
+
+---
+
+## 6. Ordem de execução
+
+1. Migração (`ALTER TABLE` + tabela de sessões).
+2. Reescrita do `telegram-send-alert` (layout + janela).
+3. Novo `telegram-webhook` (comandos + IA + Excel) e registro do webhook.
+4. UI da aba Alertas Telegram.
+5. Deploy de ambas as funções e teste prático: enviar `/start` ao bot, pedir "reparos por potência em Blumenau", clicar "Exportar Excel".
+
+---
+
+## Observações importantes
+
+- Sem mudanças em `ConcentracaoReparos.tsx` (regras de negócio intactas).
+- Tudo continua admin-only no painel.
+- A IA usa o `LOVABLE_API_KEY` já existente — sem custos extras de chave.
+- Posso seguir? Se aprovar, executo tudo de uma vez e deixo operacional.

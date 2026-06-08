@@ -1238,25 +1238,40 @@ export type Database = {
       }
       telegram_alert_config: {
         Row: {
+          ai_enabled: boolean
           cooldown_minutes: number
           created_at: string
           enabled: boolean
+          end_hour: number
           id: string
+          interval_minutes: number
+          start_hour: number
           updated_at: string
+          weekdays: number[]
         }
         Insert: {
+          ai_enabled?: boolean
           cooldown_minutes?: number
           created_at?: string
           enabled?: boolean
+          end_hour?: number
           id?: string
+          interval_minutes?: number
+          start_hour?: number
           updated_at?: string
+          weekdays?: number[]
         }
         Update: {
+          ai_enabled?: boolean
           cooldown_minutes?: number
           created_at?: string
           enabled?: boolean
+          end_hour?: number
           id?: string
+          interval_minutes?: number
+          start_hour?: number
           updated_at?: string
+          weekdays?: number[]
         }
         Relationships: []
       }
