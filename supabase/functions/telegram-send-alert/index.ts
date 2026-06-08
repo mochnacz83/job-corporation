@@ -669,19 +669,127 @@ Deno.serve(async (req) => {
       }
 
       if (text) {
-        const textMsg = "Olá! Bem-vindo ao bot de Concentração de Reparos da Ability Tecnologia. 🤖\n\nAqui você pode consultar ordens de serviço (SA) e aplicar filtros com a mesma regra de negócio do site.";
-        const replyMarkup = {
-          inline_keyboard: [
-            [
-              { "text": "🔍 Filtrar e Consultar", "callback_data": "menu:all:all:all" },
-              { "text": "📊 Resumo de Alertas", "callback_data": "alerts_summary" }
-            ],
-            [
-              { "text": "📥 Baixar Relatório (.xlsx)", "callback_data": "down:all:all:all" }
+        const trimmed = text.trim();
+        const isCommand = /^\/(start|menu|ajuda|help)\b/i.test(trimmed);
+
+        // Check AI flag
+        const { data: cfgRow } = await supabase
+          .from("telegram_alert_config")
+          .select("ai_enabled")
+          .limit(1)
+          .maybeSingle();
+        const aiOn = cfgRow?.ai_enabled !== false;
+
+        const showMenu = async () => {
+          const textMsg = "Olá! Bem-vindo ao bot de Concentração de Reparos da Ability Tecnologia. 🤖\n\nVocê pode <b>conversar comigo em português</b> (ex.: <i>“quantos reparos abertos em Itajaí com sem potência?”</i>) ou usar os botões abaixo.";
+          const replyMarkup = {
+            inline_keyboard: [
+              [
+                { "text": "🔍 Filtrar e Consultar", "callback_data": "menu:all:all:all" },
+                { "text": "📊 Resumo de Alertas", "callback_data": "alerts_summary" }
+              ],
+              [
+                { "text": "📥 Baixar Relatório (.xlsx)", "callback_data": "down:all:all:all" }
+              ]
             ]
-          ]
+          };
+          await sendMessage(chatId, textMsg, replyMarkup);
         };
-        await sendMessage(chatId, textMsg, replyMarkup);
+
+        if (isCommand || !aiOn) {
+          await showMenu();
+        } else {
+          // ====== AI mode (Lovable AI Gateway) ======
+          try {
+            // Compute current full snapshot once
+            const { data: fatoData } = await supabase
+              .from("atividades_fato")
+              .select("ds_estado, ds_macro_atividade, raw")
+              .eq("ds_macro_atividade", "REP-FTTH");
+
+            const base = (fatoData || []).filter((r: any) => {
+              const raw = r.raw || {};
+              const uf = getRaw(raw, ["cd_uf", "uf"]).trim().toUpperCase();
+              if (uf !== "SC") return false;
+              const pe = getRaw(raw, ["in_pronto_execucao", "pronto_execucao"]).trim().toUpperCase();
+              if (pe !== "SIM") return false;
+              const estadoKey = norm(fixEstado(r.ds_estado || ""));
+              if (!STATUS_ABERTO.has(estadoKey)) return false;
+              return true;
+            });
+
+            const stats: any = {
+              total: base.length,
+              por_cidade: {} as Record<string, number>,
+              por_operadora: {} as Record<string, number>,
+              por_status_potencia: {} as Record<string, number>,
+              top_bairros: {} as Record<string, number>,
+              top_olts: {} as Record<string, number>,
+              top_cdos: {} as Record<string, number>,
+            };
+            base.forEach((r: any) => {
+              const raw = r.raw || {};
+              const mun = cleanLocal(getRaw(raw, ["ds_municipio"])).toUpperCase() || "—";
+              const cp = getRaw(raw, ["cp", "cd_cp"]).trim().toUpperCase() || "—";
+              const sn = getRaw(raw, ["status_naf"]);
+              const sp = computeStatusPot(sn, getRaw(raw, ["potencia_na_olt"]), getRaw(raw, ["potencia_na_ont"])) || "—";
+              const bairro = (getRaw(raw, ["ds_bairro"]) || "—").toUpperCase().trim();
+              const olt = (getRaw(raw, ["olt"]) || "—").toUpperCase().trim();
+              const cdo = (getRaw(raw, ["cdo"]) || "—").toUpperCase().trim();
+              stats.por_cidade[mun] = (stats.por_cidade[mun] || 0) + 1;
+              stats.por_operadora[cp] = (stats.por_operadora[cp] || 0) + 1;
+              stats.por_status_potencia[sp] = (stats.por_status_potencia[sp] || 0) + 1;
+              stats.top_bairros[bairro] = (stats.top_bairros[bairro] || 0) + 1;
+              stats.top_olts[olt] = (stats.top_olts[olt] || 0) + 1;
+              stats.top_cdos[cdo] = (stats.top_cdos[cdo] || 0) + 1;
+            });
+            const topK = (obj: Record<string, number>, k = 10) =>
+              Object.fromEntries(Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, k));
+            stats.top_bairros = topK(stats.top_bairros, 15);
+            stats.top_olts = topK(stats.top_olts, 10);
+            stats.top_cdos = topK(stats.top_cdos, 15);
+
+            const sysPrompt =
+              "Você é o assistente do módulo Concentração de Reparos da Ability Tecnologia. " +
+              "Responda sempre em português do Brasil, de forma curta, direta e usando os dados do JSON fornecido. " +
+              "Se a pergunta for sobre quantidades por cidade, operadora, status de potência, bairros, OLTs ou CDOs, use o JSON. " +
+              "Se faltar dado, diga claramente que não está disponível no momento. " +
+              "Quando fizer sentido, sugira que o usuário use o menu (/start) para baixar a planilha Excel completa. " +
+              "Use emojis com moderação e formate com HTML simples (apenas <b> e <i>).";
+            const userPrompt = `Pergunta do usuário: ${trimmed}\n\nDados atuais (snapshot):\n${JSON.stringify(stats)}`;
+
+            const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${lovableKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: [
+                  { role: "system", content: sysPrompt },
+                  { role: "user", content: userPrompt },
+                ],
+              }),
+            });
+            const aiJson = await aiResp.json();
+            const reply = aiJson?.choices?.[0]?.message?.content?.toString().trim();
+            if (reply) {
+              const replyMarkup = {
+                inline_keyboard: [[
+                  { text: "🔍 Menu", callback_data: "start" },
+                  { text: "📥 Baixar Excel", callback_data: "down:all:all:all" },
+                ]],
+              };
+              await sendMessage(chatId, reply, replyMarkup);
+            } else {
+              await showMenu();
+            }
+          } catch (e) {
+            console.error("AI error:", e);
+            await showMenu();
+          }
+        }
       }
 
       return new Response("ok", { headers: corsHeaders });
