@@ -879,6 +879,57 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Janela de horário (apenas para envio automático/cron; testes ignoram)
+    if (!isTest) {
+      const startH = configRow?.start_hour ?? 8;
+      const endH = configRow?.end_hour ?? 20;
+      const weekdays: number[] = Array.isArray(configRow?.weekdays)
+        ? configRow.weekdays
+        : [0, 1, 2, 3, 4, 5, 6];
+      const intervalMin = configRow?.interval_minutes ?? 60;
+
+      const nowSP = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }),
+      );
+      const dow = nowSP.getDay(); // 0=dom, 6=sab
+      const hour = nowSP.getHours();
+      const minute = nowSP.getMinutes();
+
+      const dowOk = weekdays.includes(dow);
+      // janela [startH, endH) — se end<=start, considera atravessando meia-noite
+      const hourOk = endH > startH
+        ? hour >= startH && hour < endH
+        : hour >= startH || hour < endH;
+
+      // controle de intervalo: só envia se o último envio bem-sucedido foi há >= intervalMin
+      if (dowOk && hourOk && intervalMin > 1) {
+        const sinceIso = new Date(Date.now() - (intervalMin - 1) * 60 * 1000).toISOString();
+        const { data: recentSent } = await supabase
+          .from("telegram_alert_log")
+          .select("id")
+          .eq("success", true)
+          .gte("sent_at", sinceIso)
+          .not("cidade", "is", null)
+          .limit(1);
+        if (recentSent && recentSent.length > 0) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: `interval ${intervalMin}min not elapsed` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+
+      if (!dowOk || !hourOk) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            skipped: `outside schedule (dow=${dow}, hour=${hour}:${String(minute).padStart(2,"0")}, window=${startH}-${endH}h, days=${weekdays.join(",")})`,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const sanitizeChat = (s: string) => {
       const v = String(s || "").trim();
       const neg = v.startsWith("-");
@@ -1049,35 +1100,40 @@ Deno.serve(async (req) => {
         month: "2-digit",
       });
       
-      const parts: string[] = [`🚨 <b>Concentração de Reparos</b> — ${nowStr}`];
+      const blocks: string[] = [`🚨 <b>Concentração de Reparos</b> — ${nowStr}`];
       for (const { cidade, acc, limite } of alerting) {
         const delta = acc.novosHora > 0 ? ` | <b>+${acc.novosHora}</b> na última hora` : "";
-        
-        // Build list of Bairros and their CDOs
+        const lines: string[] = [];
+        lines.push(`\n📍 <b>${cidade}</b> — ${acc.total} abertos (limite ${limite})${delta}`);
+
         const sortedBairros = [...acc.bairros.values()]
           .sort((a, b) => b.total - a.total)
-          .slice(0, 3); // top 3 bairros
-
-        let bairrosSection = "";
+          .slice(0, 3);
         for (const bInfo of sortedBairros) {
+          lines.push(`🏘 <b>${bInfo.nome}</b> (${bInfo.total} abertos)`);
           const sortedCDOs = [...bInfo.cdos.entries()]
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([cdoName, cdoCount]) => `${cdoName} (${cdoCount})`)
-            .join(", ");
-
-          bairrosSection += `\n   🏘️ <b>${bInfo.nome}</b> (${bInfo.total} abertos)\n      └── 🔌 CDOs: ${sortedCDOs || "—"}`;
+            .slice(0, 3);
+          if (sortedCDOs.length > 0) {
+            lines.push(`└── 🔌 CDOs:`);
+            sortedCDOs.forEach(([cdoName, cdoCount]) => {
+              lines.push(`           <code>${cdoName}</code> (${cdoCount})`);
+            });
+          }
         }
 
-        const olts = topN(acc.olts, 3).map(([k, v]) => `${k} (${v})`).join(", ") || "—";
-        parts.push(
-          `\n📍 <b>${cidade}</b> — ${acc.total} abertos (limite ${limite})${delta}` +
-          bairrosSection +
-          `\n   ⚡ OLTs: ${olts}`,
-        );
+        const olts = topN(acc.olts, 3);
+        if (olts.length > 0) {
+          lines.push(`⚡️ OLTs:`);
+          olts.forEach(([k, v]) => {
+            lines.push(`        <code>${k}</code> (${v})`);
+          });
+        }
+
+        blocks.push(lines.join("\n"));
       }
-      
-      messageText = parts.join("\n");
+
+      messageText = blocks.join("\n");
       cidadeAlerta = alerting.map((a) => a.cidade).join(", ");
       totalReparosAlerta = alerting.reduce((s, a) => s + a.acc.total, 0);
       novosUltimaHoraAlerta = totalNovos;
