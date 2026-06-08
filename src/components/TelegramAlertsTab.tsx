@@ -8,7 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2, Send, Trash2, Plus, RefreshCw } from "lucide-react";
 
-type Config = { id: string; enabled: boolean; cooldown_minutes: number };
+type Config = {
+  id: string;
+  enabled: boolean;
+  cooldown_minutes: number;
+  start_hour?: number;
+  end_hour?: number;
+  weekdays?: number[];
+  interval_minutes?: number;
+  ai_enabled?: boolean;
+};
 type Recipient = { id: string; chat_id: string; label: string | null; active: boolean };
 type Threshold = { id: string; cidade: string; limite: number; active: boolean };
 type LogRow = {
@@ -66,6 +75,49 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     if (error) { toast({ title: "Erro", description: error.message, variant: "destructive" }); return; }
     setConfig({ ...config, cooldown_minutes: n });
   };
+
+  const patchConfig = async (patch: Partial<Config>) => {
+    if (!config) return;
+    const { error } = await supabase
+      .from("telegram_alert_config")
+      .update(patch as any)
+      .eq("id", config.id);
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    setConfig({ ...config, ...patch });
+  };
+
+  const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const toggleWeekday = (d: number) => {
+    const current = config?.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
+    const next = current.includes(d) ? current.filter((x) => x !== d) : [...current, d].sort();
+    patchConfig({ weekdays: next });
+  };
+
+  const scheduleStatus = (() => {
+    if (!config) return { inside: false, label: "—" };
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const dow = now.getDay();
+    const hour = now.getHours();
+    const startH = config.start_hour ?? 8;
+    const endH = config.end_hour ?? 20;
+    const weekdays = config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
+    const dowOk = weekdays.includes(dow);
+    const hourOk = endH > startH ? hour >= startH && hour < endH : hour >= startH || hour < endH;
+    const inside = dowOk && hourOk && (config.enabled ?? false);
+    return {
+      inside,
+      label: inside
+        ? "ATIVO — dentro da janela"
+        : !config.enabled
+          ? "DESATIVADO no botão geral"
+          : !dowOk
+            ? "FORA DA JANELA (dia da semana)"
+            : "FORA DA JANELA (horário)",
+    };
+  })();
 
   const addRecipient = async () => {
     // Sanitiza: mantém apenas dígitos e o sinal de menos inicial (grupos).
@@ -168,6 +220,10 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
               <span>{config?.enabled ? "Alertas automáticos ATIVOS" : "Alertas automáticos DESATIVADOS"}</span>
             </div>
             <div className="flex items-center gap-2">
+              <Switch checked={config?.ai_enabled !== false} onCheckedChange={(v) => patchConfig({ ai_enabled: v })} />
+              <span>🤖 IA conversacional</span>
+            </div>
+            <div className="flex items-center gap-2">
               <span>Cooldown (min):</span>
               <Input type="number" className="w-24 h-8" value={config?.cooldown_minutes || 60}
                 onChange={(e) => config && setConfig({ ...config, cooldown_minutes: Number(e.target.value) })}
@@ -177,6 +233,82 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
           <p className="text-xs text-muted-foreground">
             Quando ativo, o sistema verifica a cada hora se alguma cidade ultrapassou o limite e envia mensagem para todos os destinatários ativos.
             Como obter o Chat ID: o destinatário envia <code>/start</code> ao bot, depois acesse <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> e copie o <code>chat.id</code>.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span>⏰ Janela de Envio Automático</span>
+            <Badge variant={scheduleStatus.inside ? "default" : "secondary"} className="text-[10px]">
+              {scheduleStatus.label}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span>Início:</span>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                className="w-20 h-8"
+                value={config?.start_hour ?? 8}
+                onChange={(e) => config && setConfig({ ...config, start_hour: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ start_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
+              />
+              <span>h</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Fim:</span>
+              <Input
+                type="number"
+                min={0}
+                max={23}
+                className="w-20 h-8"
+                value={config?.end_hour ?? 20}
+                onChange={(e) => config && setConfig({ ...config, end_hour: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ end_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
+              />
+              <span>h</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Intervalo:</span>
+              <select
+                className="h-8 rounded border bg-background px-2 text-sm"
+                value={config?.interval_minutes ?? 60}
+                onChange={(e) => patchConfig({ interval_minutes: Number(e.target.value) })}
+              >
+                <option value={15}>15 min</option>
+                <option value={30}>30 min</option>
+                <option value={60}>1 hora</option>
+                <option value={120}>2 horas</option>
+                <option value={180}>3 horas</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs text-muted-foreground mr-2">Dias da semana:</span>
+            {weekdayNames.map((name, idx) => {
+              const active = (config?.weekdays ?? [0,1,2,3,4,5,6]).includes(idx);
+              return (
+                <Button
+                  key={idx}
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => toggleWeekday(idx)}
+                >
+                  {name}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Fora dessa janela o bot <b>não envia</b> alertas automáticos (horário Brasília). O envio manual via "Enviar teste agora" funciona sempre.
+            O intervalo controla a frequência mínima entre envios reais.
           </p>
         </CardContent>
       </Card>
