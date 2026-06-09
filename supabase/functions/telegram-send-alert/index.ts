@@ -803,8 +803,6 @@ Deno.serve(async (req) => {
   let isCron = false;
   if (token && token === serviceRole) {
     isCron = true;
-  } else if (triggerHeader === "cron-hourly") {
-    isCron = true;
   } else {
     try {
       const { data: userData, error } = await supabase.auth.getUser(token);

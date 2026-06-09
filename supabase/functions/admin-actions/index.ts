@@ -624,9 +624,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         exists: true,
         hasProfile: !!profile,
-        status: profile?.status || null,
-        matricula: profile?.matricula || null,
-        userId: user.id
+        status: profile?.status || null
       }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
