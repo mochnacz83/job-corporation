@@ -264,6 +264,16 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
                 onBlur={(e) => patchConfig({ start_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
               />
               <span>h</span>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                className="w-20 h-8"
+                value={config?.start_minute ?? 0}
+                onChange={(e) => config && setConfig({ ...config, start_minute: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ start_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
+              />
+              <span>min</span>
             </div>
             <div className="flex items-center gap-2">
               <span>Fim:</span>
@@ -277,6 +287,16 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
                 onBlur={(e) => patchConfig({ end_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
               />
               <span>h</span>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                className="w-20 h-8"
+                value={config?.end_minute ?? 0}
+                onChange={(e) => config && setConfig({ ...config, end_minute: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ end_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
+              />
+              <span>min</span>
             </div>
             <div className="flex items-center gap-2">
               <span>Intervalo:</span>
