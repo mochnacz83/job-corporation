@@ -19,6 +19,7 @@ type Config = {
   weekdays?: number[];
   interval_minutes?: number;
   ai_enabled?: boolean;
+  send_times?: string[];
 };
 type Recipient = { id: string; chat_id: string; label: string | null; active: boolean };
 type Threshold = { id: string; cidade: string; limite: number; active: boolean };
@@ -45,6 +46,8 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
   const [newCidade, setNewCidade] = useState("");
   const [newLimite, setNewLimite] = useState<number>(20);
   const [sending, setSending] = useState(false);
+  const [newTimeH, setNewTimeH] = useState<string>("08");
+  const [newTimeM, setNewTimeM] = useState<string>("00");
 
   const loadAll = async () => {
     setLoading(true);
@@ -104,30 +107,68 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     const dow = now.getDay();
     const hour = now.getHours();
     const minute = now.getMinutes();
-    const startH = config.start_hour ?? 8;
-    const endH = config.end_hour ?? 20;
-    const startM = config.start_minute ?? 0;
-    const endM = config.end_minute ?? 0;
     const weekdays = config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
     const dowOk = weekdays.includes(dow);
     const nowTotal = hour * 60 + minute;
-    const startTotal = startH * 60 + startM;
-    const endTotal = endH * 60 + endM;
-    const hourOk = endTotal > startTotal
-      ? nowTotal >= startTotal && nowTotal < endTotal
-      : nowTotal >= startTotal || nowTotal < endTotal;
+    const sendTimes = (config.send_times ?? []).filter((t) => /^\d{1,2}:\d{2}$/.test(t));
+    let hourOk = false;
+    let nextTime = "";
+    if (sendTimes.length > 0) {
+      const totals = sendTimes.map((t) => {
+        const [hh, mm] = t.split(":").map((x) => parseInt(x, 10));
+        return hh * 60 + mm;
+      });
+      hourOk = totals.some((t) => Math.abs(nowTotal - t) <= 3);
+      const upcoming = totals.filter((t) => t >= nowTotal).sort((a, b) => a - b)[0]
+        ?? totals.sort((a, b) => a - b)[0];
+      if (upcoming != null) {
+        nextTime = `${String(Math.floor(upcoming / 60)).padStart(2, "0")}:${String(upcoming % 60).padStart(2, "0")}`;
+      }
+    } else {
+      const startH = config.start_hour ?? 8;
+      const endH = config.end_hour ?? 20;
+      const startM = config.start_minute ?? 0;
+      const endM = config.end_minute ?? 0;
+      const startTotal = startH * 60 + startM;
+      const endTotal = endH * 60 + endM;
+      hourOk = endTotal > startTotal
+        ? nowTotal >= startTotal && nowTotal < endTotal
+        : nowTotal >= startTotal || nowTotal < endTotal;
+    }
     const inside = dowOk && hourOk && (config.enabled ?? false);
     return {
       inside,
+      nextTime,
       label: inside
-        ? "ATIVO — dentro da janela"
+        ? "ATIVO — disparando agora"
         : !config.enabled
           ? "DESATIVADO no botão geral"
           : !dowOk
-            ? "FORA DA JANELA (dia da semana)"
-            : "FORA DA JANELA (horário)",
+            ? "FORA (dia da semana)"
+            : sendTimes.length > 0 && nextTime
+              ? `Próximo envio: ${nextTime}`
+              : "FORA DA JANELA (horário)",
     };
   })();
+
+  const sendTimes = (config?.send_times ?? []).slice().sort();
+
+  const addSendTime = () => {
+    const h = Math.max(0, Math.min(23, parseInt(newTimeH, 10) || 0));
+    const m = Math.max(0, Math.min(59, parseInt(newTimeM, 10) || 0));
+    const t = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    const current = config?.send_times ?? [];
+    if (current.includes(t)) {
+      toast({ title: "Horário já cadastrado", variant: "destructive" });
+      return;
+    }
+    patchConfig({ send_times: [...current, t].sort() });
+  };
+
+  const removeSendTime = (t: string) => {
+    const current = config?.send_times ?? [];
+    patchConfig({ send_times: current.filter((x) => x !== t) });
+  };
 
   const addRecipient = async () => {
     // Sanitiza: mantém apenas dígitos e o sinal de menos inicial (grupos).
@@ -244,73 +285,61 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
       <Card>
         <CardHeader className="py-3">
           <CardTitle className="text-sm flex items-center justify-between">
-            <span>⏰ Janela de Envio Automático</span>
+            <span>⏰ Horários de Envio Automático</span>
             <Badge variant={scheduleStatus.inside ? "default" : "secondary"} className="text-[10px]">
               {scheduleStatus.label}
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span>Início:</span>
-              <Input
-                type="number"
-                min={0}
-                max={23}
-                className="w-20 h-8"
-                value={config?.start_hour ?? 8}
-                onChange={(e) => config && setConfig({ ...config, start_hour: Number(e.target.value) })}
-                onBlur={(e) => patchConfig({ start_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
-              />
-              <span>h</span>
-              <Input
-                type="number"
-                min={0}
-                max={59}
-                className="w-20 h-8"
-                value={config?.start_minute ?? 0}
-                onChange={(e) => config && setConfig({ ...config, start_minute: Number(e.target.value) })}
-                onBlur={(e) => patchConfig({ start_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
-              />
-              <span>min</span>
+          <div className="space-y-2">
+            <div className="flex items-end gap-2 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Hora</span>
+                <select
+                  className="h-8 rounded border bg-background px-2 text-sm w-20"
+                  value={newTimeH}
+                  onChange={(e) => setNewTimeH(e.target.value)}
+                >
+                  {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")).map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Minuto</span>
+                <select
+                  className="h-8 rounded border bg-background px-2 text-sm w-20"
+                  value={newTimeM}
+                  onChange={(e) => setNewTimeM(e.target.value)}
+                >
+                  {["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <Button size="sm" onClick={addSendTime} className="h-8">
+                <Plus className="h-3 w-3 mr-1" /> Adicionar horário
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <span>Fim:</span>
-              <Input
-                type="number"
-                min={0}
-                max={23}
-                className="w-20 h-8"
-                value={config?.end_hour ?? 20}
-                onChange={(e) => config && setConfig({ ...config, end_hour: Number(e.target.value) })}
-                onBlur={(e) => patchConfig({ end_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
-              />
-              <span>h</span>
-              <Input
-                type="number"
-                min={0}
-                max={59}
-                className="w-20 h-8"
-                value={config?.end_minute ?? 0}
-                onChange={(e) => config && setConfig({ ...config, end_minute: Number(e.target.value) })}
-                onBlur={(e) => patchConfig({ end_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
-              />
-              <span>min</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span>Intervalo:</span>
-              <select
-                className="h-8 rounded border bg-background px-2 text-sm"
-                value={config?.interval_minutes ?? 60}
-                onChange={(e) => patchConfig({ interval_minutes: Number(e.target.value) })}
-              >
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={60}>1 hora</option>
-                <option value={120}>2 horas</option>
-                <option value={180}>3 horas</option>
-              </select>
+            <div className="flex flex-wrap gap-1 pt-1">
+              {sendTimes.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum horário cadastrado. Sem horários, nenhum alerta automático será enviado.
+                </p>
+              )}
+              {sendTimes.map((t) => (
+                <Badge key={t} variant="outline" className="text-xs gap-1 pr-1 py-1">
+                  <span className="font-mono">{t}</span>
+                  <button
+                    onClick={() => removeSendTime(t)}
+                    className="ml-1 rounded hover:bg-destructive/20 p-0.5"
+                    aria-label={`Remover ${t}`}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </button>
+                </Badge>
+              ))}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-1">
@@ -331,8 +360,8 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
             })}
           </div>
           <p className="text-xs text-muted-foreground">
-            Fora dessa janela o bot <b>não envia</b> alertas automáticos (horário Brasília). O envio manual via "Enviar teste agora" funciona sempre.
-            O intervalo controla a frequência mínima entre envios reais.
+            O bot dispara <b>somente nos horários cadastrados</b> e <b>somente nos dias marcados</b> (horário de Brasília).
+            O verificador roda a cada 5 minutos com tolerância de ±3 min. O envio manual via "Enviar teste agora" funciona sempre.
           </p>
         </CardContent>
       </Card>
