@@ -883,6 +883,8 @@ Deno.serve(async (req) => {
     if (!isTest) {
       const startH = configRow?.start_hour ?? 8;
       const endH = configRow?.end_hour ?? 20;
+      const startM = configRow?.start_minute ?? 0;
+      const endM = configRow?.end_minute ?? 0;
       const weekdays: number[] = Array.isArray(configRow?.weekdays)
         ? configRow.weekdays
         : [0, 1, 2, 3, 4, 5, 6];
@@ -896,10 +898,13 @@ Deno.serve(async (req) => {
       const minute = nowSP.getMinutes();
 
       const dowOk = weekdays.includes(dow);
-      // janela [startH, endH) — se end<=start, considera atravessando meia-noite
-      const hourOk = endH > startH
-        ? hour >= startH && hour < endH
-        : hour >= startH || hour < endH;
+      // janela [start, end) em minutos do dia — se end<=start, atravessa meia-noite
+      const nowTotal = hour * 60 + minute;
+      const startTotal = startH * 60 + startM;
+      const endTotal = endH * 60 + endM;
+      const hourOk = endTotal > startTotal
+        ? nowTotal >= startTotal && nowTotal < endTotal
+        : nowTotal >= startTotal || nowTotal < endTotal;
 
       // controle de intervalo: só envia se o último envio bem-sucedido foi há >= intervalMin
       if (dowOk && hourOk && intervalMin > 1) {
@@ -923,7 +928,7 @@ Deno.serve(async (req) => {
         return new Response(
           JSON.stringify({
             ok: true,
-            skipped: `outside schedule (dow=${dow}, hour=${hour}:${String(minute).padStart(2,"0")}, window=${startH}-${endH}h, days=${weekdays.join(",")})`,
+            skipped: `outside schedule (dow=${dow}, time=${hour}:${String(minute).padStart(2,"0")}, window=${String(startH).padStart(2,"0")}:${String(startM).padStart(2,"0")}-${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}, days=${weekdays.join(",")})`,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
