@@ -887,6 +887,9 @@ Deno.serve(async (req) => {
         ? configRow.weekdays
         : [0, 1, 2, 3, 4, 5, 6];
       const intervalMin = configRow?.interval_minutes ?? 60;
+      const sendTimes: string[] = Array.isArray(configRow?.send_times)
+        ? configRow.send_times.filter((s: any) => typeof s === "string" && /^\d{1,2}:\d{2}$/.test(s))
+        : [];
 
       const nowSP = new Date(
         new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }),
@@ -896,17 +899,31 @@ Deno.serve(async (req) => {
       const minute = nowSP.getMinutes();
 
       const dowOk = weekdays.includes(dow);
-      // janela [start, end) em minutos do dia — se end<=start, atravessa meia-noite
       const nowTotal = hour * 60 + minute;
-      const startTotal = startH * 60 + startM;
-      const endTotal = endH * 60 + endM;
-      const hourOk = endTotal > startTotal
-        ? nowTotal >= startTotal && nowTotal < endTotal
-        : nowTotal >= startTotal || nowTotal < endTotal;
 
-      // controle de intervalo: só envia se o último envio bem-sucedido foi há >= intervalMin
-      if (dowOk && hourOk && intervalMin > 1) {
-        const sinceIso = new Date(Date.now() - (intervalMin - 1) * 60 * 1000).toISOString();
+      // Modo NOVO: lista de horários específicos (HH:MM). Tolerância ±3min para casar com cron de 5min.
+      // Dedup: só envia se nenhum envio bem-sucedido nos últimos 7 min (evita duplicar quando 2 ticks caem no mesmo horário).
+      if (sendTimes.length > 0) {
+        if (!dowOk) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: `outside weekday (dow=${dow}, days=${weekdays.join(",")})` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        const matched = sendTimes.some((t) => {
+          const [hh, mm] = t.split(":").map((x) => parseInt(x, 10));
+          if (isNaN(hh) || isNaN(mm)) return false;
+          const total = hh * 60 + mm;
+          return Math.abs(nowTotal - total) <= 3;
+        });
+        if (!matched) {
+          return new Response(
+            JSON.stringify({ ok: true, skipped: `not in send_times (now=${hour}:${String(minute).padStart(2,"0")}, list=${sendTimes.join(",")})` }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        // Dedup contra disparos repetidos do cron dentro da mesma janela de 7min
+        const sinceIso = new Date(Date.now() - 7 * 60 * 1000).toISOString();
         const { data: recentSent } = await supabase
           .from("telegram_alert_log")
           .select("id")
@@ -916,20 +933,42 @@ Deno.serve(async (req) => {
           .limit(1);
         if (recentSent && recentSent.length > 0) {
           return new Response(
-            JSON.stringify({ ok: true, skipped: `interval ${intervalMin}min not elapsed` }),
+            JSON.stringify({ ok: true, skipped: `already sent within 7min window` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
-      }
-
-      if (!dowOk || !hourOk) {
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            skipped: `outside schedule (dow=${dow}, time=${hour}:${String(minute).padStart(2,"0")}, window=${String(startH).padStart(2,"0")}:${String(startM).padStart(2,"0")}-${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}, days=${weekdays.join(",")})`,
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+      } else {
+        // Modo LEGADO: janela [start, end) + intervalo
+        const startTotal = startH * 60 + startM;
+        const endTotal = endH * 60 + endM;
+        const hourOk = endTotal > startTotal
+          ? nowTotal >= startTotal && nowTotal < endTotal
+          : nowTotal >= startTotal || nowTotal < endTotal;
+        if (dowOk && hourOk && intervalMin > 1) {
+          const sinceIso = new Date(Date.now() - (intervalMin - 1) * 60 * 1000).toISOString();
+          const { data: recentSent } = await supabase
+            .from("telegram_alert_log")
+            .select("id")
+            .eq("success", true)
+            .gte("sent_at", sinceIso)
+            .not("cidade", "is", null)
+            .limit(1);
+          if (recentSent && recentSent.length > 0) {
+            return new Response(
+              JSON.stringify({ ok: true, skipped: `interval ${intervalMin}min not elapsed` }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+            );
+          }
+        }
+        if (!dowOk || !hourOk) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              skipped: `outside schedule (dow=${dow}, time=${hour}:${String(minute).padStart(2,"0")}, window=${String(startH).padStart(2,"0")}:${String(startM).padStart(2,"0")}-${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}, days=${weekdays.join(",")})`,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
       }
     }
 
