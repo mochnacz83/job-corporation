@@ -1246,6 +1246,7 @@ export type Database = {
           end_minute: number
           id: string
           interval_minutes: number
+          send_times: string[]
           start_hour: number
           start_minute: number
           updated_at: string
@@ -1260,6 +1261,7 @@ export type Database = {
           end_minute?: number
           id?: string
           interval_minutes?: number
+          send_times?: string[]
           start_hour?: number
           start_minute?: number
           updated_at?: string
@@ -1274,6 +1276,7 @@ export type Database = {
           end_minute?: number
           id?: string
           interval_minutes?: number
+          send_times?: string[]
           start_hour?: number
           start_minute?: number
           updated_at?: string
