@@ -14,6 +14,8 @@ type Config = {
   cooldown_minutes: number;
   start_hour?: number;
   end_hour?: number;
+  start_minute?: number;
+  end_minute?: number;
   weekdays?: number[];
   interval_minutes?: number;
   ai_enabled?: boolean;
@@ -101,11 +103,19 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
     const dow = now.getDay();
     const hour = now.getHours();
+    const minute = now.getMinutes();
     const startH = config.start_hour ?? 8;
     const endH = config.end_hour ?? 20;
+    const startM = config.start_minute ?? 0;
+    const endM = config.end_minute ?? 0;
     const weekdays = config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
     const dowOk = weekdays.includes(dow);
-    const hourOk = endH > startH ? hour >= startH && hour < endH : hour >= startH || hour < endH;
+    const nowTotal = hour * 60 + minute;
+    const startTotal = startH * 60 + startM;
+    const endTotal = endH * 60 + endM;
+    const hourOk = endTotal > startTotal
+      ? nowTotal >= startTotal && nowTotal < endTotal
+      : nowTotal >= startTotal || nowTotal < endTotal;
     const inside = dowOk && hourOk && (config.enabled ?? false);
     return {
       inside,
