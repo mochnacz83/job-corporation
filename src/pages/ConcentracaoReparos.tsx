@@ -157,14 +157,6 @@ const MultiFilter = ({
 const ConcentracaoReparos = () => {
   useAccessTracking("/concentracao-reparos", true, "Concentração de Reparos");
   const { isAdmin } = useAuth();
-
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Acesso restrito a administradores.</p>
-      </div>
-    );
-  }
   const [fato, setFato] = useState<FatoRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
