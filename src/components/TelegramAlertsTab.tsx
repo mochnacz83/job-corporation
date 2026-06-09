@@ -14,6 +14,8 @@ type Config = {
   cooldown_minutes: number;
   start_hour?: number;
   end_hour?: number;
+  start_minute?: number;
+  end_minute?: number;
   weekdays?: number[];
   interval_minutes?: number;
   ai_enabled?: boolean;
@@ -101,11 +103,19 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
     const dow = now.getDay();
     const hour = now.getHours();
+    const minute = now.getMinutes();
     const startH = config.start_hour ?? 8;
     const endH = config.end_hour ?? 20;
+    const startM = config.start_minute ?? 0;
+    const endM = config.end_minute ?? 0;
     const weekdays = config.weekdays ?? [0, 1, 2, 3, 4, 5, 6];
     const dowOk = weekdays.includes(dow);
-    const hourOk = endH > startH ? hour >= startH && hour < endH : hour >= startH || hour < endH;
+    const nowTotal = hour * 60 + minute;
+    const startTotal = startH * 60 + startM;
+    const endTotal = endH * 60 + endM;
+    const hourOk = endTotal > startTotal
+      ? nowTotal >= startTotal && nowTotal < endTotal
+      : nowTotal >= startTotal || nowTotal < endTotal;
     const inside = dowOk && hourOk && (config.enabled ?? false);
     return {
       inside,
@@ -254,6 +264,16 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
                 onBlur={(e) => patchConfig({ start_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
               />
               <span>h</span>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                className="w-20 h-8"
+                value={config?.start_minute ?? 0}
+                onChange={(e) => config && setConfig({ ...config, start_minute: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ start_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
+              />
+              <span>min</span>
             </div>
             <div className="flex items-center gap-2">
               <span>Fim:</span>
@@ -267,6 +287,16 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
                 onBlur={(e) => patchConfig({ end_hour: Math.max(0, Math.min(23, Number(e.target.value))) })}
               />
               <span>h</span>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                className="w-20 h-8"
+                value={config?.end_minute ?? 0}
+                onChange={(e) => config && setConfig({ ...config, end_minute: Number(e.target.value) })}
+                onBlur={(e) => patchConfig({ end_minute: Math.max(0, Math.min(59, Number(e.target.value) || 0)) })}
+              />
+              <span>min</span>
             </div>
             <div className="flex items-center gap-2">
               <span>Intervalo:</span>

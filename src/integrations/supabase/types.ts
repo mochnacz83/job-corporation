@@ -1243,9 +1243,11 @@ export type Database = {
           created_at: string
           enabled: boolean
           end_hour: number
+          end_minute: number
           id: string
           interval_minutes: number
           start_hour: number
+          start_minute: number
           updated_at: string
           weekdays: number[]
         }
@@ -1255,9 +1257,11 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           end_hour?: number
+          end_minute?: number
           id?: string
           interval_minutes?: number
           start_hour?: number
+          start_minute?: number
           updated_at?: string
           weekdays?: number[]
         }
@@ -1267,9 +1271,11 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           end_hour?: number
+          end_minute?: number
           id?: string
           interval_minutes?: number
           start_hour?: number
+          start_minute?: number
           updated_at?: string
           weekdays?: number[]
         }
