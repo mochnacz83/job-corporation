@@ -223,16 +223,10 @@ export default function TelegramAlertsTab({ isAdmin }: { isAdmin: boolean }) {
               <Switch checked={config?.ai_enabled !== false} onCheckedChange={(v) => patchConfig({ ai_enabled: v })} />
               <span>🤖 IA conversacional</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span>Cooldown (min):</span>
-              <Input type="number" className="w-24 h-8" value={config?.cooldown_minutes || 60}
-                onChange={(e) => config && setConfig({ ...config, cooldown_minutes: Number(e.target.value) })}
-                onBlur={(e) => setCooldown(Number(e.target.value))} />
-            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Quando ativo, o sistema verifica a cada hora se alguma cidade ultrapassou o limite e envia mensagem para todos os destinatários ativos.
-            Como obter o Chat ID: o destinatário envia <code>/start</code> ao bot, depois acesse <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> e copie o <code>chat.id</code>.
+            Quando ativo, o sistema verifica nos intervalos definidos abaixo se alguma cidade ultrapassou o limite e envia mensagem para todos os destinatários ativos.
+            A frequência é controlada apenas pelo campo <b>Intervalo</b> da "Janela de Envio Automático" — não há mais cooldown separado.
           </p>
         </CardContent>
       </Card>
