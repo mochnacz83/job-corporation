@@ -1,0 +1,1 @@
+ALTER TABLE public.ont_bases_meta DROP COLUMN IF EXISTS updated_by_email;
