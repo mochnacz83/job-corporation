@@ -23,7 +23,7 @@ import {
   BarChart3, Home, LogOut, User, Shield, Activity, KeyRound,
   CalendarDays, ClipboardList, ClipboardCheck, Boxes, Package,
   Truck, Lock, Unlock, ChevronDown, Lightbulb, CheckCircle2, FileSpreadsheet, Wrench
-  , Radar, ScanBarcode, Clock
+  , Radar, ScanBarcode, Clock, Activity
 } from "lucide-react";
 import {
   Collapsible,
@@ -130,6 +130,7 @@ const AppSidebar = () => {
     { show: hasModule("atividades_encerramento"), path: "/atividades-encerramento", icon: CheckCircle2, label: "Acompanhamento Atividades" },
     { show: hasModule("justificativa_dez_horas") || isAdmin, path: "/justificativa-dez-horas", icon: Clock, label: "Justificativas 10h" },
     { show: hasModule("concentracao_reparos"), path: "/concentracao-reparos", icon: Wrench, label: "Concentração de Reparos" },
+    { show: hasModule("qualidade_ftth") || isAdmin, path: "/qualidade-ftth", icon: Activity, label: "Qualidade FTTH" },
     { show: hasModule("planilhas"), path: "/planilhas", icon: FileSpreadsheet, label: "Planilhas Online" },
   ];
 

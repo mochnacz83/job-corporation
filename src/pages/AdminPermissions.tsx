@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList, ClipboardCheck, Boxes, CheckCircle2, FileSpreadsheet, Wrench, Radar, ScanBarcode, Clock } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, BarChart3, LayoutDashboard, RefreshCw, CalendarDays, ClipboardList, ClipboardCheck, Boxes, CheckCircle2, FileSpreadsheet, Wrench, Radar, ScanBarcode, Clock, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PowerBILink {
@@ -45,6 +45,7 @@ const AVAILABLE_MODULES = [
     { id: "rastreamento_vtal", label: "Rastreamento Equipamentos VTAL", icon: Radar },
     { id: "rastreabilidade_ont", label: "Rastreabilidade de ONT", icon: ScanBarcode },
     { id: "justificativa_10h", label: "Justificativa de Atividades 10h", icon: Clock },
+    { id: "qualidade_ftth", label: "Qualidade FTTH", icon: Activity },
 ];
 
 const AdminPermissions = () => {
