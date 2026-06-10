@@ -59,7 +59,7 @@ const INDICADORES: Array<{
   },
 ];
 
-type Record = {
+type QRecord = {
   indicador: IndicadorKey;
   tecnico_matricula: string | null;
   municipio: string | null;
@@ -105,7 +105,7 @@ const cellTone = (c?: Cell) => {
 export default function QualidadeFTTH() {
   const { isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<QRecord[]>([]);
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [imports, setImports] = useState<any[]>([]);
   const [tab, setTab] = useState<"painel" | "tecnicos" | "carregar">("painel");
@@ -130,7 +130,7 @@ export default function QualidadeFTTH() {
         .order("imported_at", { ascending: false })
         .limit(50),
     ]);
-    setRecords((r.data as Record[]) || []);
+    setRecords((r.data as QRecord[]) || []);
     setTecnicos((t.data as Tecnico[]) || []);
     setImports(imp.data || []);
     setLoading(false);
