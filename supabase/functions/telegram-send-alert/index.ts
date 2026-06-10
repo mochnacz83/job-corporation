@@ -833,7 +833,7 @@ Deno.serve(async (req) => {
   }
 
   const isTest = url.searchParams.get("test") === "true";
-  const triggeredBy =
+  let triggeredBy =
     req.headers.get("x-trigger") ||
     url.searchParams.get("trigger") ||
     (isTest ? "manual-test" : "cron");
@@ -910,30 +910,36 @@ Deno.serve(async (req) => {
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
-        const matched = sendTimes.some((t) => {
+        // Tolerância ±1min (cron roda a cada 1min). Identifica QUAL send_time casou.
+        let matchedTime: string | null = null;
+        for (const t of sendTimes) {
           const [hh, mm] = t.split(":").map((x) => parseInt(x, 10));
-          if (isNaN(hh) || isNaN(mm)) return false;
+          if (isNaN(hh) || isNaN(mm)) continue;
           const total = hh * 60 + mm;
-          return Math.abs(nowTotal - total) <= 3;
-        });
-        if (!matched) {
+          if (Math.abs(nowTotal - total) <= 1) {
+            matchedTime = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+            break;
+          }
+        }
+        if (!matchedTime) {
           return new Response(
             JSON.stringify({ ok: true, skipped: `not in send_times (now=${hour}:${String(minute).padStart(2,"0")}, list=${sendTimes.join(",")})` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
-        // Dedup contra disparos repetidos do cron dentro da mesma janela de 7min
-        const sinceIso = new Date(Date.now() - 7 * 60 * 1000).toISOString();
+        // Marca o trigger com o horário exato e deduplica APENAS contra o mesmo bucket
+        triggeredBy = `cron:${matchedTime}`;
+        const sinceIso = new Date(Date.now() - 10 * 60 * 1000).toISOString();
         const { data: recentSent } = await supabase
           .from("telegram_alert_log")
           .select("id")
           .eq("success", true)
+          .eq("triggered_by", triggeredBy)
           .gte("sent_at", sinceIso)
-          .not("cidade", "is", null)
           .limit(1);
         if (recentSent && recentSent.length > 0) {
           return new Response(
-            JSON.stringify({ ok: true, skipped: `already sent within 7min window` }),
+            JSON.stringify({ ok: true, skipped: `already sent for ${matchedTime} in last 10min` }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } },
           );
         }
