@@ -683,19 +683,16 @@ export type Database = {
           base_type: string
           row_count: number
           updated_at: string
-          updated_by_email: string | null
         }
         Insert: {
           base_type: string
           row_count?: number
           updated_at?: string
-          updated_by_email?: string | null
         }
         Update: {
           base_type?: string
           row_count?: number
           updated_at?: string
-          updated_by_email?: string | null
         }
         Relationships: []
       }

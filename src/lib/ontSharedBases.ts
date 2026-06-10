@@ -53,7 +53,6 @@ export interface OntBaseMeta {
   base_type: string;
   row_count: number;
   updated_at: string;
-  updated_by_email: string | null;
 }
 
 export async function fetchAllMeta(): Promise<Record<string, OntBaseMeta>> {
@@ -65,9 +64,9 @@ export async function fetchAllMeta(): Promise<Record<string, OntBaseMeta>> {
   return out;
 }
 
-export async function upsertMeta(type: OntBaseType, rowCount: number, email: string | null) {
+export async function upsertMeta(type: OntBaseType, rowCount: number, _email?: string | null) {
   await (supabase.from("ont_bases_meta" as any) as any).upsert(
-    { base_type: type, row_count: rowCount, updated_at: new Date().toISOString(), updated_by_email: email },
+    { base_type: type, row_count: rowCount, updated_at: new Date().toISOString() },
     { onConflict: "base_type" },
   );
 }
