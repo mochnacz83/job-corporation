@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import {
-  BarChart3, Home, LogOut, User, Shield, Activity, KeyRound,
+  BarChart3, Home, LogOut, User, Shield, Activity as ActivityIcon, KeyRound,
   CalendarDays, ClipboardList, ClipboardCheck, Boxes, Package,
   Truck, Lock, Unlock, ChevronDown, Lightbulb, CheckCircle2, FileSpreadsheet, Wrench
   , Radar, ScanBarcode, Clock, Activity
