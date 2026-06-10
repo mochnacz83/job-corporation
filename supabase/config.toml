@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.telegram-send-alert]
 verify_jwt = false
+
+[functions.upload-qualidade-csv]
+verify_jwt = false

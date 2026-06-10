@@ -819,6 +819,87 @@ export type Database = {
         }
         Relationships: []
       }
+      quality_imports: {
+        Row: {
+          error_message: string | null
+          file_name: string | null
+          id: string
+          imported_at: string
+          imported_by: string | null
+          indicador: string
+          rows_count: number
+          status: string
+        }
+        Insert: {
+          error_message?: string | null
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          indicador: string
+          rows_count?: number
+          status?: string
+        }
+        Update: {
+          error_message?: string | null
+          file_name?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          indicador?: string
+          rows_count?: number
+          status?: string
+        }
+        Relationships: []
+      }
+      quality_records: {
+        Row: {
+          cdo: string | null
+          dat_abertura: string | null
+          dat_fechamento: string | null
+          id: string
+          import_batch: string | null
+          imported_at: string
+          in_flag_indicador: string | null
+          indicador: string
+          municipio: string | null
+          num_documento: string | null
+          raw: Json
+          tecnico_matricula: string | null
+          uf: string | null
+        }
+        Insert: {
+          cdo?: string | null
+          dat_abertura?: string | null
+          dat_fechamento?: string | null
+          id?: string
+          import_batch?: string | null
+          imported_at?: string
+          in_flag_indicador?: string | null
+          indicador: string
+          municipio?: string | null
+          num_documento?: string | null
+          raw?: Json
+          tecnico_matricula?: string | null
+          uf?: string | null
+        }
+        Update: {
+          cdo?: string | null
+          dat_abertura?: string | null
+          dat_fechamento?: string | null
+          id?: string
+          import_batch?: string | null
+          imported_at?: string
+          in_flag_indicador?: string | null
+          indicador?: string
+          municipio?: string | null
+          num_documento?: string | null
+          raw?: Json
+          tecnico_matricula?: string | null
+          uf?: string | null
+        }
+        Relationships: []
+      }
       raw_b2b: {
         Row: {
           causa_ofensora_n1: string | null
