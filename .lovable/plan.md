@@ -1,129 +1,96 @@
-# Ajustes no Bot Telegram — Concentração de Reparos
+## Módulo Qualidade FTTH
 
-Tudo fica **só no bot/edge functions**. As regras de negócio da página `ConcentracaoReparos` não serão alteradas.
+Novo módulo independente. **Nada das regras existentes é alterado** — Telegram, Concentração de Reparos, Material Coleta, permissões atuais permanecem intactos.
 
----
+### 1. Banco de dados (1 nova migração)
 
-## 1. Novo layout hierárquico das mensagens automáticas
+**Tabela única `quality_records`** (mais simples que 8 tabelas, mesma performance com índice por `indicador`):
 
-Cada cidade acima do limite vai sair assim (HTML do Telegram):
+| campo | tipo | observação |
+|---|---|---|
+| `id` | uuid PK | |
+| `indicador` | text | `'reparo_por_planta'`, `'reparo_no_prazo'`, `'instalacao_no_prazo'`, `'infancia_30_dias'`, `'cumprimento_1a_reparo'`, `'cumprimento_1a_instalacao'`, `'infancia_30_dias_instalacao'`, `'repetida_30_dias'` |
+| `tecnico` | text | matrícula (TR/TT) extraída do CSV |
+| `num_documento` | text | id do reparo/instalação |
+| `municipio` / `uf` / `cdo` / `cdo_name` | text | filtros |
+| `dat_abertura` / `dat_fechamento` | timestamptz | |
+| `in_flag_indicador` | text | `'SIM'`/`'NAO'` |
+| `raw` | jsonb | linha bruta completa |
+| `imported_at` | timestamptz | |
+| `import_batch` | uuid | |
 
-```text
-📍 BLUMENAU — 46 abertos (limite 35) | +4 na última hora
+Índices: `(indicador, tecnico)`, `(indicador, dat_abertura)`.
 
-🏘 ITOUPAVA CENTRAL (5 abertos)
-└── 🔌 CDOs:
-        CDOE-4427M (2)
-        CDOI-316 (1)
-        CDOE-4424M (1)
+**Tabela `quality_imports`**: log de importações (arquivo, indicador, linhas, quem importou, quando).
 
-🏘 ITOUPAVAZINHA (5 abertos)
-└── 🔌 CDOs:
-        CDOE-9707 (2)
-        CDOE-3314 (1)
-        CDOE-3901 (1)
+**Tabela `quality_tecnicos_extra`** (opcional, vazia por padrão): mapeia `matricula → supervisor, coordenador` quando vier separadamente. Por padrão usa `tecnicos_cadastro` existente.
 
-⚡️ OLTs:
-     SC-ITSC1-GHUA (8)
-     SC-AGVY1-GHUA (6)
-     SC-ITSC2-GHUA (6)
-```
+**RLS**:
+- `quality_records` / `quality_imports`: SELECT para `authenticated` com permissão `qualidade_ftth`; INSERT/UPDATE/DELETE para admin ou `qualidade_upload`.
+- GRANTs explícitos.
 
-- Top 3 bairros (com top 3 CDOs **dentro de cada bairro**).
-- Bloco único de top 3 OLTs ao final da cidade.
-- Reescrevo a função `telegram-send-alert` para montar esse formato.
+### 2. Permissões
 
----
+Duas novas chaves em `area_permissions` (sem alterar lógica existente):
+- `qualidade_ftth` — leitura/visualização do módulo
+- `qualidade_upload` — importação de bases
 
-## 2. Janela de horários (em vez de só cooldown em minutos)
+Admin tem acesso automático (regra já existente).
 
-Substituo a configuração atual por uma agenda semanal simples:
+### 3. Edge function `upload-qualidade-csv`
 
-- `enabled` (liga/desliga geral)
-- `start_hour` (ex.: 08) e `end_hour` (ex.: 20) — só envia automaticamente dentro dessa janela
-- `weekdays` (segunda a domingo, multi-seleção)
-- `interval_minutes` (15/30/60) — frequência dentro da janela
-- `cooldown_minutes` mantido como anti-spam por cidade
+- Recebe `multipart/form-data` com `file` + `indicador`.
+- Detecta cabeçalho (delimitador `;`), normaliza colunas, extrai `tecnico` (campo `tecnico` ou `matricula_tecnico`), `municipio`, `uf`, `cdo`/`cdo_name`, `dat_abertura`, `dat_fechamento`, `in_flag_indicador`, e guarda a linha bruta em `raw`.
+- Estratégia de carga: **substitui** todos os registros do indicador selecionado pelos do CSV (igual ao padrão de Concentração de Reparos com `raw_b2b` etc.).
+- Loga em `quality_imports`.
+- Valida permissão (`admin` ou `qualidade_upload`) com JWT do usuário.
 
-Na UI da aba **Alertas Telegram**:
-- Card "Janela de envio" com sliders/selects para início/fim, dias da semana, intervalo.
-- Indicador "Próximo envio previsto: HH:MM" e "Status agora: ATIVO/FORA DA JANELA".
-- O cron continua de hora em hora, mas a função **só dispara** se a hora atual estiver dentro da janela.
+### 4. Página `src/pages/QualidadeFTTH.tsx` (3 abas)
 
----
+**Aba 1 — Painel por Supervisor (default)**
+- Tabela com colunas: `Supervisor | Coordenador | Reparo Planta (qtd / %) | Reparo Prazo | Instalação Prazo | Infância 30d | 1ª Agenda Reparo | 1ª Agenda Instalação | Infância Instalação | Repetida 30d`
+- Cada célula mostra `qtd / pct%` (formato pedido pelo usuário).
+- `%` = (SIM / total) × 100 do `in_flag_indicador`.
+- Agregação: JOIN `quality_records.tecnico` → `tecnicos_cadastro.matricula` → `supervisor`.
+- Filtro por UF/município/CDO no topo.
+- Click no supervisor → muda para Aba 2 já filtrada.
 
-## 3. Bot interativo com IA + Excel
+**Aba 2 — Detalhe por Técnico**
+- Seletor de supervisor (preenchido ao clicar na Aba 1).
+- Mesma tabela, mas linhas = técnicos daquele supervisor.
+- Botão "Voltar para Painel".
 
-Crio um segundo edge function **`telegram-webhook`** (`verify_jwt=false`) que recebe mensagens do Telegram, com:
+**Aba 3 — Carregar Bases** (somente admin/`qualidade_upload`)
+- 8 cards, um por indicador. Cada card mostra:
+  - Nome amigável do indicador
+  - Data da última importação + qtd de linhas
+  - Botão "Carregar CSV" (input file `.csv`)
+  - Link de referência para o usuário baixar manualmente do bucket vtal (já que GCS exige login)
+- Após upload: toast com resumo, painel se atualiza.
 
-### Comandos diretos (rápidos, sem IA)
-- `/start` — boas-vindas + menu inline
-- `/totais` — total de reparos abertos por cidade
-- `/cidade <nome>` — resumo da cidade (bairros, CDOs, OLTs)
-- `/potencia` — reparos com causa relacionada a potência ótica
-- `/operadora <nome>` — reparos por operadora (produto/cliente)
-- `/excel <filtro>` — gera planilha XLSX e envia como documento
-- `/ajuda` — lista de comandos
+### 5. Sidebar e roteamento
 
-### Modo conversa com IA
-Qualquer mensagem em texto livre é enviada ao **Lovable AI Gateway** (`google/gemini-2.5-flash`) com **function calling**. As funções expostas para a IA:
-- `consultar_reparos({cidade?, bairro?, cdo?, olt?, operadora?, causa?, tecnologia?})`
-- `top_concentracoes({por: 'cidade'|'bairro'|'cdo'|'olt', limite?})`
-- `exportar_excel({filtros})` → devolve link/arquivo
+- Item novo "Qualidade FTTH" em `AppSidebar.tsx`, visível somente para quem tem `qualidade_ftth` ou é admin (regra atual de `area_permissions` já cobre isso).
+- Rota `/qualidade-ftth` em `App.tsx` com `ProtectedRoute`.
+- Página fica montada e oculta via CSS, igual às demais (regra existente preservada).
 
-A IA interpreta perguntas como *"quantos reparos abertos por potência em Itajaí hoje?"* e chama a função certa. Resposta volta formatada e, quando aplicável, com botão inline **"📊 Exportar Excel"**.
+### 6. Orientação ao usuário (entregue no chat após o build)
 
-### Exportação Excel
-- Geração do XLSX dentro do edge function (`xlsx` via esm.sh).
-- Colunas pré-definidas: Protocolo, Designação, Cliente, Produto, Cidade, Bairro, CDO, OLT, Causa N1/N2/N3, TMR, Data Abertura.
-- Enviado como `sendDocument` pelo gateway Telegram.
+Passo a passo com prints conceituais explicando:
+1. Como entrar no GCS pelo navegador (você já está logado), baixar os 8 CSVs.
+2. Como abrir o módulo e ir em "Carregar Bases".
+3. Como subir cada arquivo no card correto.
+4. Como liberar o módulo para outros usuários (Admin → Permissões → marcar `qualidade_ftth`).
+5. Como interpretar a tabela e clicar nos supervisores.
 
-### Registro do webhook
-Faço o `setWebhook` automaticamente após o deploy (chamada via gateway, com `secret_token` derivado do `TELEGRAM_API_KEY`, conforme padrão Lovable).
+### O que NÃO muda
 
----
+- Telegram, cron, Concentração de Reparos, Material Coleta, autenticação, sidebar das demais áreas, regras de RLS existentes, schemas atuais. Zero alteração em código já funcional.
 
-## 4. Banco — nova tabela de agenda
+### Entrega
 
-```sql
-ALTER TABLE telegram_alert_config
-  ADD COLUMN start_hour int DEFAULT 8,
-  ADD COLUMN end_hour int DEFAULT 20,
-  ADD COLUMN weekdays int[] DEFAULT '{1,2,3,4,5,6,0}',
-  ADD COLUMN interval_minutes int DEFAULT 60;
-```
-
-Tabela nova `telegram_chat_sessions` (opcional, para guardar contexto curto da conversa por chat_id).
-
----
-
-## 5. Arquivos afetados
-
-**Criar:**
-- `supabase/functions/telegram-webhook/index.ts` (interativo + IA + Excel)
-- `supabase/migrations/<timestamp>_telegram_schedule.sql`
-
-**Editar:**
-- `supabase/functions/telegram-send-alert/index.ts` — novo layout + checagem de janela
-- `supabase/config.toml` — adicionar `[functions.telegram-webhook] verify_jwt=false`
-- `src/components/TelegramAlertsTab.tsx` — UI da janela de horários, dias da semana, intervalo, status atual, prévia do novo layout
-- `.lovable/plan.md` — atualizar com este novo escopo
-
----
-
-## 6. Ordem de execução
-
-1. Migração (`ALTER TABLE` + tabela de sessões).
-2. Reescrita do `telegram-send-alert` (layout + janela).
-3. Novo `telegram-webhook` (comandos + IA + Excel) e registro do webhook.
-4. UI da aba Alertas Telegram.
-5. Deploy de ambas as funções e teste prático: enviar `/start` ao bot, pedir "reparos por potência em Blumenau", clicar "Exportar Excel".
-
----
-
-## Observações importantes
-
-- Sem mudanças em `ConcentracaoReparos.tsx` (regras de negócio intactas).
-- Tudo continua admin-only no painel.
-- A IA usa o `LOVABLE_API_KEY` já existente — sem custos extras de chave.
-- Posso seguir? Se aprovar, executo tudo de uma vez e deixo operacional.
+Tudo em uma única rodada após sua aprovação:
+- 1 migração SQL (tabelas + RLS + permissões)
+- 1 edge function nova
+- 1 página nova + entradas no sidebar e router
+- Documentação em chat ao final
