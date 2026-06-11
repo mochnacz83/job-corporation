@@ -127,13 +127,15 @@ export default function QualidadeFTTH() {
   const [filterUf, setFilterUf] = useState("");
   const [uploading, setUploading] = useState<IndicadorKey | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [onlyKnown, setOnlyKnown] = useState(true);
+  const [drill, setDrill] = useState<DrillContext>(null);
 
   const loadAll = async () => {
     setLoading(true);
     const [r, t, imp] = await Promise.all([
       supabase
         .from("quality_records")
-        .select("indicador, tecnico_matricula, municipio, uf, in_flag_indicador"),
+        .select("id, indicador, tecnico_matricula, num_documento, municipio, uf, in_flag_indicador, dat_abertura, dat_fechamento"),
       supabase
         .from("tecnicos_cadastro")
         .select("tr, tt, nome_tecnico, supervisor, coordenador"),
@@ -162,16 +164,20 @@ export default function QualidadeFTTH() {
     return m;
   }, [tecnicos]);
 
-  // Filtered records
+  // Filtered records (apply UF/Municipio + only-known filter)
   const filtered = useMemo(() => {
     const mu = filterMun.trim().toUpperCase();
     const uf = filterUf.trim().toUpperCase();
     return records.filter((r) => {
       if (mu && !(r.municipio || "").includes(mu)) return false;
       if (uf && (r.uf || "") !== uf) return false;
+      if (onlyKnown) {
+        const mat = (r.tecnico_matricula || "").toUpperCase();
+        if (!mat || !tecMap.has(mat)) return false;
+      }
       return true;
     });
-  }, [records, filterMun, filterUf]);
+  }, [records, filterMun, filterUf, onlyKnown, tecMap]);
 
   // Group by supervisor
   const supervisorRows: GroupRow[] = useMemo(() => {
