@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Activity, Upload, RefreshCw, ChevronLeft, Loader2, BarChart3, Download, FileSpreadsheet,
+  Activity, Upload, RefreshCw, ChevronLeft, Loader2, BarChart3, Download, FileSpreadsheet, Eye,
 } from "lucide-react";
 
 type IndicadorKey =
@@ -60,11 +62,15 @@ const INDICADORES: Array<{
 ];
 
 type QRecord = {
+  id?: string;
   indicador: IndicadorKey;
   tecnico_matricula: string | null;
+  num_documento?: string | null;
   municipio: string | null;
   uf: string | null;
   in_flag_indicador: string | null;
+  dat_abertura?: string | null;
+  dat_fechamento?: string | null;
 };
 
 type Tecnico = {
@@ -82,6 +88,13 @@ type GroupRow = {
   sub?: string;
   cells: Partial<Record<IndicadorKey, Cell>> & Record<string, any>;
 };
+
+type DrillContext = {
+  title: string;
+  records: QRecord[];
+  indicador: IndicadorKey;
+  back: () => void;
+} | null;
 
 const emptyCells = (): Record<IndicadorKey, Cell> => {
   const o: any = {};
@@ -114,13 +127,15 @@ export default function QualidadeFTTH() {
   const [filterUf, setFilterUf] = useState("");
   const [uploading, setUploading] = useState<IndicadorKey | null>(null);
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [onlyKnown, setOnlyKnown] = useState(true);
+  const [drill, setDrill] = useState<DrillContext>(null);
 
   const loadAll = async () => {
     setLoading(true);
     const [r, t, imp] = await Promise.all([
       supabase
         .from("quality_records")
-        .select("indicador, tecnico_matricula, municipio, uf, in_flag_indicador"),
+        .select("id, indicador, tecnico_matricula, num_documento, municipio, uf, in_flag_indicador, dat_abertura, dat_fechamento"),
       supabase
         .from("tecnicos_cadastro")
         .select("tr, tt, nome_tecnico, supervisor, coordenador"),
@@ -149,16 +164,20 @@ export default function QualidadeFTTH() {
     return m;
   }, [tecnicos]);
 
-  // Filtered records
+  // Filtered records (apply UF/Municipio + only-known filter)
   const filtered = useMemo(() => {
     const mu = filterMun.trim().toUpperCase();
     const uf = filterUf.trim().toUpperCase();
     return records.filter((r) => {
       if (mu && !(r.municipio || "").includes(mu)) return false;
       if (uf && (r.uf || "") !== uf) return false;
+      if (onlyKnown) {
+        const mat = (r.tecnico_matricula || "").toUpperCase();
+        if (!mat || !tecMap.has(mat)) return false;
+      }
       return true;
     });
-  }, [records, filterMun, filterUf]);
+  }, [records, filterMun, filterUf, onlyKnown, tecMap]);
 
   // Group by supervisor
   const supervisorRows: GroupRow[] = useMemo(() => {
@@ -245,7 +264,50 @@ export default function QualidadeFTTH() {
     }
   };
 
-  const renderTable = (rows: GroupRow[], firstColLabel: string, onClickRow?: (row: GroupRow) => void) => (
+  // Drill-down helpers ------------------------------------------------
+  const recordsForSupervisor = (sup: string, ind: IndicadorKey) =>
+    filtered.filter((r) => {
+      if (r.indicador !== ind) return false;
+      const tec = r.tecnico_matricula ? tecMap.get(r.tecnico_matricula.toUpperCase()) : null;
+      const s = tec?.supervisor || "— Sem supervisor —";
+      return s === sup;
+    });
+
+  const recordsForTecnico = (mat: string, ind: IndicadorKey) =>
+    filtered.filter(
+      (r) =>
+        r.indicador === ind &&
+        (r.tecnico_matricula || "").toUpperCase() === mat.toUpperCase(),
+    );
+
+  const openDrillSupervisor = (sup: string, ind: IndicadorKey) => {
+    const recs = recordsForSupervisor(sup, ind);
+    const label = INDICADORES.find((i) => i.key === ind)?.label || ind;
+    setDrill({
+      title: `${label} — ${sup}`,
+      records: recs,
+      indicador: ind,
+      back: () => setDrill(null),
+    });
+  };
+
+  const openDrillTecnico = (mat: string, nome: string, ind: IndicadorKey) => {
+    const recs = recordsForTecnico(mat, ind);
+    const label = INDICADORES.find((i) => i.key === ind)?.label || ind;
+    setDrill({
+      title: `${label} — ${nome} (${mat})`,
+      records: recs,
+      indicador: ind,
+      back: () => setDrill(null),
+    });
+  };
+
+  const renderTable = (
+    rows: GroupRow[],
+    firstColLabel: string,
+    onClickRow?: (row: GroupRow) => void,
+    onClickCell?: (row: GroupRow, ind: IndicadorKey) => void,
+  ) => (
     <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
@@ -271,17 +333,25 @@ export default function QualidadeFTTH() {
           {rows.map((row) => (
             <TableRow
               key={row.key}
-              className={onClickRow ? "cursor-pointer hover:bg-primary/5" : ""}
-              onClick={() => onClickRow?.(row)}
+              className={onClickRow ? "hover:bg-primary/5" : ""}
             >
-              <TableCell className="sticky left-0 bg-background">
+              <TableCell
+                className={`sticky left-0 bg-background ${onClickRow ? "cursor-pointer" : ""}`}
+                onClick={() => onClickRow?.(row)}
+              >
                 <div className="font-semibold text-sm">{row.label}</div>
                 {row.sub && <div className="text-[11px] text-muted-foreground">{row.sub}</div>}
               </TableCell>
               {INDICADORES.map((i) => {
                 const c = (row.cells as any)[i.key] as Cell;
+                const clickable = !!onClickCell && (c?.total || 0) > 0;
                 return (
-                  <TableCell key={i.key} className="text-center whitespace-nowrap">
+                  <TableCell
+                    key={i.key}
+                    className={`text-center whitespace-nowrap ${clickable ? "cursor-pointer hover:bg-primary/10 rounded" : ""}`}
+                    onClick={() => clickable && onClickCell?.(row, i.key)}
+                    title={clickable ? "Clique para ver registros" : undefined}
+                  >
                     <div className="text-xs">{c.total || 0}</div>
                     <div className={`text-[11px] ${cellTone(c)}`}>{fmtPct(c)}</div>
                   </TableCell>
@@ -361,9 +431,18 @@ export default function QualidadeFTTH() {
                     onChange={(e) => setFilterMun(e.target.value.toUpperCase())}
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={onlyKnown}
+                    onCheckedChange={(v) => setOnlyKnown(!!v)}
+                  />
+                  <span className="text-xs">
+                    Apenas técnicos cadastrados <span className="text-muted-foreground">({tecMap.size / 2 | 0} cadastrados)</span>
+                  </span>
+                </label>
                 <div className="ml-auto text-[11px] text-muted-foreground">
-                  Cada célula: <b>quantidade</b> em cima e <b>% cumprimento</b> abaixo.
-                  Clique em uma linha para ver os técnicos.
+                  Cada célula: <b>quantidade</b> em cima e <b>% cumprimento</b> abaixo.<br />
+                  Clique no <b>nome</b> do supervisor para ver os técnicos · Clique em um <b>número</b> para ver os registros.
                 </div>
               </CardContent>
             </Card>
@@ -373,10 +452,15 @@ export default function QualidadeFTTH() {
                 <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
               </div>
             ) : (
-              renderTable(supervisorRows, "Supervisor / Coordenador", (row) => {
-                setSelectedSupervisor(row.key);
-                setTab("tecnicos");
-              })
+              renderTable(
+                supervisorRows,
+                "Supervisor / Coordenador",
+                (row) => {
+                  setSelectedSupervisor(row.key);
+                  setTab("tecnicos");
+                },
+                (row, ind) => openDrillSupervisor(row.key, ind),
+              )
             )}
           </TabsContent>
 
@@ -388,8 +472,16 @@ export default function QualidadeFTTH() {
               <div className="text-sm">
                 Supervisor: <b>{selectedSupervisor}</b>
               </div>
+              <Badge variant="outline" className="text-[10px] ml-2">
+                {tecnicoRows.length} técnicos
+              </Badge>
             </div>
-            {renderTable(tecnicoRows, "Técnico (TR / TT)")}
+            {renderTable(
+              tecnicoRows,
+              "Técnico (Nome / TR / TT)",
+              undefined,
+              (row, ind) => openDrillTecnico(row.key, row.label, ind),
+            )}
           </TabsContent>
 
           {isAdmin && (
@@ -470,6 +562,81 @@ export default function QualidadeFTTH() {
           )}
         </Tabs>
       </div>
+
+      {/* Drill-down modal: shows raw records that compose a number */}
+      <Dialog open={!!drill} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Eye className="w-4 h-4 text-primary" />
+              {drill?.title}
+              <Badge variant="outline" className="text-[10px]">
+                {drill?.records.length || 0} registros
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pb-2 border-b">
+            <Button size="sm" variant="outline" onClick={() => drill?.back()}>
+              <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Voltar
+            </Button>
+            <div className="text-[11px] text-muted-foreground">
+              Lista dos chamados que compõem este número.
+            </div>
+          </div>
+          <div className="overflow-auto flex-1">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-[10px]">Documento</TableHead>
+                  <TableHead className="text-[10px]">Técnico</TableHead>
+                  <TableHead className="text-[10px]">Nome</TableHead>
+                  <TableHead className="text-[10px]">Supervisor</TableHead>
+                  <TableHead className="text-[10px]">UF</TableHead>
+                  <TableHead className="text-[10px]">Município</TableHead>
+                  <TableHead className="text-[10px]">Abertura</TableHead>
+                  <TableHead className="text-[10px]">Fechamento</TableHead>
+                  <TableHead className="text-[10px] text-center">Cumpriu?</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(drill?.records || []).map((r) => {
+                  const tec = r.tecnico_matricula ? tecMap.get(r.tecnico_matricula.toUpperCase()) : null;
+                  const fmtD = (s?: string | null) =>
+                    s ? new Date(s).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
+                  const flag = (r.in_flag_indicador || "").toUpperCase();
+                  return (
+                    <TableRow key={r.id || `${r.num_documento}-${r.tecnico_matricula}`}>
+                      <TableCell className="text-xs">{r.num_documento || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.tecnico_matricula || "—"}</TableCell>
+                      <TableCell className="text-xs">{tec?.nome_tecnico || "—"}</TableCell>
+                      <TableCell className="text-xs">{tec?.supervisor || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.uf || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.municipio || "—"}</TableCell>
+                      <TableCell className="text-[11px]">{fmtD(r.dat_abertura)}</TableCell>
+                      <TableCell className="text-[11px]">{fmtD(r.dat_fechamento)}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${flag === "SIM" ? "border-emerald-500 text-emerald-700" : "border-red-500 text-red-700"}`}
+                        >
+                          {flag || "—"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(drill?.records.length || 0) === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-6 text-sm">
+                      Sem registros para esta combinação.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
