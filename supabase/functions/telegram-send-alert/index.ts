@@ -801,8 +801,24 @@ Deno.serve(async (req) => {
 
   // Auth: only require user auth for non-cron / non-webhook callers
   let isCron = false;
+  const cronSecretHeader = req.headers.get("x-cron-secret") || "";
   if (token && token === serviceRole) {
     isCron = true;
+  } else if (cronSecretHeader) {
+    // Validate against telegram_alert_config.cron_secret
+    const { data: cfgSec } = await supabase
+      .from("telegram_alert_config")
+      .select("cron_secret")
+      .limit(1)
+      .maybeSingle();
+    if (cfgSec?.cron_secret && cfgSec.cron_secret === cronSecretHeader) {
+      isCron = true;
+    } else {
+      return new Response(JSON.stringify({ error: "Unauthorized (bad cron secret)" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } else {
     try {
       const { data: userData, error } = await supabase.auth.getUser(token);
