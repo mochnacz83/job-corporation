@@ -8,8 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Activity, Upload, RefreshCw, ChevronLeft, Loader2, BarChart3, Download, FileSpreadsheet,
+  Activity, Upload, RefreshCw, ChevronLeft, Loader2, BarChart3, Download, FileSpreadsheet, Eye,
 } from "lucide-react";
 
 type IndicadorKey =
