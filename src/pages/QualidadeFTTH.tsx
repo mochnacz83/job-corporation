@@ -562,6 +562,81 @@ export default function QualidadeFTTH() {
           )}
         </Tabs>
       </div>
+
+      {/* Drill-down modal: shows raw records that compose a number */}
+      <Dialog open={!!drill} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Eye className="w-4 h-4 text-primary" />
+              {drill?.title}
+              <Badge variant="outline" className="text-[10px]">
+                {drill?.records.length || 0} registros
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center gap-2 pb-2 border-b">
+            <Button size="sm" variant="outline" onClick={() => drill?.back()}>
+              <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Voltar
+            </Button>
+            <div className="text-[11px] text-muted-foreground">
+              Lista dos chamados que compõem este número.
+            </div>
+          </div>
+          <div className="overflow-auto flex-1">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-[10px]">Documento</TableHead>
+                  <TableHead className="text-[10px]">Técnico</TableHead>
+                  <TableHead className="text-[10px]">Nome</TableHead>
+                  <TableHead className="text-[10px]">Supervisor</TableHead>
+                  <TableHead className="text-[10px]">UF</TableHead>
+                  <TableHead className="text-[10px]">Município</TableHead>
+                  <TableHead className="text-[10px]">Abertura</TableHead>
+                  <TableHead className="text-[10px]">Fechamento</TableHead>
+                  <TableHead className="text-[10px] text-center">Cumpriu?</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(drill?.records || []).map((r) => {
+                  const tec = r.tecnico_matricula ? tecMap.get(r.tecnico_matricula.toUpperCase()) : null;
+                  const fmtD = (s?: string | null) =>
+                    s ? new Date(s).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
+                  const flag = (r.in_flag_indicador || "").toUpperCase();
+                  return (
+                    <TableRow key={r.id || `${r.num_documento}-${r.tecnico_matricula}`}>
+                      <TableCell className="text-xs">{r.num_documento || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.tecnico_matricula || "—"}</TableCell>
+                      <TableCell className="text-xs">{tec?.nome_tecnico || "—"}</TableCell>
+                      <TableCell className="text-xs">{tec?.supervisor || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.uf || "—"}</TableCell>
+                      <TableCell className="text-xs">{r.municipio || "—"}</TableCell>
+                      <TableCell className="text-[11px]">{fmtD(r.dat_abertura)}</TableCell>
+                      <TableCell className="text-[11px]">{fmtD(r.dat_fechamento)}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${flag === "SIM" ? "border-emerald-500 text-emerald-700" : "border-red-500 text-red-700"}`}
+                        >
+                          {flag || "—"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(drill?.records.length || 0) === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-6 text-sm">
+                      Sem registros para esta combinação.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
