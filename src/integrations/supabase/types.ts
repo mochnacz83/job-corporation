@@ -1319,6 +1319,7 @@ export type Database = {
           ai_enabled: boolean
           cooldown_minutes: number
           created_at: string
+          cron_secret: string
           enabled: boolean
           end_hour: number
           end_minute: number
@@ -1334,6 +1335,7 @@ export type Database = {
           ai_enabled?: boolean
           cooldown_minutes?: number
           created_at?: string
+          cron_secret?: string
           enabled?: boolean
           end_hour?: number
           end_minute?: number
@@ -1349,6 +1351,7 @@ export type Database = {
           ai_enabled?: boolean
           cooldown_minutes?: number
           created_at?: string
+          cron_secret?: string
           enabled?: boolean
           end_hour?: number
           end_minute?: number
