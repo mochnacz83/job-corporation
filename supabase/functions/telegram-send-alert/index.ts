@@ -680,6 +680,18 @@ Deno.serve(async (req) => {
           .maybeSingle();
         const aiOn = cfgRow?.ai_enabled !== false;
 
+        // Detect download intent in natural language and trigger XLSX directly
+        const wantsDownload = /\b(baix[ae]r?|download|planilha|excel|xlsx|relat[oó]rio|exportar)\b/i.test(trimmed);
+        const lower = trimmed.toLowerCase();
+        const cityMatch = ["itajai","joinville","blumenau","florianopolis","brusque"].find((c) =>
+          lower.normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(c)
+        );
+        const opMatch = /\btim\b/.test(lower) ? "tim" : (/\bnio\b/.test(lower) ? "nio" : "all");
+        let stMatch = "all";
+        if (/sem\s*pot/i.test(trimmed)) stMatch = "sem";
+        else if (/(potencia|potência)\s*ok/i.test(trimmed)) stMatch = "ok";
+        else if (/atenuad/i.test(trimmed)) stMatch = "ate";
+
         const showMenu = async () => {
           const textMsg = "Olá! Bem-vindo ao bot de Concentração de Reparos da Ability Tecnologia. 🤖\n\nVocê pode <b>conversar comigo em português</b> (ex.: <i>“quantos reparos abertos em Itajaí com sem potência?”</i>) ou usar os botões abaixo.";
           const replyMarkup = {
@@ -698,6 +710,47 @@ Deno.serve(async (req) => {
 
         if (isCommand || !aiOn) {
           await showMenu();
+        } else if (wantsDownload) {
+          // Trigger XLSX download via callback handler logic
+          const cidadeSel = cityMatch || "all";
+          await sendMessage(chatId, `📥 Gerando planilha (${cidadeSel === "all" ? "todas as cidades" : cidadeSel.toUpperCase()}, status=${statusNames[stMatch]}, operadora=${opMatch.toUpperCase()})...`);
+          try {
+            const filtered = await getFilteredSAs(cidadeSel, stMatch, opMatch);
+            const excelData = filtered.map((r: any) => {
+              const raw = r.raw || {};
+              return {
+                SA: getRaw(raw, ["cd_nrba", "nrba"]),
+                Status_SA: fixEstado(r.ds_estado || ""),
+                Abertura: fmtDateTime(getRaw(raw, ["dh_abertura_ba"])),
+                Gpon: getRaw(raw, ["cd_gpon"]),
+                Municipio: cleanLocal(getRaw(raw, ["ds_municipio"])),
+                Bairro: cleanLocal(getRaw(raw, ["ds_bairro"])),
+                Operadora: getRaw(raw, ["cp", "cd_cp"]),
+                OLT: getRaw(raw, ["olt"]),
+                CDO: getRaw(raw, ["cdo"]),
+                Status_Naf: getRaw(raw, ["status_naf"]),
+                Pot_OLT: fmtPot(getRaw(raw, ["potencia_na_olt"])),
+                Pot_ONT: fmtPot(getRaw(raw, ["potencia_na_ont"])),
+              };
+            });
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Concentracao");
+            const fileBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+            const formData = new FormData();
+            formData.append("chat_id", String(chatId));
+            formData.append("document",
+              new Blob([fileBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+              `concentracao_${cidadeSel}.xlsx`);
+            formData.append("caption", `📥 ${filtered.length} SAs — ${cidadeSel === "all" ? "Todas" : cidadeSel.toUpperCase()}`);
+            await fetch(`${GATEWAY_URL}/sendDocument`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${lovableKey}`, "X-Connection-Api-Key": telegramKey },
+              body: formData,
+            });
+          } catch (e) {
+            await sendMessage(chatId, `❌ Erro ao gerar planilha: ${String(e)}`);
+          }
         } else {
           // ====== AI mode (Lovable AI Gateway) ======
           try {
@@ -801,8 +854,24 @@ Deno.serve(async (req) => {
 
   // Auth: only require user auth for non-cron / non-webhook callers
   let isCron = false;
+  const cronSecretHeader = req.headers.get("x-cron-secret") || "";
   if (token && token === serviceRole) {
     isCron = true;
+  } else if (cronSecretHeader) {
+    // Validate against telegram_alert_config.cron_secret
+    const { data: cfgSec } = await supabase
+      .from("telegram_alert_config")
+      .select("cron_secret")
+      .limit(1)
+      .maybeSingle();
+    if (cfgSec?.cron_secret && cfgSec.cron_secret === cronSecretHeader) {
+      isCron = true;
+    } else {
+      return new Response(JSON.stringify({ error: "Unauthorized (bad cron secret)" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } else {
     try {
       const { data: userData, error } = await supabase.auth.getUser(token);
