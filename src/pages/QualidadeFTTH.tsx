@@ -264,7 +264,50 @@ export default function QualidadeFTTH() {
     }
   };
 
-  const renderTable = (rows: GroupRow[], firstColLabel: string, onClickRow?: (row: GroupRow) => void) => (
+  // Drill-down helpers ------------------------------------------------
+  const recordsForSupervisor = (sup: string, ind: IndicadorKey) =>
+    filtered.filter((r) => {
+      if (r.indicador !== ind) return false;
+      const tec = r.tecnico_matricula ? tecMap.get(r.tecnico_matricula.toUpperCase()) : null;
+      const s = tec?.supervisor || "— Sem supervisor —";
+      return s === sup;
+    });
+
+  const recordsForTecnico = (mat: string, ind: IndicadorKey) =>
+    filtered.filter(
+      (r) =>
+        r.indicador === ind &&
+        (r.tecnico_matricula || "").toUpperCase() === mat.toUpperCase(),
+    );
+
+  const openDrillSupervisor = (sup: string, ind: IndicadorKey) => {
+    const recs = recordsForSupervisor(sup, ind);
+    const label = INDICADORES.find((i) => i.key === ind)?.label || ind;
+    setDrill({
+      title: `${label} — ${sup}`,
+      records: recs,
+      indicador: ind,
+      back: () => setDrill(null),
+    });
+  };
+
+  const openDrillTecnico = (mat: string, nome: string, ind: IndicadorKey) => {
+    const recs = recordsForTecnico(mat, ind);
+    const label = INDICADORES.find((i) => i.key === ind)?.label || ind;
+    setDrill({
+      title: `${label} — ${nome} (${mat})`,
+      records: recs,
+      indicador: ind,
+      back: () => setDrill(null),
+    });
+  };
+
+  const renderTable = (
+    rows: GroupRow[],
+    firstColLabel: string,
+    onClickRow?: (row: GroupRow) => void,
+    onClickCell?: (row: GroupRow, ind: IndicadorKey) => void,
+  ) => (
     <div className="overflow-x-auto rounded-md border">
       <Table>
         <TableHeader>
@@ -290,17 +333,25 @@ export default function QualidadeFTTH() {
           {rows.map((row) => (
             <TableRow
               key={row.key}
-              className={onClickRow ? "cursor-pointer hover:bg-primary/5" : ""}
-              onClick={() => onClickRow?.(row)}
+              className={onClickRow ? "hover:bg-primary/5" : ""}
             >
-              <TableCell className="sticky left-0 bg-background">
+              <TableCell
+                className={`sticky left-0 bg-background ${onClickRow ? "cursor-pointer" : ""}`}
+                onClick={() => onClickRow?.(row)}
+              >
                 <div className="font-semibold text-sm">{row.label}</div>
                 {row.sub && <div className="text-[11px] text-muted-foreground">{row.sub}</div>}
               </TableCell>
               {INDICADORES.map((i) => {
                 const c = (row.cells as any)[i.key] as Cell;
+                const clickable = !!onClickCell && (c?.total || 0) > 0;
                 return (
-                  <TableCell key={i.key} className="text-center whitespace-nowrap">
+                  <TableCell
+                    key={i.key}
+                    className={`text-center whitespace-nowrap ${clickable ? "cursor-pointer hover:bg-primary/10 rounded" : ""}`}
+                    onClick={() => clickable && onClickCell?.(row, i.key)}
+                    title={clickable ? "Clique para ver registros" : undefined}
+                  >
                     <div className="text-xs">{c.total || 0}</div>
                     <div className={`text-[11px] ${cellTone(c)}`}>{fmtPct(c)}</div>
                   </TableCell>
