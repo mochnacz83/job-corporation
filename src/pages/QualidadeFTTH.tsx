@@ -431,9 +431,18 @@ export default function QualidadeFTTH() {
                     onChange={(e) => setFilterMun(e.target.value.toUpperCase())}
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Checkbox
+                    checked={onlyKnown}
+                    onCheckedChange={(v) => setOnlyKnown(!!v)}
+                  />
+                  <span className="text-xs">
+                    Apenas técnicos cadastrados <span className="text-muted-foreground">({tecMap.size / 2 | 0} cadastrados)</span>
+                  </span>
+                </label>
                 <div className="ml-auto text-[11px] text-muted-foreground">
-                  Cada célula: <b>quantidade</b> em cima e <b>% cumprimento</b> abaixo.
-                  Clique em uma linha para ver os técnicos.
+                  Cada célula: <b>quantidade</b> em cima e <b>% cumprimento</b> abaixo.<br />
+                  Clique no <b>nome</b> do supervisor para ver os técnicos · Clique em um <b>número</b> para ver os registros.
                 </div>
               </CardContent>
             </Card>
@@ -443,10 +452,15 @@ export default function QualidadeFTTH() {
                 <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
               </div>
             ) : (
-              renderTable(supervisorRows, "Supervisor / Coordenador", (row) => {
-                setSelectedSupervisor(row.key);
-                setTab("tecnicos");
-              })
+              renderTable(
+                supervisorRows,
+                "Supervisor / Coordenador",
+                (row) => {
+                  setSelectedSupervisor(row.key);
+                  setTab("tecnicos");
+                },
+                (row, ind) => openDrillSupervisor(row.key, ind),
+              )
             )}
           </TabsContent>
 
@@ -458,8 +472,16 @@ export default function QualidadeFTTH() {
               <div className="text-sm">
                 Supervisor: <b>{selectedSupervisor}</b>
               </div>
+              <Badge variant="outline" className="text-[10px] ml-2">
+                {tecnicoRows.length} técnicos
+              </Badge>
             </div>
-            {renderTable(tecnicoRows, "Técnico (TR / TT)")}
+            {renderTable(
+              tecnicoRows,
+              "Técnico (Nome / TR / TT)",
+              undefined,
+              (row, ind) => openDrillTecnico(row.key, row.label, ind),
+            )}
           </TabsContent>
 
           {isAdmin && (
