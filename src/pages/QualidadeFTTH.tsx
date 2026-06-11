@@ -62,11 +62,15 @@ const INDICADORES: Array<{
 ];
 
 type QRecord = {
+  id?: string;
   indicador: IndicadorKey;
   tecnico_matricula: string | null;
+  num_documento?: string | null;
   municipio: string | null;
   uf: string | null;
   in_flag_indicador: string | null;
+  dat_abertura?: string | null;
+  dat_fechamento?: string | null;
 };
 
 type Tecnico = {
@@ -84,6 +88,13 @@ type GroupRow = {
   sub?: string;
   cells: Partial<Record<IndicadorKey, Cell>> & Record<string, any>;
 };
+
+type DrillContext = {
+  title: string;
+  records: QRecord[];
+  indicador: IndicadorKey;
+  back: () => void;
+} | null;
 
 const emptyCells = (): Record<IndicadorKey, Cell> => {
   const o: any = {};
