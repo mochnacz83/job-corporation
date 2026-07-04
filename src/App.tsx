@@ -82,11 +82,13 @@ const persistentPages = [
 
 const Login = lazy(() => import("./pages/Login"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 
 const AppRoutes = () => {
   const location = useLocation();
   const isLoginRoute = location.pathname === "/";
   const isChangePasswordRoute = location.pathname === "/alterar-senha";
+  const isOAuthConsentRoute = location.pathname === "/.lovable/oauth/consent";
   const isPersistentRoute = persistentPages.some(p => p.path === location.pathname);
   const isDashboard = location.pathname === "/dashboard";
   const isProtectedArea = isPersistentRoute || isDashboard;
@@ -98,6 +100,13 @@ const AppRoutes = () => {
         <Routes>
           <Route path="/" element={<Login />} />
         </Routes>
+      )}
+
+      {/* OAuth consent (MCP) - standalone, does its own session check */}
+      {isOAuthConsentRoute && (
+        <Suspense fallback={<PageLoader />}>
+          <OAuthConsent />
+        </Suspense>
       )}
 
       {/* Change password page - standalone (no sidebar/layout) */}
@@ -131,7 +140,7 @@ const AppRoutes = () => {
       )}
 
       {/* 404 */}
-      {!isLoginRoute && !isProtectedArea && !isPersistentRoute && !isChangePasswordRoute && (
+      {!isLoginRoute && !isProtectedArea && !isPersistentRoute && !isChangePasswordRoute && !isOAuthConsentRoute && (
         <Routes>
           <Route path="*" element={<NotFound />} />
         </Routes>
