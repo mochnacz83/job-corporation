@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +62,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   const { toast } = useToast();
   
   // Ghost reset state
@@ -108,7 +111,7 @@ const Login = () => {
       if (profileData?.must_change_password) {
         navigate("/alterar-senha");
       } else {
-        navigate("/dashboard");
+        navigate(safeNext ?? "/dashboard");
       }
     } catch (err: any) {
       if (err?.code === "email_not_confirmed" || err?.message === "PENDING_APPROVAL") {
