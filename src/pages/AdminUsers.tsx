@@ -133,10 +133,20 @@ const AdminUsers = () => {
     // Auto-recover any auth user that signed up but never got a profile,
     // so the admin can validate them. Silent — non-blocking on failure.
     try {
-      const { data: recData } = await supabase.functions.invoke("admin-actions", {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        // Sessão expirada — pula auto-recover, não é bloqueante.
+        await loadUsers();
+        setLoading(false);
+        return;
+      }
+      const { data: recData, error: recErr } = await supabase.functions.invoke("admin-actions", {
         body: { action: "recover-ghost-users" },
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (recData?.recoveredCount > 0) {
+      if (recErr) {
+        console.warn("[AdminUsers] auto-recover skipped:", recErr.message);
+      } else if (recData?.recoveredCount > 0) {
         toast({
           title: `${recData.recoveredCount} cadastro(s) recuperado(s)`,
           description: "Novos usuários que ficaram sem perfil agora aparecem como Pendente.",
@@ -257,6 +267,11 @@ const AdminUsers = () => {
 
     setResetting(true);
     try {
+      // Detecta se admin está resetando a própria senha — Supabase revoga
+      // todas as sessões após reset, o que geraria 403 em chamadas seguintes.
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const isSelfReset = currentUser?.id === resetUser.user_id;
+
       // Força refresh da sessão antes de chamar — caso o token local esteja
       // "stale" (existe no localStorage mas foi invalidado no servidor após
       // outro reset/logout), o getUser() na edge function falharia e cairia
@@ -302,6 +317,19 @@ const AdminUsers = () => {
       setWaPassword(passwordUsed || newPassword);
       setWaCopied(false);
       setWaDialogOpen(true);
+
+      if (isSelfReset) {
+        toast({
+          title: "Senha própria redefinida",
+          description: "Sua sessão foi encerrada. Faça login novamente com a nova senha.",
+          duration: 6000,
+        });
+        setTimeout(async () => {
+          await supabase.auth.signOut();
+          window.location.replace("/");
+        }, 1500);
+        return;
+      }
 
       await loadUsers(); // Refresh to clear badges
     } catch (err: any) {
