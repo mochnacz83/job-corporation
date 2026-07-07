@@ -257,6 +257,11 @@ const AdminUsers = () => {
 
     setResetting(true);
     try {
+      // Detecta se admin está resetando a própria senha — Supabase revoga
+      // todas as sessões após reset, o que geraria 403 em chamadas seguintes.
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const isSelfReset = currentUser?.id === resetUser.user_id;
+
       // Força refresh da sessão antes de chamar — caso o token local esteja
       // "stale" (existe no localStorage mas foi invalidado no servidor após
       // outro reset/logout), o getUser() na edge function falharia e cairia
@@ -302,6 +307,19 @@ const AdminUsers = () => {
       setWaPassword(passwordUsed || newPassword);
       setWaCopied(false);
       setWaDialogOpen(true);
+
+      if (isSelfReset) {
+        toast({
+          title: "Senha própria redefinida",
+          description: "Sua sessão foi encerrada. Faça login novamente com a nova senha.",
+          duration: 6000,
+        });
+        setTimeout(async () => {
+          await supabase.auth.signOut();
+          window.location.replace("/");
+        }, 1500);
+        return;
+      }
 
       await loadUsers(); // Refresh to clear badges
     } catch (err: any) {
