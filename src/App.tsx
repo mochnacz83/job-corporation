@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import MainLayout from "@/components/MainLayout";
 import { lazy, Suspense, useEffect, useState, ReactNode } from "react";
 import PageLoader from "@/components/PageLoader";
+import ShutdownAlert from "@/components/ShutdownAlert";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -156,6 +157,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <ShutdownAlert />
           <AppRoutes />
         </AuthProvider>
       </BrowserRouter>
