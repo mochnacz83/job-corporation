@@ -55,7 +55,7 @@ serve(async (req) => {
     // Notify Admin
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'Portal Corporativo <onboarding@resend.dev>';
-    const ADMIN_EMAIL = 'juniomar.mochnacz@abilitytecnologia.com.br';
+    const ADMIN_EMAIL = 'juniomar.alex@gmail.com';
 
     if (RESEND_API_KEY) {
       try {
