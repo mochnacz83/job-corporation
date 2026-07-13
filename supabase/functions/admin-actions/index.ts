@@ -418,8 +418,8 @@ serve(async (req) => {
               </div>
               <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
               <p style="font-size: 12px; color: #999;">Em caso de dúvidas, entre em contato:<br/>
-                📱 Juniomar Alex Mochnacz — (48) 99143-1983<br/>
-                📧 juniomar.mochnacz@abilitytecnologia.com.br
+                📱 Juniomar Alex Mochnacz — (49) 98405-5959<br/>
+                📧 juniomar.alex@gmail.com
               </p>
               <p style="font-size: 12px; color: #999;">Este é um e-mail automático da Ability Tecnologia.</p>
             </div>`

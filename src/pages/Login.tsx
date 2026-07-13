@@ -101,7 +101,7 @@ const Login = () => {
         await supabase.auth.signOut();
         toast({
           title: "⏳ Aguardando validação do Administrador",
-          description: "Sua conta ainda não foi ativada ou a alteração de senha está pendente. Entre em contato:\n📱 Juniomar Alex Mochnacz — (48) 99146-1983\n📧 juniomar.mochnacz@abilitytecnologia.com.br",
+          description: "Sua conta ainda não foi ativada ou a alteração de senha está pendente. Entre em contato:\n📱 Juniomar Alex Mochnacz — (49) 98405-5959\n📧 juniomar.alex@gmail.com",
           variant: "destructive",
           duration: 12000,
         });
@@ -117,7 +117,7 @@ const Login = () => {
       if (err?.code === "email_not_confirmed" || err?.message === "PENDING_APPROVAL") {
         toast({
           title: "⏳ Aguarde a ativação do Administrador",
-          description: "Seu cadastro ainda não foi aprovado. Para liberação imediata, entre em contato:\n📱 WhatsApp: (48) 99146-1983 — Juniomar Alex Mochnacz\n💬 Telegram: @juniomar",
+          description: "Seu cadastro ainda não foi aprovado. Para liberação imediata, entre em contato:\n📱 WhatsApp: (49) 98405-5959 — Juniomar Alex Mochnacz\n📧 juniomar.alex@gmail.com",
           variant: "destructive",
           duration: 12000,
         });
