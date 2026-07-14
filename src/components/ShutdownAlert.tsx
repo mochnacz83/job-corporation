@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +79,33 @@ const ShutdownAlert = () => {
             operação antes do encerramento, entre em contato com o administrador:
           </DialogDescription>
         </DialogHeader>
+        <div className="rounded-lg border bg-warning/10 p-4 text-center">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            Tempo restante até a desativação
+          </p>
+          {timeLeft.expired ? (
+            <p className="text-lg font-bold text-destructive">Site desativado</p>
+          ) : (
+            <div className="grid grid-cols-4 gap-2">
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-bold tabular-nums text-foreground">{pad(timeLeft.days)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">Dias</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-bold tabular-nums text-foreground">{pad(timeLeft.hours)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">Horas</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-bold tabular-nums text-foreground">{pad(timeLeft.minutes)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">Min</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-bold tabular-nums text-foreground">{pad(timeLeft.seconds)}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">Seg</span>
+              </div>
+            </div>
+          )}
+        </div>
         <div className="rounded-lg border bg-muted/40 p-4 space-y-2 text-sm">
           <p className="font-semibold text-foreground">Juniomar Alex Mochnacz</p>
           <p className="flex items-center gap-2 text-muted-foreground">
