@@ -73,7 +73,7 @@ const ShutdownAlert = () => {
             Aviso Importante — Descontinuação do Site
           </DialogTitle>
           <DialogDescription className="text-center pt-2 text-sm leading-relaxed">
-            Este portal será <strong>descontinuado em 20 dias</strong> (previsão: <strong>{SHUTDOWN_DATE}</strong>).
+            Este portal será <strong>descontinuado em {timeLeft.days} {timeLeft.days === 1 ? 'dia' : 'dias'}</strong> (previsão: <strong>{SHUTDOWN_DATE}</strong>).
             <br /><br />
             Caso precise realizar <strong>download de arquivos</strong>, exportações ou qualquer outra
             operação antes do encerramento, entre em contato com o administrador:
