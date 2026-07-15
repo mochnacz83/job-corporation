@@ -613,29 +613,46 @@ serve(async (req) => {
       const { email } = await req.json();
       if (!email) throw new Error('Email is required');
 
-      // Check auth metadata first
-      const { data: { users }, error: findError } = await serviceClient.auth.admin.listUsers();
-      if (findError) throw findError;
+      // Anti-enumeration: only respond truthfully for internal signup emails
+      // (matricula@corporativo.local) AND only surface the "ghost user"
+      // outcome — never reveal existence/status of real, completed accounts.
+      // Every other combination collapses to a generic { exists:false }.
+      const emailStr = String(email).toLowerCase().trim();
+      const isInternalSignupEmail = /^[a-z0-9._-]+@corporativo\.local$/.test(emailStr);
 
-      const user = users.find(u => u.email === email);
-      if (!user) {
-        return new Response(JSON.stringify({ exists: false }), {
+      const genericResponse = { exists: false } as Record<string, unknown>;
+
+      if (!isInternalSignupEmail) {
+        return new Response(JSON.stringify(genericResponse), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Check if profile exists
+      const { data: { users }, error: findError } = await serviceClient.auth.admin.listUsers();
+      if (findError) throw findError;
+      const user = users.find(u => u.email === emailStr);
+      if (!user) {
+        return new Response(JSON.stringify(genericResponse), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data: profile } = await serviceClient
         .from('profiles')
-        .select('id, status, matricula')
+        .select('id')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      return new Response(JSON.stringify({
-        exists: true,
-        hasProfile: !!profile,
-        status: profile?.status || null
-      }), {
+      // Only expose the ghost-user case (needed for the signup restart flow).
+      // For any active/pending profile, return the generic response so a caller
+      // cannot distinguish "registered" from "not registered".
+      if (!profile) {
+        return new Response(JSON.stringify({ exists: true, hasProfile: false }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify(genericResponse), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -644,8 +661,16 @@ serve(async (req) => {
       const { email } = await req.json();
       if (!email) throw new Error('Email is required');
 
+      // Restrict to the internal signup email domain used by the signup flow.
+      const emailStr = String(email).toLowerCase().trim();
+      if (!/^[a-z0-9._-]+@corporativo\.local$/.test(emailStr)) {
+        return new Response(JSON.stringify({ success: true, message: 'User not found, nothing to reset.' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data: { users } } = await serviceClient.auth.admin.listUsers();
-      const user = users.find(u => u.email === email);
+      const user = users.find(u => u.email === emailStr);
 
       if (!user) {
         return new Response(JSON.stringify({ success: true, message: 'User not found, nothing to reset.' }), {
@@ -666,10 +691,25 @@ serve(async (req) => {
         });
       }
 
+      // Anti-abuse: only allow deletion of freshly-created ghost accounts that
+      // have never signed in. This prevents an anonymous attacker from wiping
+      // long-standing pending signups belonging to other people.
+      const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
+      const ageMs = Date.now() - createdAt;
+      const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
+      const hasEverSignedIn = !!(user as any).last_sign_in_at;
+      if (hasEverSignedIn || !createdAt || ageMs > MAX_AGE_MS) {
+        return new Response(JSON.stringify({
+          error: 'Este cadastro não pode ser reiniciado automaticamente. Contate o administrador.',
+        }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { error: delError } = await serviceClient.auth.admin.deleteUser(user.id);
       if (delError) throw delError;
 
-      console.log(`[RESET] Ghost user ${user.id} (${email}) deleted successfully.`);
+      console.log(`[RESET] Ghost user ${user.id} deleted successfully.`);
 
       return new Response(JSON.stringify({ success: true }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
