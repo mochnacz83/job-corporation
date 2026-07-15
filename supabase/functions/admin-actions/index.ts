@@ -254,11 +254,11 @@ serve(async (req) => {
           '🔐 Sua senha foi redefinida - Portal Corporativo',
           `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
             <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">Redefinição de Senha</h2>
-            <p>Olá, <strong>${profile.nome}</strong>,</p>
+            <p>Olá, <strong>${escapeHtml(profile.nome)}</strong>,</p>
             <p>Um administrador redefiniu sua senha no Portal Corporativo.</p>
             <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
               <p style="margin: 0; font-size: 16px;">Sua nova senha temporária é:</p>
-              <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">${passwordToUse}</p>
+              <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">${escapeHtml(passwordToUse)}</p>
             </div>
             <p style="color: #666; font-size: 14px;"><strong>IMPORTANTE:</strong> Por segurança, você será solicitado a alterar esta senha no seu próximo login.</p>
             <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
@@ -333,11 +333,11 @@ serve(async (req) => {
         '🔐 Sua senha de acesso - Portal Corporativo',
         `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
           <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">Acesso ao Portal Corporativo</h2>
-          <p>Olá, <strong>${profile.nome}</strong>,</p>
+          <p>Olá, <strong>${escapeHtml(profile.nome)}</strong>,</p>
           <p>Conforme solicitado, estamos encaminhando sua senha inicial de acesso.</p>
           <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e9ecef;">
             <p style="margin: 0; font-size: 16px;">Sua senha é:</p>
-            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">${defaultPassword}</p>
+            <p style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #4361ee; font-family: monospace;">${escapeHtml(defaultPassword)}</p>
           </div>
           <p style="color: #666; font-size: 14px;"><strong>DICA:</strong> Por segurança, você deverá alterar essa senha ao realizar o primeiro acesso.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
@@ -419,7 +419,7 @@ serve(async (req) => {
             '🎉 Sua conta foi aprovada! - Portal Corporativo',
             `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
               <h2 style="color: #1a1a2e; border-bottom: 2px solid #4361ee; padding-bottom: 10px;">✅ Acesso Liberado!</h2>
-              <p>Olá, <strong>${profile.nome}</strong>!</p>
+              <p>Olá, <strong>${escapeHtml(profile.nome)}</strong>!</p>
               <p>Boa notícia! Sua conta no <strong>Portal Corporativo da Ability Tecnologia</strong> foi aprovada e já está ativa.</p>
               <div style="background: #f0f7ff; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #bfdbfe;">
                 <p style="margin: 0; font-size: 15px; font-weight: bold; color: #1a1a2e;">Como acessar:</p>
