@@ -217,6 +217,17 @@ Deno.serve(async (req) => {
     try {
       const body = await req.json();
       if (body && (body.update_id || body.message || body.callback_query)) {
+        // Verify Telegram's secret_token header before trusting the payload.
+        // Rejects forged webhook posts from anyone who doesn't know the token.
+        if (!telegramKey) {
+          return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+        }
+        const expectedSecret = await deriveTelegramWebhookSecret(telegramKey);
+        const providedSecret = req.headers.get("x-telegram-bot-api-secret-token");
+        if (!safeEqual(providedSecret, expectedSecret)) {
+          console.warn("[telegram-webhook] Rejected request with invalid or missing secret_token header");
+          return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+        }
         update = body;
         isWebhook = true;
       }
