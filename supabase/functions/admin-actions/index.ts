@@ -6,6 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Escape user-controlled values before embedding them into HTML email bodies.
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Centralized email sender with full error reporting
 async function sendEmail(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string; details?: any }> {
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
