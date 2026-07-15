@@ -4,10 +4,31 @@ import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-trigger",
+    "authorization, x-client-info, apikey, content-type, x-trigger, x-telegram-bot-api-secret-token",
 };
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+
+// Derive a stable secret_token from TELEGRAM_API_KEY so that Telegram can be
+// configured (via setWebhook) to send this exact token in the
+// X-Telegram-Bot-Api-Secret-Token header. We then verify each incoming webhook
+// request against this value to reject forged calls.
+async function deriveTelegramWebhookSecret(telegramApiKey: string): Promise<string> {
+  const data = new TextEncoder().encode(`telegram-webhook:${telegramApiKey}`);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function safeEqual(a: string | null | undefined, b: string): boolean {
+  if (!a) return false;
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 const STATUS_ABERTO = new Set([
   "atribuido",
